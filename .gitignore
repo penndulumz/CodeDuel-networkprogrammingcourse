@@ -1,0 +1,27 @@
+# Worktrees
+.worktrees/
+worktrees/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+env/
+venv/
+*.egg-info/
+dist/
+build/
+
+# Database & Logs
+*.db
+*.sqlite3
+matches/
+replays/
+logs/
+
+# IDE & OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
