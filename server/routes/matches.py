@@ -26,13 +26,17 @@ class ChallengeRequest(BaseModel):
 
 
 def _is_portal_open_now(db: Session) -> bool:
-    """Check if the FFA challenge portal is active based on settings and schedule."""
-    config = load_tournament_config()
+    """Check if the FFA challenge portal is active based on settings and schedule.
+
+    If TournamentSetting for 'is_portal_open' is explicitly present in the database,
+    its value acts as an authoritative master override (True = open, False = closed).
+    Only falls back to the time schedule window if no database setting exists.
+    """
     setting = db.query(TournamentSetting).filter(TournamentSetting.key == "is_portal_open").first()
     if setting and setting.value is not None:
-        val_bool = setting.value.strip().lower() in ("true", "1", "yes")
-        config.setdefault("tournament", {}).setdefault("daily_schedule", {})["is_portal_open"] = val_bool
+        return setting.value.strip().lower() in ("true", "1", "yes")
 
+    config = load_tournament_config()
     return is_ffa_portal_open(config)
 
 

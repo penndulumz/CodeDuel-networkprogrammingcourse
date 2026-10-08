@@ -105,7 +105,7 @@ def execute_match_job(
         )
 
         # Save replay JSON
-        replays_dir = Path("replays")
+        replays_dir = Path("replays").resolve()
         replays_dir.mkdir(parents=True, exist_ok=True)
         replay_filepath = str(replays_dir / f"match_{match_id}.json")
         save_replay(match_result, replay_filepath)
