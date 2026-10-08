@@ -13,6 +13,10 @@ from engine.game import (
     TYPE_ICONS,
     MAX_TURNS,
 )
+from engine.sandbox import (
+    validate_bot_source,
+    validate_bot_file,
+)
 
 __all__ = [
     "GameState",
@@ -26,4 +30,6 @@ __all__ = [
     "TYPE_NAMES",
     "TYPE_ICONS",
     "MAX_TURNS",
+    "validate_bot_source",
+    "validate_bot_file",
 ]
