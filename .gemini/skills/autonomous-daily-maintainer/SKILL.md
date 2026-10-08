@@ -1,62 +1,90 @@
 ---
 name: autonomous-daily-maintainer
-description: Use when running automated daily maintenance, regression testing, bot balance simulation, or continuous improvement cycles on the Battlecode RPS Platform without human intervention
+description: Use when running automated maintenance, continuous upgrades, regression testing, or autonomous feature development on the Battlecode RPS Platform using the Superpowers skill lifecycle
 ---
 
 # Autonomous Daily Maintainer
 
 ## Overview
-Synthesizes the complete Superpowers lifecycle (`using-superpowers`, `writing-plans`, `subagent-driven-development`, `systematic-debugging`, `verification-before-completion`) into an autonomous, non-interactive recurring maintenance workflow for the Battlecode RPS platform.
+Synthesizes and invokes the entire **Superpowers skill lifecycle** (`using-superpowers`, `systematic-debugging`, `test-driven-development`, `brainstorming`, `writing-plans`, `subagent-driven-development`, `verification-before-completion`, `finishing-a-development-branch`) for non-interactive, autonomous maintenance and platform upgrades.
 
 ## When to Use
-- Triggered by daily background cron schedules (`schedule` tool)
-- When unattended health auditing, regression verification, or bot balance benchmarking is needed
-- When rotating the daily Elo multiplier $x$ or advancing tournament calendar days
+- Triggered on a daily schedule or manual prompt to maintain and evolve the Battlecode platform.
+- When unattended bug detection, regression patching, bot tactical balancing, or continuous feature enhancement is requested.
 
-## The Superpowers Autonomous Lifecycle
+---
+
+## The Superpowers Autonomous Lifecycle Pipeline
 
 ```mermaid
 flowchart TD
-    A["1. Automated Regression Suite (pytest -v)"] --> B{"Tests Pass?"}
-    B -->|Yes| C["2. Arena Simulation Benchmark (20 Matches)"]
-    B -->|No| D["Superpower: systematic-debugging + TDD Fix"]
-    D --> A
-    C --> E["3. Advance Tournament Schedule (config/tournament.yaml)"]
-    E --> F["4. Daily Health Report (docs/logs/daily_report_YYYY-MM-DD.md)"]
-    F --> G["5. Git Commit & Verification Complete"]
+    Start["Trigger Daily Run"] --> Check["1. Regression Suite (pytest -v)"]
+    Check -->|Tests Fail| Debug["Invoke superpowers:systematic-debugging"]
+    Debug --> TDD["Invoke superpowers:test-driven-development"]
+    TDD --> VerifyFix["Invoke superpowers:verification-before-completion"]
+    VerifyFix --> Check
+
+    Check -->|Tests Pass (100% Green)| Benchmark["2. Bot Arena Benchmark (starter_kit/local_arena.py)"]
+    Benchmark --> Decision{"Needs Upgrade / Feature?"}
+    
+    Decision -->|Routine Maintenance| Schedule["3. Advance Tournament State (config/tournament.yaml)"]
+    Schedule --> Report["4. Daily Health Report (docs/logs/)"]
+    Report --> Commit["5. Commit Clean State"]
+
+    Decision -->|Enhancement / Upgrade| Brainstorm["Invoke superpowers:brainstorming"]
+    Brainstorm --> Plan["Invoke superpowers:writing-plans"]
+    Plan --> SDD["Invoke superpowers:subagent-driven-development"]
+    SDD --> LoopLaw["Enforce Continuous Feedback Loop Law (Update docs/CONTEXT_RESUME.md)"]
+    LoopLaw --> Finish["Invoke superpowers:finishing-a-development-branch"]
+    Finish --> Commit
 ```
 
-### Step 1: Automated Regression Suite
-Run full test suite in quiet/verbose mode:
-```bash
-pytest -v
-```
-If any test fails:
-1. Immediately invoke `superpowers:systematic-debugging` to isolate root cause.
-2. Use `superpowers:test-driven-development` to author minimal failing reproduction and patch.
-3. Verify test suite returns to 100% green before proceeding.
+---
 
-### Step 2: Bot Balance & Tactical Benchmarking
-Run 20 automated head-to-head matches between baseline bots to record statistical distributions:
+## Detailed Execution Steps
+
+### Phase 1: Automated Health Audit & Systematic Debugging
+1. **Execute full test suite**:
+   ```bash
+   pytest -v
+   ```
+2. **If ANY test fails or bug is detected**:
+   - **MUST INVOKE** `superpowers:systematic-debugging`:
+     - Reproduce with minimal command.
+     - Inspect exact stack traces and isolate root cause.
+     - Formulate testable hypothesis before touching code.
+   - **MUST INVOKE** `superpowers:test-driven-development`:
+     - Write failing test reproducing the issue.
+     - Verify test fails.
+     - Implement minimal code fix.
+     - Verify test passes.
+   - **MUST INVOKE** `superpowers:verification-before-completion`:
+     - Re-run full test suite (`pytest -v`) to confirm zero regressions.
+
+### Phase 2: Bot Balance & Tactical Benchmarking
+Run 10 head-to-head rounds between standard bots:
 ```bash
 python starter_kit/local_arena.py starter_kit/bot_template.py starter_kit/heuristic_bot.py --rounds 10 --max-turns 150
 ```
-Log win ratios, average match length, goal reaches vs wipeout captures.
+Log victory ratios, average turns, and wipeout vs goal win distributions.
 
-### Step 3: Tournament State Maintenance
-1. Check `config/tournament.yaml`.
-2. Randomize daily Elo multiplier $x \in [1.2, 2.5]$ for the upcoming active match window.
-3. If current day exceeds $n$, prepare bracket seeding candidates.
+### Phase 3: Autonomous System Upgrades & Enhancements
+When upgrading features (e.g. runner latency optimizations, new heuristic bot variants, tournament analytics):
+1. **MUST INVOKE** `superpowers:brainstorming`:
+   - Explore requirements and propose architectural approaches.
+2. **MUST INVOKE** `superpowers:writing-plans`:
+   - Decompose into bite-sized TDD tasks with file paths and interfaces.
+3. **MUST INVOKE** `superpowers:subagent-driven-development`:
+   - Dispatch implementer and reviewer subagents task-by-task.
+4. **ENFORCE CONTINUOUS FEEDBACK LOOP LAW**:
+   - If any API, schema, rule, or interface changed, **IMMEDIATELY UPDATE** `docs/CONTEXT_RESUME.md` and `TASKS.md` in the same commit.
+5. **MUST INVOKE** `superpowers:finishing-a-development-branch`:
+   - Merge back to `main` locally once all tests pass.
 
-### Step 4: Daily Log Generation
-Write summary log to `docs/logs/daily_report_<YYYY-MM-DD>.md` capturing:
-- Test suite pass rate (167/167)
-- Bot arena win rate distribution
-- Database match count & active participant count
-- Daily multiplier $x$ configured
-
-### Step 5: Git Ledger
-Commit maintenance log:
-```bash
-git add docs/logs/ && git commit -m "chore(daily): autonomous maintenance and health check <date>"
-```
+### Phase 4: Tournament State Maintenance & Reporting
+1. Update `config/tournament.yaml` (daily Elo multiplier $x \in [1.2, 2.5]$, current day).
+2. Generate health report at `docs/logs/daily_report_<YYYY-MM-DD>.md`.
+3. Commit maintenance ledger:
+   ```bash
+   git add docs/logs/ config/tournament.yaml && git commit -m "chore(daily): autonomous maintenance and upgrade cycle <date>"
+   ```

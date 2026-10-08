@@ -1,51 +1,37 @@
-# GEMINI.md — Persistent Context & Instructions for Gemini & Antigravity
+# GEMINI.md — Persistent Pointer & Instructions for Gemini & Antigravity
 
-> **Notice for Gemini / Antigravity Agents**:
-> This file is automatically loaded into your context. You are working on the **Battlecode RPS Platform** (9x9 Rock-Paper-Scissors Chess tournament system).
-> Follow the principles and conventions defined below across all sessions without requiring the user to re-paste master prompts.
-
----
-
-## 1. Project Overview & Architecture
-- **Purpose**: Battlecode-style tournament platform for 9×9 Rock-Paper-Scissors chess. Students submit Python bots to compete 1v1.
-- **Tech Stack**:
-  - **Backend**: Python 3.10+, FastAPI, SQLAlchemy (SQLite with WAL mode).
-  - **Frontend**: Pure HTML5, CSS3, Vanilla JavaScript (Jinja2 templates, zero Node.js/npm runtime dependencies).
-  - **Engine**: Pure Python 9x9 game engine (`engine/game.py`), AST security sandbox (`engine/sandbox.py`), isolated subprocess runner (`engine/runner.py`).
-  - **Tournament**: Daily FFA window with randomized Elo multiplier $x$, Final-day single-elimination Bracket tournament (BO3), normalized scoring formula.
+> **Notice for Gemini & Antigravity Agents**:
+> This project operates under a strict **Single Source of Truth (SSOT)** architecture.
+> **DO NOT define new rules, divergent workflows, or duplicate architectures in this file.**
+> Doing so causes divergence when other teammates use `CLAUDE.md`, `.cursorrules`, or alternate LLMs.
 
 ---
 
-## 2. Global Constraints & Standards
-1. **Zero-npm**: Never introduce Node.js or npm build steps. The frontend is vanilla HTML/CSS/JS served directly via FastAPI.
-2. **Code Comments**: All code comments, docstrings, and commit messages MUST be written in **clear, detailed English**.
-3. **Board Rules & Coordinates**:
-   - 9×9 grid: `row: 0..8`, `col: 0..8`. Row 0 = Rank 1, Row 8 = Rank 9. Col 0 = File a, Col 8 = File i.
-   - Pieces: `'R'` (Rock), `'P'` (Paper), `'S'` (Scissors). Hierarchy: `R > S`, `S > P`, `P > R`.
-   - Player 1 (Red) starts row 0, goal is `i9` (`row=8, col=8`).
-   - Player 2 (Blue) starts row 8, goal is `a1` (`row=0, col=0`).
-   - Win conditions: Goal reach, 3-piece wipeout of any type, forfeit (timeout 1.0s or crash), or turn 200 tiebreaker (piece count).
-4. **Bot API Signature**:
-   ```python
-   def get_move(board: list[list[dict | None]], my_player: int, history: list[dict]) -> tuple[tuple[int, int], tuple[int, int]]:
-   ```
-5. **Testing**: Always run `pytest` to verify before committing. All tests live in `tests/`.
+## 1. Single Source of Truth References
+Before executing any action, answering questions, or proposing changes, you MUST read and ground your decisions in the existing central project files:
+1. 📄 **[`docs/CONTEXT_RESUME.md`](docs/CONTEXT_RESUME.md)**: **The supreme authoritative source** for:
+   - System architecture & database schemas.
+   - Core game rules (9x9 board, Rock-Paper-Scissors hierarchy, goal reaching, wipeouts).
+   - Bot API signature (`get_move(board, my_player, history)`).
+   - 4-member roles & team division.
+   - **Continuous Feedback Loop Law**: If you make any breaking change or architectural alteration, you **MUST** update `docs/CONTEXT_RESUME.md` immediately in that same change.
+2. 📖 **[`README.md`](README.md)**: Entry point for user guides, setup instructions, folder structure, and CLI usage.
+3. 📋 **[`TASKS.md`](TASKS.md)**: Active task tracking, milestones, and verification acceptance criteria.
 
 ---
 
-## 3. Team Member Division (4 Roles)
-- **Member 1 (Engine Lead)**: `engine/game.py`, `engine/sandbox.py`, `starter_kit/`, `tests/test_game.py`, `tests/test_sandbox.py`.
-- **Member 2 (Execution Lead)**: `engine/runner.py`, `server/queue.py`, `tests/test_runner.py`.
-- **Member 3 (Backend & Tournament Lead)**: `server/models.py`, `server/database.py`, `server/tournament.py`, `config/tournament.yaml`, `tests/test_database.py`, `tests/test_tournament.py`.
-- **Member 4 (Frontend & Visualizer Lead)**: `web/templates/`, `web/static/`, `server/main.py`, `tests/test_web.py`.
+## 2. Global Constraints Summary
+- **Zero-Node.js**: Pure HTML5/CSS3/Vanilla JS served by FastAPI. Never introduce npm/node runtime dependencies.
+- **Code Comments**: All code comments, docstrings, and commit messages MUST be in clear, detailed English.
+- **Testing Before Completion**: Run `pytest -v` to verify any modifications before committing.
 
 ---
 
-## 4. Superpowers Skill Lifecycle Integration
-When receiving any feature request or bug report:
-1. **Brainstorming & Design**: Use `brainstorming` before making changes.
-2. **Planning**: Use `writing-plans` to produce bite-sized TDD tasks.
-3. **Execution**: Use `subagent-driven-development` or `test-driven-development` to ensure failing tests precede implementation.
-4. **Debugging**: Use `systematic-debugging` if encountering any failures.
-5. **Verification**: Always run `pytest` to guarantee all tests pass.
-6. **Finishing**: Use `finishing-a-development-branch` to integrate cleanly into `main`.
+## 3. Superpowers Skill Lifecycle Integration
+When prompted for features, fixes, or maintenance:
+1. **Explore & Design**: Use `brainstorming` before making changes.
+2. **Plan**: Use `writing-plans` to generate bite-sized TDD tasks.
+3. **Execute**: Use `subagent-driven-development` or `test-driven-development`.
+4. **Debug**: Use `systematic-debugging` if encountering any test failure.
+5. **Verify**: Use `verification-before-completion` with `pytest`.
+6. **Finish**: Use `finishing-a-development-branch` to cleanly integrate into `main`.
