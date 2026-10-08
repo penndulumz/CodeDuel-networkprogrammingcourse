@@ -17,6 +17,10 @@ from engine.sandbox import (
     validate_bot_source,
     validate_bot_file,
 )
+from engine.runner import (
+    run_match,
+    save_replay,
+)
 
 __all__ = [
     "GameState",
@@ -32,4 +36,6 @@ __all__ = [
     "MAX_TURNS",
     "validate_bot_source",
     "validate_bot_file",
+    "run_match",
+    "save_replay",
 ]
