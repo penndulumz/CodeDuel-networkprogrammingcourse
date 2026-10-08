@@ -21,6 +21,9 @@ replays/
 logs/
 bots/
 
+# Reference materials (local reference repository clones & assets)
+resources/
+
 
 # IDE & OS
 .vscode/
