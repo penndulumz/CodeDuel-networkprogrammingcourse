@@ -14,11 +14,13 @@ dist/
 build/
 
 # Database & Logs
-*.db
-*.sqlite3
+*.db*
+*.sqlite*
 matches/
 replays/
 logs/
+bots/
+
 
 # IDE & OS
 .vscode/
