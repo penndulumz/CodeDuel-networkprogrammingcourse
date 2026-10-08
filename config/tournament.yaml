@@ -2,7 +2,7 @@
 tournament:
   title: "Giải Đấu Cờ Oẳn Tù Tì 9x9"
   total_days: 7                  # Số ngày vòng bảng (n ngày)
-  current_day: 2                 # Ngày hiện tại của giải đấu
+  current_day: 1                 # Ngày hiện tại của giải đấu
   
   # Khung giờ mở cổng thi đấu FFA hàng ngày
   daily_schedule:
@@ -14,7 +14,7 @@ tournament:
   elo:
     initial_rating: 1200         # Điểm Elo khởi tạo cho mỗi người chơi
     k_factor: 32                 # Hệ số K chuẩn
-    daily_multiplier_x: 1.8      # Hệ số x của ngày hôm nay (admin có thể random từ 1.0 - 3.0)
+    daily_multiplier_x: 1.5      # Hệ số x của ngày hôm nay (admin có thể random từ 1.0 - 3.0)
 
   # Giới hạn trận đấu
   match_rules:
