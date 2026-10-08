@@ -18,7 +18,7 @@ build/
 *.sqlite*
 matches/
 replays/
-logs/
+/logs/
 bots/
 
 # Reference materials (local reference repository clones & assets)
