@@ -16,7 +16,7 @@
 - **Tech Stack**:
   - **Backend & Engine**: Python 3.10+, FastAPI, SQLite (qua SQLAlchemy), PyYAML.
   - **Frontend**: HTML5, Vanilla JavaScript, CSS (kế thừa từ `resources/HTML-game-project-main`), không dùng Node.js/npm.
-  - **Deployment**: Local-First (`python main.py`), mở rộng mạng qua `cloudflared tunnel`.
+  - **Deployment**: Local-First & Multi-Machine LAN (`python main.py` lắng nghe trên `0.0.0.0:8000` với cơ chế tự động dò IP mạng LAN `http://<LAN_IP>:8000`), không phụ thuộc dịch vụ ngoài.
 
 ---
 
@@ -107,10 +107,10 @@ Mỗi trận đấu sau khi kết thúc sẽ sinh file replay chuẩn:
 ## 6. Master Prompts Dành Cho Thành Viên Sao Chép Cho AI
 
 ### Master Prompt 1: Khởi đầu một phiên làm việc mới
-> *"Chào AI, tôi là **Member [Điền 1, 2, 3 hoặc 4]** trong nhóm phát triển dự án **Battlecode RPS 9x9**. Dự án đang tổ chức theo tài liệu `docs/CONTEXT_RESUME.md` và `TASKS.md`. Hãy đọc 2 file đó để nắm rõ toàn bộ kiến trúc hệ thống, các interface chuẩn và quy ước lập trình. Bây giờ, tôi cần bạn hỗ trợ tôi thực hiện **Task [Điền mã task, ví dụ 1.2]** trong `TASKS.md`. Hãy giải thích ngắn gọn, trực quan và viết code chuẩn với comment tiếng Anh chi tiết."*
+> *"tôi là **Member [Điền 1, 2, 3 hoặc 4]** trong nhóm phát triển dự án **Battlecode RPS 9x9**. Dự án đang tổ chức theo tài liệu `docs/CONTEXT_RESUME.md` và `TASKS.md`. Hãy đọc 2 file đó để nắm rõ toàn bộ kiến trúc hệ thống, các interface chuẩn và quy ước lập trình. Bây giờ, tôi cần bạn hỗ trợ tôi thực hiện **Task [Điền mã task, ví dụ 1.2]** trong `TASKS.md`. Hãy giải thích ngắn gọn, trực quan và viết code chuẩn với comment tiếng Anh chi tiết."*
 
 ### Master Prompt 2: Nhờ AI debug lỗi
-> *"AI ơi, tôi gặp lỗi này khi chạy lệnh kiểm thử [Điền lệnh, ví dụ: pytest tests/test_game.py]: [Paste log lỗi vào đây]. Hãy đối chiếu với luật game và interface trong `docs/CONTEXT_RESUME.md` để tìm nguyên nhân gốc rễ và sửa code giúp tôi một cách tối giản nhất."*
+> *"tôi gặp lỗi này khi chạy lệnh kiểm thử [Điền lệnh, ví dụ: pytest tests/test_game.py]: [Paste log lỗi vào đây]. Hãy đối chiếu với luật game và interface trong `docs/CONTEXT_RESUME.md` để tìm nguyên nhân gốc rễ và sửa code giúp tôi một cách tối giản nhất."*
 
 
 ---
@@ -157,4 +157,64 @@ Mỗi trận đấu sau khi kết thúc sẽ sinh file replay chuẩn:
 2. **Triển Khai Đa Máy Qua Mạng Nội Bộ (LAN Access)**:
    - Server lắng nghe trên mọi giao diện mạng (`0.0.0.0:8000`).
    - Banner khởi động tự động dò IP mạng nội bộ của máy chủ (`http://<LAN_IP>:8000`) để người tổ chức cung cấp cho các máy tính khác trong cùng Wi-Fi/LAN truy cập thi đấu.
+
+---
+
+## 11. Hệ Thống Phân Tầng Tài Liệu & Nguyên Tắc Đồng Bộ Tuyệt Đối (Documentation Hierarchy & Synchronization Law)
+
+Nhằm đảm bảo tính nhất quán, không phân mảnh dữ liệu và định vị chính xác mục đích sử dụng cho từng đối tượng, tài liệu dự án được tổ chức theo hệ thống phân tầng nghiêm ngặt:
+
+```text
+┌────────────────────────────────────────────────────────────────────────┐
+│                        README.md (Tầng Tiếp Nhận)                       │
+│     Entrypoint duy nhất cho người mới, Landing Page, Navigation Index & FAQ     │
+└───────────────────────────────────┬────────────────────────────────────┘
+                                    │ trỏ trực tiếp đến
+┌───────────────────────────────────▼────────────────────────────────────┐
+│                    docs/CONTEXT_RESUME.md (Tầng SSOT)                  │
+│       Nguồn Chân Lý Duy Nhất Tối Cao — Quy định luật game, API, CSDL,  │
+│             vai trò 4 thành viên & nguyên tắc vòng lặp hệ thống        │
+└──────────┬────────────────────────┬───────────────────────┬────────────┘
+           │                        │                       │
+           ▼                        ▼                       ▼
+┌──────────────────────┐ ┌──────────────────────┐ ┌──────────────────────┐
+│ docs/ARCHITECTURE.md │ │  docs/BOT_GUIDE.md   │ │ docs/ADMIN_GUIDE.md  │
+│  (Đặc tả kỹ thuật)   │ │  (Cẩm nang thí sinh) │ │ (Cẩm nang vận hành)  │
+└──────────────────────┘ └──────────────────────┘ └──────────────────────┘
+           │                        │                       │
+           └────────────────────────┼───────────────────────┘
+                                    │
+┌───────────────────────────────────▼────────────────────────────────────┐
+│                    TASKS.md (Tầng Quản Trị Nhóm)                       │
+│    Bảng theo dõi tiến độ Milestones & phân chia trách nhiệm 4 thành viên   │
+│           (Dành cho con người, giảng viên chấm điểm & nghiệm thu)      │
+└───────────────────────────────────┬────────────────────────────────────┘
+                                    │ ánh xạ chi tiết sang
+┌───────────────────────────────────▼────────────────────────────────────┐
+│         docs/superpowers/specs/ & docs/superpowers/plans/               │
+│       Blueprint kiến trúc & Kế hoạch thực thi TDD chi tiết cho AI/Dev   │
+└────────────────────────────────────────────────────────────────────────┘
+```
+
+### 11.1 Vai Trò Cụ Thể Của Từng Tài Liệu
+1. **`README.md` (Entry Point Bắt Buộc)**:
+   - **Mục đích**: Trang hạ cánh (Landing Page) cho người mới, hướng dẫn khởi chạy trong 1 lệnh (`python main.py`), bản đồ chỉ mục điều hướng (Navigation Directory) và mục Hỏi-Đáp (FAQ).
+   - **Quy tắc**: Tuyệt đối không nhồi nhét chi tiết luật cờ hay code schema vào `README.md`. Mọi chi tiết kỹ thuật cốt lõi phải dẫn link về `docs/CONTEXT_RESUME.md`.
+2. **`docs/CONTEXT_RESUME.md` (Single Source of Truth - SSOT)**:
+   - **Mục đích**: Bộ nhớ ngữ cảnh trung tâm cho toàn bộ nhóm và mọi AI Agent.
+   - **Quy tắc**: Đây là tài liệu có thẩm quyền cao nhất. Mọi thay đổi kiến trúc, CSDL, luật game bắt buộc phải cập nhật vào file này đầu tiên.
+3. **Bộ tài liệu chuyên biệt (`docs/ARCHITECTURE.md`, `docs/BOT_GUIDE.md`, `docs/ADMIN_GUIDE.md`)**:
+   - Tách bạch phục vụ chính xác 3 đối tượng: Kỹ thuật viên/giáo viên chấm điểm, Thí sinh viết bot, và Ban tổ chức giải đấu.
+4. **Mối quan hệ giữa `TASKS.md` và `docs/superpowers/`**:
+   - **`TASKS.md` không bị redundant**: `TASKS.md` là bảng Kanban cấp cao dành cho **con người và chấm điểm học phần** (chia việc cho Member 1, 2, 3, 4 theo Milestones của đề bài, tiêu chí nghiệm thu môn học).
+   - **`docs/superpowers/specs/` & `plans/`**: Là tài liệu kỹ thuật vi mô dành cho **lập trình viên / AI** (chia nhỏ từng bước TDD, code diff, mock, test case).
+   - **Nguyên tắc phân định**: `TASKS.md` chỉ theo dõi ở mức Milestones và đầu mục công việc cấp cao, kèm link trỏ tới các file plan/spec tương ứng trong `docs/superpowers/`, tuyệt đối không chép lại từng dòng code TDD vào `TASKS.md`.
+
+### 11.2 Nguyên Tắc Đồng Bộ Tuyệt Đối (Continuous Documentation Sync)
+- Khi có bất kỳ sự thay đổi nào về: API (`get_move`, endpoint REST), CSDL (`server/models.py`), luật cờ, hoặc quy trình triển khai:
+  1. Cập nhật **ngay lập tức** vào `docs/CONTEXT_RESUME.md` (SSOT).
+  2. Cập nhật tài liệu chuyên biệt tương ứng (`ARCHITECTURE.md`, `BOT_GUIDE.md`, hoặc `ADMIN_GUIDE.md`).
+  3. Cập nhật trạng thái nghiệm thu trong `TASKS.md`.
+  4. Đảm bảo `README.md` giữ vững vai trò là bản đồ chỉ mục điều hướng chính xác.
+
 

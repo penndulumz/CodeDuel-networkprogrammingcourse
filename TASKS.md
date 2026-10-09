@@ -1,6 +1,6 @@
 # Kế Hoạch Thực Hiện & Theo Dõi Tiến Độ Dự Án (TASKS.md)
 
-> **Trạng thái**: 🎉 **100% HOÀN THÀNH VÀ TOÀN BỘ TEST PASS (167/167 tests passed in 5.88s)**
+> **Trạng thái**: 🎉 **100% HOÀN THÀNH VÀ TOÀN BỘ TEST PASS (171/171 tests passed in 5.86s)**
 > - Quy tắc: Đã kiểm chứng tự động toàn diện qua Subagent-Driven Development và Unit/Integration/E2E test suite.
 
 ---
@@ -62,3 +62,20 @@
   - *Verification*: Chạy `pytest tests/test_e2e.py` -> 6/6 tests PASS.
 - [x] **Task 5.2**: Entrypoint 1 lệnh duy nhất (`main.py`):
   - *Verification*: Khởi chạy server tại `http://localhost:8000` với đầy đủ tài khoản `admin` / `admin123`.
+
+---
+
+## 🌐 Milestone 6: Triển Khai Đa Máy (LAN), Bảo Mật Single-Admin & Phân Tầng Tài Liệu (Cả Nhóm)
+- [x] **Task 6.1**: Bảo mật Single-Admin & cấu hình động qua biến môi trường (`server/routes/auth.py`, `main.py`). Chặn đăng ký `admin`, tự động demote admin giả mạo.
+  - *Verification*: Chạy `pytest tests/test_admin_security.py` -> 2/2 tests PASS.
+- [x] **Task 6.2**: Tự động dò IP mạng LAN & banner đa máy (`main.py`). Hiển thị `http://<LAN_IP>:8000` trên console khởi động.
+  - *Verification*: Chạy `pytest tests/test_lan_banner.py` -> 2/2 tests PASS.
+- [x] **Task 6.3**: Biên soạn bộ tài liệu chuyên biệt phục vụ từng đối tượng:
+  - `docs/ARCHITECTURE.md` (Đặc tả kiến trúc 4 tầng, AST sandbox, Subprocess runner, SQLite WAL).
+  - `docs/BOT_GUIDE.md` (Cẩm nang thí sinh, luật cờ 9×9, API `get_move`, test offline với `local_arena.py`).
+  - `docs/ADMIN_GUIDE.md` (Cẩm nang ban tổ chức, mạng LAN, cài firewall, hệ số $x$, bracket BO3).
+- [x] **Task 6.4**: Tinh gọn `README.md` làm Entry Point duy nhất, bản đồ chỉ mục điều hướng (Index Directory) và FAQ.
+- *Liên kết chi tiết Spec & Plan*:
+  - Spec: [`docs/superpowers/specs/2026-10-09-multi-machine-single-admin-docs-design.md`](docs/superpowers/specs/2026-10-09-multi-machine-single-admin-docs-design.md)
+  - Plan: [`docs/superpowers/plans/2026-10-09-multi-machine-single-admin-docs.md`](docs/superpowers/plans/2026-10-09-multi-machine-single-admin-docs.md)
+
