@@ -1,138 +1,138 @@
-# 🏆 Battlecode RPS Platform — Nền Tảng Thi Đấu Thuật Toán Cờ Oẳn Tù Tì 9×9
+# Battlecode RPS Platform — 9x9 Rock-Paper-Scissors Algorithmic Arena
 
-> **Hệ thống thi đấu đối kháng bot tự động (Battlecode-style)** dành cho sinh viên. Sinh viên lập trình thuật toán điều khiển quân cờ Oẳn Tù Tì trên bàn cờ 9×9, thi đấu rank FFA hàng ngày và tranh tài tại giải đấu loại trực tiếp (Bracket BO3) ngày chung kết.
+> Autonomous bot competition platform modeled after MIT Battlecode. Students engineer algorithmic agents in Python to contest 1v1 duels on an expanded 9x9 board with cyclic Rock-Paper-Scissors combat, competing in daily Free-For-All (FFA) rating ladders and single-elimination tournament playoffs.
 >
-> ⚠️ **LƯU Ý VỀ SINGLE SOURCE OF TRUTH (SSOT)**:  
-> File **[`docs/CONTEXT_RESUME.md`](docs/CONTEXT_RESUME.md)** là **Nguồn Chân Lý Duy Nhất** chi phối toàn bộ kiến trúc hệ thống, luật cờ 9×9, chữ ký hàm bot, cơ sở dữ liệu và workflow của nhóm. Hãy đọc `docs/CONTEXT_RESUME.md` để nắm rõ toàn bộ quy ước cốt lõi!
+> **Notice on Single Source of Truth (SSOT)**:  
+> The file **[`docs/CONTEXT_RESUME.md`](docs/CONTEXT_RESUME.md)** serves as the authoritative single source of truth governing system architecture, game rules, bot interface specifications, database schemas, and developer workflows. Refer to `docs/CONTEXT_RESUME.md` for foundational specifications.
 
 ---
 
-## ⚡ 1. Khởi Chạy Nhanh (Quickstart Trong 1 Lệnh)
+## 1. Quickstart Guide
 
-Hệ thống được thiết kế **Zero-Node.js & Local-First** — chỉ cần môi trường Python (>= 3.10):
+The platform is designed to be **Zero-Node.js & Local-First**, requiring only a standard Python environment (>= 3.10):
 
-### Bước 1: Cài đặt thư viện
+### Step 1: Install Dependencies
 ```bash
 pip install -r requirements.txt
 ```
 
-### Bước 2: Khởi chạy máy chủ
+### Step 2: Launch Application Server
 ```bash
 python main.py
 ```
 
-Console khởi động sẽ hiển thị trực tiếp các địa chỉ truy cập:
-- 🌐 **Giao diện Web cục bộ**: [http://localhost:8000](http://localhost:8000)
-- 📡 **Địa chỉ Mạng Nội Bộ (LAN)**: `http://<LAN_IP>:8000` *(Chia sẻ cho các máy khác trong cùng Wi-Fi/mạng dây)*
-- 🛠️ **Trang Quản Trị Giải Đấu**: [http://localhost:8000/admin](http://localhost:8000/admin) *(Tài khoản mặc định: `admin` / `admin123`)*
-- 📚 **Tài liệu API Swagger**: [http://localhost:8000/docs](http://localhost:8000/docs)
+The boot routine outputs active network endpoints:
+- **Local Web Interface**: [http://localhost:8000](http://localhost:8000)
+- **Local Area Network (LAN) URL**: `http://<LAN_IP>:8000` *(Share with other machines on the local Wi-Fi or wired network)*
+- **Tournament Admin Dashboard**: [http://localhost:8000/admin](http://localhost:8000/admin) *(Default credentials: `admin` / `admin123`)*
+- **Interactive OpenAPI Documentation**: [http://localhost:8000/docs](http://localhost:8000/docs)
 
 ---
 
-## 🧭 2. Bản Đồ Điều Hướng Tài Liệu (Documentation Directory)
+## 2. Documentation Directory
 
-Để tránh lặp lại thông tin và phục vụ chính xác từng đối tượng, tài liệu dự án được phân chia chuyên biệt:
+To avoid information duplication and serve specific stakeholders, project documentation is partitioned by role:
 
-| Đối Tượng | Tài Liệu Hướng Dẫn | Nội Dung Trọng Tâm |
+| Target Audience | Document | Core Scope |
 | :--- | :--- | :--- |
-| **Tất cả mọi người & AI** | 📄 **[`docs/CONTEXT_RESUME.md`](docs/CONTEXT_RESUME.md)** | **SSOT Cốt Lõi**: Luật game 9×9, bot API, CSDL, phân chia 4 vai trò, luật Continuous Feedback Loop. |
-| **Thí sinh & Sinh viên** | 🤖 **[`docs/BOT_GUIDE.md`](docs/BOT_GUIDE.md)** | **Cẩm Nang Viết Bot**: Hệ tọa độ `a1`-`i9`, combat RPS, 2 cách thắng (Goal & Wipeout), test offline với `local_arena.py`. |
-| **Ban tổ chức & Quản trị** | 🛠️ **[`docs/ADMIN_GUIDE.md`](docs/ADMIN_GUIDE.md)** | **Vận Hành Giải Đấu**: Single-Admin bảo mật, mở cổng LAN & firewall, đổi hệ số $x$, bốc thăm Playoff BO3. |
-| **Kỹ thuật viên & Chấm điểm** | 🏗️ **[`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)** | **Đặc Tả Kỹ Thuật**: Kiến trúc 4 tầng, AST sandbox (74 mẫu tấn công), Subprocess IPC timeout 1s, SQLite WAL. |
-| **Thành viên nhóm dự án** | 📋 **[`TASKS.md`](TASKS.md)** & **[`GEMINI.md`](GEMINI.md)** | Phân chia tiến độ 4 thành viên, quy ước Git Worktrees cách ly và bảo tồn thư mục gốc. |
+| **All Contributors & AI Agents** | [`docs/CONTEXT_RESUME.md`](docs/CONTEXT_RESUME.md) | **SSOT**: 9x9 rules, bot API signature, schemas, team roles, Continuous Feedback Loop law. |
+| **Competitors & Students** | [`docs/BOT_GUIDE.md`](docs/BOT_GUIDE.md) | **Bot Development Manual**: `a1`-`i9` coordinates, combat matrix, goal/wipeout logic, Minimax/heuristic design, offline CLI testing. |
+| **Tournament Administrators** | [`docs/ADMIN_GUIDE.md`](docs/ADMIN_GUIDE.md) | **Operations Guide**: Single-Admin invariant, LAN setup, schedule windows (`start_time`/`end_time`), boss deployment, playoff brackets. |
+| **Evaluators & System Engineers** | [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) | **Technical Architecture**: Multi-tier engine, AST sandbox (74 patterns), isolated subprocess runner, SQLite WAL, CSS design tokens. |
+| **Project Team Members** | [`TASKS.md`](TASKS.md) & [`GEMINI.md`](GEMINI.md) | High-level milestone tracking, Git worktree isolation rules, root repository preservation invariants. |
 
 ---
 
-## 📂 3. Cấu Trúc Thư Mục Dự Án (Folder Structure)
+## 3. Project Directory Structure
 
 ```text
 Battlecode-clone0810/
-├── main.py                      # Entrypoint khởi chạy server, dò IP mạng LAN & seeder admin
-├── requirements.txt             # Thư viện tối giản (FastAPI, SQLAlchemy, PyYAML, pytest)
-├── pytest.ini                   # Cấu hình kiểm thử tự động
-├── TASKS.md                     # Bảng tiến độ & nghiệm thu của nhóm 4 thành viên
-├── GEMINI.md                    # Chỉ dẫn AI tuân thủ SSOT & quy ước Git Worktrees
+├── main.py                      # Application launcher, LAN address discovery, admin seeder
+├── requirements.txt             # Minimal dependencies (FastAPI, SQLAlchemy, PyYAML, pytest)
+├── pytest.ini                   # Pytest test discovery configuration
+├── TASKS.md                     # High-level project milestone delivery ledger
+├── GEMINI.md                    # SSOT and agent instructions pointer
 │
 ├── config/
-│   └── tournament.yaml          # Cấu hình giải (số ngày n, khung giờ mở cổng, hệ số x, max turns)
+│   └── tournament.yaml          # Default tournament operational parameters
 │
-├── engine/                      # Core Game Logic (Python thuần, chạy độc lập)
-│   ├── game.py                  # Luật cờ 9×9 Oẳn Tù Tì, ma trận tọa độ, Goal & Wipeout
-│   ├── runner.py                # Isolated Subprocess Runner (giám sát timeout 1.0s, bắt crash)
-│   └── sandbox.py               # Bộ lọc AST bảo mật (chặn triệt để os, sys, socket, eval, open)
+├── engine/                      # Core Game Logic (Pure Python, standalone execution)
+│   ├── game.py                  # 9x9 RPS chess engine, coordinates, victory conditions
+│   ├── runner.py                # Subprocess runner with 1.0s timeout and crash isolation
+│   └── sandbox.py               # AST static analysis validator (74 attack patterns)
 │
-├── server/                      # FastAPI Backend & CSDL
-│   ├── main.py                  # Ứng dụng FastAPI, mount static & template HTML
-│   ├── database.py              # SQLite engine với chế độ WAL chống khóa file
-│   ├── models.py                # Bảng CSDL: User, Bot, Match, TournamentSetting, BracketMatch
-│   ├── queue.py                 # Hàng đợi trận đấu bất đồng bộ (Background worker)
-│   ├── tournament.py            # Công thức tính Elo (hệ số x) & bốc thăm Bracket Playoff
-│   └── routes/                  # REST API Endpoints (auth, bots, matches, leaderboard, admin)
+├── server/                      # FastAPI Backend & Persistence
+│   ├── main.py                  # FastAPI routing, static assets, and template rendering
+│   ├── database.py              # SQLite engine with Write-Ahead Logging (WAL)
+│   ├── models.py                # Database models: User, Bot, Match, TournamentSetting, BracketMatch
+│   ├── queue.py                 # Asynchronous background match execution queue
+│   ├── tournament.py            # Elo calculation, schedule checks, bracket seeding
+│   ├── boss_manager.py          # Server boss deployment lifecycle and accounts
+│   ├── bosses/                  # Benchmark boss bots: novice, rusher, sentinel, tactician, apex
+│   └── routes/                  # REST API endpoints (auth, bots, matches, leaderboard, admin)
 │
-├── web/                         # Giao diện Web (Zero-Node.js / Zero-npm)
-│   ├── static/                  # CSS Dark-mode & visualizer.js tương tác xem replay bàn cờ 9×9
-│   └── templates/               # Giao diện Jinja2 (Leaderboard, Profile, Replay, Admin, Bracket)
+├── web/                         # Frontend presentation layer (Zero-Node.js)
+│   ├── static/                  # Slate/Charcoal CSS design tokens and replay visualizer.js
+│   └── templates/               # Jinja2 templates (Leaderboard, Profile, Replay, Admin, Bracket)
 │
-├── starter_kit/                 # Bộ công cụ phát cho thí sinh tải về máy làm việc offline
-│   ├── bot_template.py          # Bot mẫu cơ bản
-│   ├── heuristic_bot.py         # Bot chiến thuật mẫu thông minh
-│   ├── local_arena.py           # CLI giả lập đấu thử 2 bot trực tiếp trên máy nhà
-│   └── README.md                # Hướng dẫn nhanh cho thí sinh
+├── starter_kit/                 # Offline development bundle for competitors
+│   ├── bot_template.py          # Baseline bot skeleton
+│   ├── heuristic_bot.py         # Sample heuristic competitor
+│   ├── local_arena.py           # CLI tournament simulator for offline bot duels
+│   └── README.md                # Quickstart instructions for competitors
 │
-├── docs/                        # Thư viện tài liệu chuyên biệt
-│   ├── CONTEXT_RESUME.md        # Single Source of Truth tối cao
-│   ├── ARCHITECTURE.md          # Đặc tả kiến trúc kỹ thuật sâu
-│   ├── BOT_GUIDE.md             # Cẩm nang toàn tập cho thí sinh viết bot
-│   ├── ADMIN_GUIDE.md           # Cẩm nang vận hành giải đấu & mạng LAN
-│   ├── logs/                    # Nhật ký sức khỏe và bảo trì định kỳ tự động
-│   └── superpowers/             # Thiết kế kiến trúc (specs) & kế hoạch thực thi (plans)
+├── docs/                        # Formal documentation library
+│   ├── CONTEXT_RESUME.md        # Single Source of Truth
+│   ├── ARCHITECTURE.md          # In-depth architectural specifications
+│   ├── BOT_GUIDE.md             # Competitor and bot engineering manual
+│   ├── ADMIN_GUIDE.md           # Tournament administration operations manual
+│   └── superpowers/             # Architecture specifications and implementation plans
 │
-└── tests/                       # Toàn bộ 171 test cases tự động (100% PASS)
+└── tests/                       # Comprehensive automated test suite
 ```
 
 ---
 
-## ❓ 4. Các Câu Hỏi Thường Gặp (Frequently Asked Questions - FAQ)
+## 4. Frequently Asked Questions (FAQ)
 
-### Q1: Làm thế nào để các máy tính khác trong phòng thi đấu kết nối vào server?
-Máy chủ mặc định lắng nghe trên `0.0.0.0:8000`. Khi khởi động `python main.py`, console sẽ in ra địa chỉ **LAN Network URL** (ví dụ: `http://192.168.1.15:8000`). Mọi máy tính kết nối chung mạng Wi-Fi hoặc mạng dây chỉ cần gõ địa chỉ đó vào trình duyệt là có thể đăng ký tài khoản và nộp bot. Nếu máy khác không vào được, hãy kiểm tra tường lửa theo hướng dẫn tại [`docs/ADMIN_GUIDE.md`](docs/ADMIN_GUIDE.md).
+### Q1: How do competitors connect from other computers on the local network?
+The server listens on `0.0.0.0:8000`. Upon launching `python main.py`, the terminal banner displays the active **LAN Network URL** (e.g. `http://192.168.1.15:8000`). Other computers connected to the same Wi-Fi or wired network access this address in any standard browser. If access is blocked, consult the firewall troubleshooting instructions in [`docs/ADMIN_GUIDE.md`](docs/ADMIN_GUIDE.md).
 
-### Q2: Mã nguồn bot của tôi có bị các đối thủ khác xem trộm không?
-**Tuyệt đối không.** Toàn bộ mã nguồn bot được lưu trữ kín trên máy chủ trong thư mục riêng tư (`bots/`). Các đối thủ chỉ nhận được file Replay JSON ghi lại nước đi và tọa độ trên bàn cờ, hoàn toàn không thể xem hoặc tải về file `.py` của bạn.
+### Q2: Is submitted bot source code visible to opposing competitors?
+**No.** All competitor code is stored securely in the private server directory (`bots/`). Opponents only receive standardized match replay JSON logs detailing turn coordinates and SAN annotations; source files are never accessible.
 
-### Q3: Tài khoản Admin được quản lý thế nào? Người khác có tự tạo Admin được không?
-Hệ thống tuân thủ nguyên tắc **Single-Admin Invariant**:
-- Chỉ có đúng **1 tài khoản Admin duy nhất** trong hệ thống.
-- Cấu hình tài khoản admin qua biến môi trường `ADMIN_USERNAME` và `ADMIN_PASSWORD` (mặc định: `admin` / `admin123`).
-- API đăng ký sẽ từ chối ngay lập tức mọi nỗ lực đăng ký username `admin` hoặc trùng với `ADMIN_USERNAME`.
-- Seeder máy chủ sẽ tự động tước quyền (`is_admin = False`) đối với bất kỳ tài khoản giả mạo nào khác.
+### Q3: How is administrator access controlled? Can other users become administrators?
+The system enforces the **Single-Admin Invariant**:
+- Exactly one administrator exists across the persistence layer.
+- Credentials are configured via environment variables `ADMIN_USERNAME` and `ADMIN_PASSWORD` (default: `admin` / `admin123`).
+- Registration attempts matching the admin name are rejected with HTTP 400.
+- Application startup demotes any unauthorized admin flag (`is_admin = False`).
+- The `/admin` web portal enforces HTTP 303 redirection for unauthenticated visitors and HTTP 403 Forbidden for non-admin accounts.
 
-### Q4: Tại sao bot của tôi bị xử thua kỹ thuật?
-Một bot sẽ bị xử thua ngay lập tức nếu:
-1. Chạy quá **1.0 giây** cho 1 lượt tính toán (`win_reason = 'timeout'`).
-2. Mã nguồn phát sinh lỗi ngoại lệ hoặc crash (`win_reason = 'error'`).
-3. Trả về nước đi không hợp lệ (sai tọa độ hoặc đi quân ngược luật) (`win_reason = 'invalid_move'`).
+### Q4: Under what conditions does a bot incur a technical forfeit?
+A bot instantly forfeits a match if it:
+1. Exceeds the **1.0-second** per-turn calculation timeout (`win_reason = 'timeout'`).
+2. Triggers an unhandled runtime exception or crash (`win_reason = 'error'`).
+3. Emits an illegal move or malformed coordinate structure (`win_reason = 'invalid_move'`).
 
-### Q5: Tôi có thể phát triển và đấu thử bot mà không cần kết nối server không?
-**Có.** Bạn chỉ cần tải thư mục [`starter_kit/`](starter_kit/) về máy cá nhân và dùng lệnh:
+### Q5: Can competitors test bots offline without connecting to the server?
+**Yes.** Competitors can download the [`starter_kit/`](starter_kit/) directory and run:
 ```bash
 python starter_kit/local_arena.py my_bot.py starter_kit/heuristic_bot.py --rounds 10
 ```
-Công cụ này chạy trực tiếp trên máy của bạn, không cần cài đặt server hay kết nối mạng. Xem chi tiết tại [`docs/BOT_GUIDE.md`](docs/BOT_GUIDE.md).
+This utility executes locally without external networking or server configuration. See [`docs/BOT_GUIDE.md`](docs/BOT_GUIDE.md).
 
-### Q6: Hệ số nhân Elo $x$ hàng ngày hoạt động thế nào?
-Trong $n$ ngày vòng bảng, cổng thi đấu mở theo khung giờ cố định (19:00 - 21:00). Mỗi ngày ban tổ chức áp dụng một hệ số ngẫu nhiên $x \in [1.0, 3.0]$. Điểm Elo tăng/giảm sau mỗi trận sẽ nhân với $x$:
-$$\Delta\text{Elo} = \text{round}(x \times 32 \times (S - E))$$
-Những ngày có hệ số $x$ cao là cơ hội lớn để bứt phá thứ hạng!
+### Q6: How does dynamic tournament scheduling operate?
+Administrators configure matchmaking operational modes (`auto`, `true`, `false`) and daily operating windows (`start_time` and `end_time`, such as `19:00` to `21:00`) directly from the web Admin Dashboard. The system also supports overnight windows and custom daily Elo multipliers $x \in [1.0, 3.0]$.
 
 ---
 
-## 🧪 5. Kiểm Thử Hệ Thống (Automated Testing)
+## 5. Automated Verification
 
-Chạy toàn bộ 171 bài kiểm thử tự động (Engine, Sandbox, Runner, Database, Tournament Elo, REST API, Web UI, LAN Banner, Admin Security và E2E):
+Run the full automated test suite covering game engine mechanics, AST sandboxing, runner isolation, database operations, Elo calibration, REST APIs, UI templates, LAN discovery, and administrator authorization:
 
 ```bash
 pytest -v
 ```
 
-Mọi bài kiểm thử đều chạy tự động và độc lập trong vài giây, đảm bảo độ tin cậy tuyệt đối cho hệ thống.
+All test cases execute locally in seconds, verifying system integrity before deployment.

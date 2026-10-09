@@ -1,49 +1,50 @@
 # Battlecode RPS 9x9 — Master Context Resume for AI Agents & Team
 
-> **Mục đích của file này**: Đây là file "bộ nhớ ngữ cảnh trung tâm" (Single Source of Truth).
-> Khi bất kỳ thành viên nào trong nhóm (Member 1, 2, 3, 4) làm việc với bất kỳ AI nào (Claude 3.7/Sonnet, Gemini Pro/Flash, GPT-4o, Cursor AI, DeepSeek...), hãy nạp file này vào để AI ngay lập tức nắm được 100% kiến trúc, quy ước và nhiệm vụ mà không bị quên hoặc làm sai lệch hệ thống.
+> **Muc dich cua file nay**: Day la file "bo nho ngu canh trung tam" (Single Source of Truth - SSOT).
+> Khi bat ky thanh vien nao trong nhom (Member 1, 2, 3, 4) lam viec voi bat ky AI nao (Claude, Gemini, GPT, Cursor AI, DeepSeek...), hay nap file nay vao de AI ngay lap tuc nam duoc 100% kien truc, quy uoc va nhiem vu ma khong bi quen hoac lam sai lech he thong.
 
 ---
 
-## 1. Tóm Tắt Dự Án (System Overview)
-- **Tên dự án**: Battlecode RPS Chess 9x9 Platform.
-- **Mô tả**: Nền tảng thi đấu cờ Oẳn Tù Tì (Rock-Paper-Scissors) kích thước 9×9 cho sinh viên. Sinh viên viết bot bằng Python để điều khiển các quân cờ đấu 1v1.
-- **Mô hình máy chủ**: Centralized Runner. Người chơi upload file bot Python lên web. Server lưu mã nguồn kín đáo (chống lộ code), chạy ngầm trận đấu, xuất file replay JSON và cập nhật điểm Elo.
-- **Thể thức giải đấu**:
-  - **Ngày 1 đến Ngày $n$**: Mở cổng theo khung giờ cố định (19h - 21h). Đấu tự do FFA không giới hạn. Mỗi ngày có một hệ số nhân Elo ngẫu nhiên $x \in [1.0, 3.0]$.
-  - **Ngày $n+1$**: Đấu bảng loại trực tiếp (Bracket BO3) giữa các top bot để tìm nhà vô địch.
-  - **Điểm tổng kết**: Kết hợp giữa Elo tích lũy và thứ hạng giải đấu ngày cuối.
+## 1. Tom Tat Du An (System Overview)
+- **Ten du an**: Battlecode RPS Chess 9x9 Platform.
+- **Mo ta**: Nen tang thi dau co Oan Tu Ti (Rock-Paper-Scissors) kich thuoc 9x9 cho sinh vien. Sinh vien viet bot bang Python de dieu khien cac quan co dau 1v1.
+- **Mo hinh may chu**: Centralized Runner. Nguoi choi upload file bot Python len web. Server luu ma nguon kin dao (chong lo code), chay ngam tran dau trong tien trinh con co lap, xuat file replay JSON va cap nhat diem Elo.
+- **The thuc giai dau**:
+  - **Ngay 1 den Ngay n**: Mo cong theo khung gio dong duoc cau hinh qua co so du lieu (mac dinh 19h - 21h). Dau tu do FFA khong gioi han. Moi ngay co mot he so nhan Elo ngau nhien x in [1.0, 3.0].
+  - **Ngay n+1**: Dau bang loai truc tiep (Bracket BO3) giua cac top bot de tim nha vo dich.
+  - **Diem tong ket**: Ket hop giua Elo tich luy va thu hang giai dau ngay cuoi.
 - **Tech Stack**:
-  - **Backend & Engine**: Python 3.10+, FastAPI, SQLite (qua SQLAlchemy), PyYAML.
-  - **Frontend**: HTML5, Vanilla JavaScript, CSS (kế thừa từ `resources/HTML-game-project-main`), không dùng Node.js/npm.
-  - **Deployment**: Local-First & Multi-Machine LAN (`python main.py` lắng nghe trên `0.0.0.0:8000` với cơ chế tự động dò IP mạng LAN `http://<LAN_IP>:8000`), không phụ thuộc dịch vụ ngoài.
+  - **Backend & Engine**: Python 3.10+, FastAPI, SQLite (qua SQLAlchemy WAL), PyYAML.
+  - **Frontend**: HTML5, Vanilla JavaScript, CSS3 Design Tokens (bang mau toi Charcoal/Slate chuyen nghiep), khong dung Node.js/npm.
+  - **Deployment**: Local-First & Multi-Machine LAN (`python main.py` lang nghe tren `0.0.0.0:8000` voi co che tu dong do IP mang LAN `http://<LAN_IP>:8000`), khong phu thuoc dich vu dam may ngoai.
 
 ---
 
-## 2. Luật Game Oẳn Tù Tì 9×9 & Bot Interface
+## 2. Luat Game Oan Tu Ti 9x9 & Bot Interface
 
-### 2.1 Bàn cờ và Tọa độ
-- Bàn cờ 9×9: `row`: 0 đến 8 (tương ứng Rank 1 đến 9), `col`: 0 đến 8 (tương ứng File a đến i).
-- Các quân cờ: `'R'` (Đấm ✊), `'P'` (Lá ✋), `'S'` (Kéo ✌).
-- Khắc chế: `R > S`, `S > P`, `P > R`. Cùng loại thì chặn nhau. Thua RPS thì không được đi vào.
-- **Bố trí xuất phát**:
-  - Player 1 (Đỏ): Hàng 0 (rank 1) gồm `['R','R','R','P','P','P','S','S','S']`. Ô đích cần đến: `i9` (`row=8, col=8`).
-  - Player 2 (Xanh): Hàng 8 (rank 9) gồm `['S','S','S','P','P','P','R','R','R']`. Ô đích cần đến: `a1` (`row=0, col=0`).
-- **Nước đi**: Đi 1 ô theo 8 hướng (như quân Vua trong cờ vua).
-- **Thắng**: Chạm ô đích của đối thủ HOẶC diệt sạch cả 3 quân của 1 loại (R, P, hoặc S) của đối thủ.
-- **Timeout**: Tối đa 1.0 giây/turn. Tối đa 200 turns/trận.
+### 2.1 Ban co va Toa do
+- Ban co 9x9: `row`: 0 den 8 (tuong ung Rank 1 den 9), `col`: 0 den 8 (tuong ung File a den i).
+- Cac quan co: `'R'` (Dam / Rock), `'P'` (La / Paper), `'S'` (Keo / Scissors).
+- Khac che: `R > S`, `S > P`, `P > R`. Cung loai thi chan nhau. Thua RPS thi khong duoc di vao.
+- **Bo tri xuat phat**:
+  - Player 1 (Do): Hang 0 (rank 1) gom `['R','R','R','P','P','P','S','S','S']`. O dich can den: `i9` (`row=8, col=8`).
+  - Player 2 (Xanh): Hang 8 (rank 9) gom `['S','S','S','P','P','P','R','R','R']`. O dich can den: `a1` (`row=0, col=0`).
+- **Nuoc di**: Di 1 o theo 8 huong (ngang, doc, cheo nhu quan Vua trong co vua).
+- **Thang**: Cham o dich cua doi thu HOAC diet sach ca 3 quan cua 1 loai (R, P, hoac S) cua doi thu.
+- **Timeout**: Toi da 1.0 giay/turn. Toi da 200 turns/tran.
 
 ### 2.2 Bot Python Interface (`bot.py`)
-Mọi bot sinh viên viết phải có signature sau:
+Moi bot sinh vien viet phai co signature chuan sau:
 
 ```python
 def get_move(board: list[list[dict | None]], my_player: int, history: list[dict]) -> tuple[tuple[int, int], tuple[int, int]]:
-    """
+    """Calculate and return the next move for the bot.
+
     Args:
         board: 9x9 list where board[row][col] is None or {'type': 'R'|'P'|'S', 'player': 1|2}
         my_player: 1 or 2
         history: list of past moves [{'player': 1, 'from': (0, 0), 'to': (1, 1), 'san': '...'}]
-    
+
     Returns:
         ((from_row, from_col), (to_row, to_col))
     """
@@ -51,8 +52,8 @@ def get_move(board: list[list[dict | None]], my_player: int, history: list[dict]
 
 ---
 
-## 3. Cấu Trúc File Replay JSON (`replays/match_<id>.json`)
-Mỗi trận đấu sau khi kết thúc sẽ sinh file replay chuẩn:
+## 3. Cau Truc File Replay JSON (`replays/match_<id>.json`)
+Moi tran dau sau khi ket thuc se sinh file replay JSON co dinh dang chuan:
 
 ```json
 {
@@ -71,7 +72,7 @@ Mỗi trận đấu sau khi kết thúc sẽ sinh file replay chuẩn:
       "to": [1, 3],
       "piece": "P",
       "captured": null,
-      "san": "✋d1-d2"
+      "san": "Pd1-d2"
     }
   ]
 }
@@ -79,142 +80,205 @@ Mỗi trận đấu sau khi kết thúc sẽ sinh file replay chuẩn:
 
 ---
 
-## 4. Phân Chia Công Việc 4 Thành Viên (Roles & Responsibilities)
+## 4. Phan Chia Cong Viec 4 Thanh Vien (Roles & Responsibilities)
 
 1. **Member 1 (Engine Lead)**:
-   - Quản lý: `engine/game.py`, `engine/sandbox.py`, `starter_kit/`, `tests/test_game.py`.
-   - Nhiệm vụ: Xây dựng luật cờ, kiểm tra di chuyển hợp lệ, sandbox AST chặn mã độc, bộ starter kit cho sinh viên tự test máy nhà.
+   - Quan ly: `engine/game.py`, `engine/sandbox.py`, `starter_kit/`, `tests/test_game.py`, `tests/test_sandbox.py`.
+   - Nhiem vu: Xay dung luat co, kiem tra di chuyen hop le, sandbox AST chan ma doc (74 mau tan cong), bo starter kit cho sinh vien tu test offline.
 2. **Member 2 (Execution Lead)**:
-   - Quản lý: `engine/runner.py`, `server/queue.py`, `tests/test_runner.py`.
-   - Nhiệm vụ: Chạy ván đấu giữa 2 file bot, giám sát tiến trình con, timeout 1s, bắt lỗi crash, tạo file `replay_<id>.json`.
+   - Quan ly: `engine/runner.py`, `server/queue.py`, `tests/test_runner.py`.
+   - Nhiem vu: Chay van dau giua 2 file bot, giam sat tien trinh con, timeout 1.0s, bat loi crash, tao file `replays/match_<id>.json`.
 3. **Member 3 (Backend & Tournament Lead)**:
-   - Quản lý: `server/models.py`, `server/routes/`, `server/tournament.py`, `config/tournament.yaml`.
-   - Nhiệm vụ: API xác thực, lưu bot, hàng đợi thách đấu FFA, công thức tính Elo nhân hệ số $x$, bốc thăm bảng Bracket ngày $n+1$.
+   - Quan ly: `server/models.py`, `server/routes/`, `server/tournament.py`, `server/boss_manager.py`, `server/bosses/`, `config/tournament.yaml`.
+   - Nhiem vu: API xac thuc, luu bot, hang doi thach dau FFA, cong thuc tinh Elo nhan he so x, quan ly Boss Arena, bo danh gia lich trinh dong va boc tham bang Bracket.
 4. **Member 4 (Frontend & Visualizer Lead)**:
-   - Quản lý: `web/templates/`, `web/static/js/visualizer.js`, `web/static/css/`.
-   - Nhiệm vụ: Bảng xếp hạng Elo (Leaderboard), trang hồ sơ người chơi & nộp code, visualizer bàn cờ 9×9 xem replay mượt mà, trang admin.
+   - Quan ly: `web/templates/`, `web/static/js/visualizer.js`, `web/static/css/`.
+   - Nhiem vu: Bang xep hang Elo (Leaderboard), trang ho so nguoi choi & nop code, visualizer ban co 9x9 xem replay muot ma voi design tokens Charcoal, trang quan tri admin bao mat.
 
 ---
 
-## 5. Quy Ước Lập Trình Bắt Buộc (Coding Standards)
-1. **Comment**: Bắt buộc comment code bằng **Tiếng Anh rõ ràng, dễ hiểu**. Giải thích vì sao làm vậy ở các logic phức tạp.
-2. **Không tự ý thêm thư viện ngoài**: Ưu tiên thư viện chuẩn của Python (`math`, `random`, `json`, `ast`, `subprocess`, `dataclasses`). Thư viện ngoài chỉ dùng những gói đã có trong `requirements.txt`.
-3. **An toàn & Kiểm thử (TDD)**: Viết hàm nào phải có unit test kiểm thử hàm đó trong thư mục `tests/`.
-4. **Human-in-the-loop**: Khi AI tạo code, thành viên phải tự chạy lệnh kiểm tra trên terminal máy mình trước khi cập nhật `TASKS.md` và `git commit`.
+## 5. Quy Uoc Lap Trinh Bat Buoc (Coding Standards)
+1. **Comment**: Bat buoc comment code bang **Tieng Anh ro rang, de hieu**. Giai thich ly do thiet ke o cac logic phuc tap.
+2. **Khong tu y them thu vien ngoai**: Uu tien thu vien chuan cua Python (`math`, `random`, `json`, `ast`, `subprocess`, `dataclasses`). Thu vien ngoai chi dung nhung goi da co trong `requirements.txt`.
+3. **An toan & Kiem thu (TDD)**: Viet ham nao phai co unit test kiem thu ham do trong thu muc `tests/`.
+4. **Human-in-the-loop**: Khi AI tao code, thanh vien phai tu chay lenh kiem tra tren terminal truoc khi cap nhat `TASKS.md` va commit git.
 
 ---
 
-## 6. Master Prompts Dành Cho Thành Viên Sao Chép Cho AI
+## 6. Master Prompts Danh Cho Thanh Vien Sao Chep Cho AI
 
-### Master Prompt 1: Khởi đầu một phiên làm việc mới
-> *"tôi là **Member [Điền 1, 2, 3 hoặc 4]** trong nhóm phát triển dự án **Battlecode RPS 9x9**. Dự án đang tổ chức theo tài liệu `docs/CONTEXT_RESUME.md` và `TASKS.md`. Hãy đọc 2 file đó để nắm rõ toàn bộ kiến trúc hệ thống, các interface chuẩn và quy ước lập trình. Bây giờ, tôi cần bạn hỗ trợ tôi thực hiện **Task [Điền mã task, ví dụ 1.2]** trong `TASKS.md`. Hãy giải thích ngắn gọn, trực quan và viết code chuẩn với comment tiếng Anh chi tiết."*
+### Master Prompt 1: Khoi dau mot phien lam viec moi
+> *"Toi la **Member [Dien 1, 2, 3 hoac 4]** trong nhom phat trien du an **Battlecode RPS 9x9**. Du an dang to chuc theo tai lieu `docs/CONTEXT_RESUME.md` va `TASKS.md`. Hay doc 2 file do de nam ro toan bo kien truc he thong, cac interface chuan va quy uoc lap trinh. Bay gio, toi can ban ho tro toi thuc hien **Task [Dien ma task, vi du 1.2]** trong `TASKS.md`. Hay giai thich ngan gon, truc quan va viet code chuan voi comment tieng Anh chi tiet."*
 
-### Master Prompt 2: Nhờ AI debug lỗi
-> *"tôi gặp lỗi này khi chạy lệnh kiểm thử [Điền lệnh, ví dụ: pytest tests/test_game.py]: [Paste log lỗi vào đây]. Hãy đối chiếu với luật game và interface trong `docs/CONTEXT_RESUME.md` để tìm nguyên nhân gốc rễ và sửa code giúp tôi một cách tối giản nhất."*
-
-
----
-
-## 7. Quy Tắc Vòng Lặp & Quản Lý Breaking Changes (Continuous Feedback Loop Law)
-
-> ⚠️ **LUẬT BẮT BUỘC CHO MỌI THÀNH VIÊN VÀ MỌI AI AGENT**:
-> Dự án vận hành theo mô hình **Vòng lặp phát triển khép kín (Continuous Feedback Loop)**. 
-
-1. **Nguồn Chân Lý Duy Nhất (Single Source of Truth - SSOT)**:
-   - File `docs/CONTEXT_RESUME.md` này là **NGUỒN SỰ THẬT TỐI CAO DUY NHẤT** chi phối toàn bộ kiến trúc, CSDL, luật cờ, và workflow của dự án.
-   - Các file thiết lập riêng cho AI (như `GEMINI.md`, `CLAUDE.md`, `.cursorrules`...) **TUYỆT ĐỐI KHÔNG ĐƯỢC TỰ Ý ĐỊNH NGHĨA RULES MỚI HOẶC TÁCH NHÁNH QUY ƯỚC**. Chúng phải luôn trỏ về `docs/CONTEXT_RESUME.md`.
-2. **Quy Tắc Cập Nhật Breaking Changes Ngay Lập Tức**:
-   - Khi có bất kỳ thay đổi mang tính bước ngoặt (Breaking Change) nào — bao gồm: thay đổi API endpoint, thay đổi hàm `get_move()`, sửa đổi luật game, thay đổi schema database trong `server/models.py`, đổi port hoặc workflow — người hoặc AI thực hiện **BẮT BUỘC PHẢI CẬP NHẬT TRỰC TIẾP VÀO FILE NÀY (`docs/CONTEXT_RESUME.md`) VÀ `TASKS.md` TRONG CÙNG COMMIT ĐÓ**.
-3. **Bảo Toàn Chu Trình Cho Người Đến Sau**:
-   - Nếu ai đó thay đổi hệ thống mà không cập nhật `docs/CONTEXT_RESUME.md`, phiên làm việc tiếp theo của các AI khác (Claude, Gemini, Cursor) sẽ đọc dữ liệu cũ, gây ra xung đột phiên bản và phá vỡ tính liên tục của dự án. Mọi thay đổi không ghi vào đây đều bị coi là không hợp lệ.
+### Master Prompt 2: Nho AI debug loi
+> *"Toi gap loi nay khi chay lenh kiem thu [Dien lenh, vi du: pytest tests/test_game.py]: [Paste log loi vao day]. Hay doi chieu voi luat game va interface trong `docs/CONTEXT_RESUME.md` de tim nguyen nhan goc re va sua code giup toi mot cach toi gian nhat."*
 
 ---
 
-## 8. Quy Tắc Bắt Buộc Cách Ly Bằng Git Worktrees (Mandatory Git Worktree Isolation)
-1. **Luôn dùng Worktree khi phát triển tính năng mới**:
-   - Mọi task mới hoặc refactor lớn bắt buộc phải tạo nhánh cách ly trong thư mục `.worktrees/<tên-nhánh>` thông qua kỹ năng `using-git-worktrees`.
-   - Tuyệt đối không code trực tiếp lên nhánh `main` khi chưa hoàn thành TDD và được review toàn diện.
-2. **Quy trình kết thúc nhánh**:
-   - Chỉ merge về `main` sau khi toàn bộ test suite (`pytest -v`) đạt 100% PASS và thực hiện clean up worktree đúng chuẩn.
+## 7. Quy Tac Vong Lap & Quan Ly Breaking Changes (Continuous Feedback Loop Law)
+
+> **QUY TAC BAT BUOC CHO MOI THANH VIEN VA MOI AI AGENT**:
+> Du an van hanh theo mo hinh **Vong lap phat trien khep kin (Continuous Feedback Loop)**.
+
+1. **Nguon Chan Ly Duy Nhat (Single Source of Truth - SSOT)**:
+   - File `docs/CONTEXT_RESUME.md` nay la **NGUON SU THAT TOI CAO DUY NHAT** chi phoi toan bo kien truc, CSDL, luat co, va workflow cua du an.
+   - Cac file thiet lap rieng cho AI (nhu `GEMINI.md`, `CLAUDE.md`, `.cursorrules`...) **TUYET DOI KHONG DUOC TU Y DINH NGHIA RULES MOI HOAC TACH NHANH QUY UOC**. Chung phai luon tro ve `docs/CONTEXT_RESUME.md`.
+2. **Quy Tac Cap Nhat Breaking Changes Ngay Lap Tuc**:
+   - Khi co bat ky thay doi mang tinh buoc ngoat nao — bao gom: thay doi API endpoint, thay doi ham `get_move()`, sua doi luat game, thay doi schema database trong `server/models.py`, doi port, bo sung boss moi, hay thay doi cau hinh lich trinh — nguoi hoac AI thuc hien **BAT BUOC PHAI CAP NHAT TRUC TIEP VAO FILE NAY (`docs/CONTEXT_RESUME.md`) VA `TASKS.md` TRONG CUNG COMMIT DO**.
+3. **Bao Toan Chu Trinh Cho Nguoi Den Sau**:
+   - Neu ai do thay doi he thong ma khong cap nhat `docs/CONTEXT_RESUME.md`, phien lam viec tiep theo cua cac AI khac (Claude, Gemini, Cursor) se doc du lieu cu, gay ra xung dot phien ban va pha vo tinh lien tuc cua du an. Moi thay doi khong ghi vao day deu bi coi la khong hop le.
 
 ---
 
-## 9. Bảo Tồn Tuyệt Đối Thư Mục Gốc & File Meta (Root Preservation Law)
-1. **Thư mục `resources/` (Thư viện tham khảo của User)**:
-   - `resources/` là thư mục chứa tài liệu gốc và các dự án mẫu của User, đã được đưa vào `.gitignore`.
-   - **BẤT BIẾN**: `resources/` CHỈ NẰM DUY NHẤT TẠI THƯ MỤC GỐC (ROOT REPO). Tuyệt đối không di chuyển, không xóa và KHÔNG ĐƯỢC DUPLICATE/COPY vào bên trong các worktree `.worktrees/`.
-2. **Các thư mục và file meta**:
-   - `.git/`, `.gemini/`, `GEMINI.md`, `CLAUDE.md`, và `docs/CONTEXT_RESUME.md` luôn giữ nguyên vị trí chuẩn ở root.
+## 8. Quy Tac Bat Buoc Cach Ly Bang Git Worktrees (Mandatory Git Worktree Isolation)
+1. **Luon dung Worktree khi phat trien tinh nang moi**:
+   - Moi task moi hoac refactor lon bat buoc phai tao nhanh cach ly trong thu muc `.worktrees/<ten-nhanh>` thong qua ky nang `using-git-worktrees`.
+   - Tuyet doi khong code truc tiep len nhanh `main` khi chua hoan thanh TDD va duoc review toan dien.
+2. **Quy trinh ket thuc nhanh**:
+   - Chi merge ve `main` sau khi toan bo test suite (`pytest -v`) dat 100% PASS va thuc hien clean up worktree dung chuan.
 
 ---
 
-## 10. Nguyên Tắc Single-Admin & Triển Khai Đa Máy (Multi-Machine LAN)
-1. **Duy Nhất Một Tài Khoản Quản Trị (Single-Admin Invariant)**:
-   - Hệ thống chỉ cho phép đúng **1 tài khoản Admin tối cao**.
-   - Cấu hình qua biến môi trường: `ADMIN_USERNAME` (mặc định: `admin`), `ADMIN_PASSWORD` (mặc định: `admin123`).
-   - Mọi nỗ lực đăng ký tài khoản mang tên `admin` (hoặc trùng `ADMIN_USERNAME`, không phân biệt hoa thường) đều bị API từ chối với mã lỗi HTTP 400.
-   - Khi khởi động seeder, bất kỳ tài khoản nào khác có `is_admin = True` đều tự động bị hạ quyền xuống `is_admin = False`.
-2. **Triển Khai Đa Máy Qua Mạng Nội Bộ (LAN Access)**:
-   - Server lắng nghe trên mọi giao diện mạng (`0.0.0.0:8000`).
-   - Banner khởi động tự động dò IP mạng nội bộ của máy chủ (`http://<LAN_IP>:8000`) để người tổ chức cung cấp cho các máy tính khác trong cùng Wi-Fi/LAN truy cập thi đấu.
+## 9. Bao Ton Tuyet Doi Thu Muc Goc & File Meta (Root Preservation Law)
+1. **Thu muc `resources/` (Thu vien tham khao cua User)**:
+   - `resources/` la thu muc chua tai lieu goc va cac du an mau cua User, da duoc dua vao `.gitignore`.
+   - **BAT BIEN**: `resources/` CHI NAM DUY NHAT TAI THU MUC GOC (ROOT REPO). Tuyet doi khong di chuyen, khong xoa va KHONG DUOC DUPLICATE/COPY vao ben trong cac worktree `.worktrees/`.
+2. **Cac thu muc va file meta**:
+   - `.git/`, `.gemini/`, `GEMINI.md`, `CLAUDE.md`, va `docs/CONTEXT_RESUME.md` luon giu nguyen vi tri chuan o root.
 
 ---
 
-## 11. Hệ Thống Phân Tầng Tài Liệu & Nguyên Tắc Đồng Bộ Tuyệt Đối (Documentation Hierarchy & Synchronization Law)
+## 10. Nguyen Tac Single-Admin & Trien Khai Da May (Multi-Machine LAN)
+1. **Duy Nhat Mot Tai Khoan Quan Tri (Single-Admin Invariant)**:
+   - He thong chi cho phep dung **1 tai khoan Admin toi cao**.
+   - Cau hinh qua bien moi truong: `ADMIN_USERNAME` (mac dinh: `admin`), `ADMIN_PASSWORD` (mac dinh: `admin123`).
+   - Moi no luc dang ky tai khoan mang ten `admin` (hoac trung `ADMIN_USERNAME`, khong phan biet hoa thuong) deu bi API tu choi voi ma loi HTTP 400.
+   - Khi khoi dong seeder, bat ky tai khoan nao khac co `is_admin = True` deu tu dong bi ha quyen xuong `is_admin = False`.
+2. **Kiem Soat Truy Cap Tuyen Admin (Route Authorization Guards)**:
+   - Route `/admin` yeu cau xac thuc admin nghiem ngat.
+   - Nguoi dung chua dang nhap truy cap `/admin` se bi chuyen huong HTTP 303 Redirect ve `/login?next=/admin`.
+   - Nguoi dung da dang nhap nhung khong co quyen admin se nhan loi HTTP 403 Forbidden.
+   - Thanh dieu huong (navbar) chi hien thi muc `Admin` khi nguoi dung hien tai co `is_admin = True`.
+3. **Trien Khai Da May Qua Mang Noi Bo (LAN Access)**:
+   - Server lang nghe tren moi giao dien mang (`0.0.0.0:8000`).
+   - Banner khoi dong tu dong do IP mang noi bo cua may chu (`http://<LAN_IP>:8000`) de nguoi to chuc cung cap cho cac may tinh khac trong cung Wi-Fi/LAN truy cap thi dau.
 
-Nhằm đảm bảo tính nhất quán, không phân mảnh dữ liệu và định vị chính xác mục đích sử dụng cho từng đối tượng, tài liệu dự án được tổ chức theo hệ thống phân tầng nghiêm ngặt:
+---
+
+## 11. Dau Truong Boss Benchmark Server-Side (`server/bosses/`, `server/boss_manager.py`)
+He thong cung cap 5 bot chuan muc server-side (Server Bosses) dat tai thu muc `server/bosses/` nham phuc vu viec test bot, do suc tren Leaderboard va lam moc tham chieu:
+
+1. **Level 1: Novice (`novice_bot.py`)**:
+   - Slug: `novice`, Display Name: `[Boss] Level 1: Novice`, Default Elo: 1000.
+   - Thuat toan: Chon ngay nuoc cham dich neu co, thuc hien an quan co loi neu co, con lai di chuyen ngau nhien hop le.
+2. **Level 2: Rusher (`rusher_bot.py`)**:
+   - Slug: `rusher`, Display Name: `[Boss] Level 2: Rusher`, Default Elo: 1200.
+   - Thuat toan: Tinh khoang cach Chebyshev toi o dich (`i9` hoac `a1`), uu tien tuyet doi nuoc tien ve dich va ne tranh cac o bi quan dich khac che de doa.
+3. **Level 3: Sentinel (`sentinel_bot.py`)**:
+   - Slug: `sentinel`, Display Name: `[Boss] Level 3: Sentinel`, Default Elo: 1400.
+   - Thuat toan: Phong thu vanh dai bao ve o dich nha, dong thoi theo doi va tap trung tieu diet loai quan co so luong it nhat cua doi thu de gianh chien thang Wipeout.
+4. **Level 4: Tactician (`tactician_bot.py`)**:
+   - Slug: `tactician`, Display Name: `[Boss] Level 4: Tactician`, Default Elo: 1600.
+   - Thuat toan: Tim kiem Minimax 2 lop (2-ply) voi cat tia Alpha-Beta. Ham danh gia the tran can bang giua gia tri quan co, khoang cach toi o dich, ap luc de doa va vi tri an toan.
+5. **Level 5: Apex Master (`apex_bot.py`)**:
+   - Slug: `apex`, Display Name: `[Boss] Level 5: Apex Master`, Default Elo: 1800.
+   - Thuat toan: Minimax do sau thich ung dong, ket hop bay quan (piece baiting), phan doan nuoc di tiep theo cua doi thu va hoi tu the tran tan cong ep goc.
+
+**Quan Ly Trien Khai Boss (`server/boss_manager.py`)**:
+- Chi Admin moi co quyen trien khai (`deploy_boss`) hoac go bo (`retract_boss`) cac Boss bot.
+- Khi trien khai, he thong tao tai khoan User dai dien (vi du: username `boss_novice`, `boss_apex`), sao chep file bot vao `bots/` va gan bot hoat dong.
+- API quan ly:
+  - `GET /api/admin/bosses`: Tra ve danh sach tat ca boss va trang thai trien khai hien tai.
+  - `POST /api/admin/bosses/deploy`: Trien khai hoac thu hoi boss dua tren tham so `slug` va `action` (`deploy` hoac `retract`).
+
+---
+
+## 12. Cau Hinh Lich Trinh Giai Dau Dong Trong CSDL (`TournamentSetting`)
+He thong ho tro cau hinh lich trinh dong luu tru trong bang `TournamentSetting` cua CSDL SQLite, cho phep quan tri vien dieu chinh tren giao dien web ma khong can khoi dong lai server hay sua file YAML:
+
+1. **Cac Khoa Cau Hinh Dong**:
+   - `start_time`: Gio mo cong FFA hang ngay (dinh dang `HH:MM`, vi du `19:00`).
+   - `end_time`: Gio dong cong FFA hang ngay (dinh dang `HH:MM`, vi du `21:00`).
+   - `ffa_mode`: Che do mo cong:
+     - `"auto"`: Mo/dong tu dong theo khung gio giua `start_time` va `end_time`.
+     - `"true"`: Luon mo cong bat ke gio giac (Override Open).
+     - `"false"`: Luon dong cong (Override Closed).
+   - `elo_multiplier`: He so nhan Elo thuong hang ngay (gia tri tu 1.0 den 3.0).
+   - `current_day`: Ngay thi dau hien tai (1 den n).
+2. **Ham Danh Gia Trang Thai Cong (`is_ffa_portal_open`)**:
+   - Nhap tham so: `config`, `current_time_str`, `db_settings`.
+   - Xu ly linh hoat ca khung gio trong ngay (`19:00` den `21:00`) lan khung gio xuyen dem (`22:00` den `02:00`).
+
+---
+
+## 13. Thiet Ke Giao Dien Minimalist Charcoal & He Thong CSS Tokens
+Giao dien web duoc thiet ke theo phong cach Minimalist Slate/Charcoal danh cho ky su va nha phat trien, loai bo toan bo mau neon va hieu ung gradient trang tri khong can thiet:
+
+1. **Design Tokens (`web/static/css/style.css`)**:
+   - `--bg-main: #0d1117`: Mau nen chinh toi gian.
+   - `--bg-surface: #161b22`: Mau nen the card, bang, hop chua du lieu.
+   - `--border-subtle: #30363d`: Duong vien tinh te 1px do tuong phan cao.
+   - `--text-primary: #f0f6fc`: Chu chinh trang sang de doc.
+   - `--text-muted: #8b949e`: Chu phu xam trung tinh.
+2. **Visualizer Ban Co 9x9 Chuyen Nghiep**:
+   - Thiet ke o co phang, net vien do ro rang.
+   - Thanh dieu khien transport bar hien dai voi nut Play/Pause/Slider tinh gon.
+   - Hien thi toa do a1 - i9 truc quan tren mep ban co.
+
+---
+
+## 14. He Thong Phan Tang Tai Lieu & Nguyen Tac Dong Bo Tuyet Doi
+
+Tai lieu du an duoc to chuc theo he thong phan tang nghiem ngat, giu giong van hoc thuat, chuyen nghiep va khong chua bieu tuong trang tri (icons/emojis):
 
 ```text
-┌────────────────────────────────────────────────────────────────────────┐
-│                        README.md (Tầng Tiếp Nhận)                       │
-│     Entrypoint duy nhất cho người mới, Landing Page, Navigation Index & FAQ     │
-└───────────────────────────────────┬────────────────────────────────────┘
-                                    │ trỏ trực tiếp đến
-┌───────────────────────────────────▼────────────────────────────────────┐
-│                    docs/CONTEXT_RESUME.md (Tầng SSOT)                  │
-│       Nguồn Chân Lý Duy Nhất Tối Cao — Quy định luật game, API, CSDL,  │
-│             vai trò 4 thành viên & nguyên tắc vòng lặp hệ thống        │
-└──────────┬────────────────────────┬───────────────────────┬────────────┘
-           │                        │                       │
-           ▼                        ▼                       ▼
-┌──────────────────────┐ ┌──────────────────────┐ ┌──────────────────────┐
-│ docs/ARCHITECTURE.md │ │  docs/BOT_GUIDE.md   │ │ docs/ADMIN_GUIDE.md  │
-│  (Đặc tả kỹ thuật)   │ │  (Cẩm nang thí sinh) │ │ (Cẩm nang vận hành)  │
-└──────────────────────┘ └──────────────────────┘ └──────────────────────┘
-           │                        │                       │
-           └────────────────────────┼───────────────────────┘
-                                    │
-┌───────────────────────────────────▼────────────────────────────────────┐
-│                    TASKS.md (Tầng Quản Trị Nhóm)                       │
-│    Bảng theo dõi tiến độ Milestones & phân chia trách nhiệm 4 thành viên   │
-│           (Dành cho con người, giảng viên chấm điểm & nghiệm thu)      │
-└───────────────────────────────────┬────────────────────────────────────┘
-                                    │ ánh xạ chi tiết sang
-┌───────────────────────────────────▼────────────────────────────────────┐
-│         docs/superpowers/specs/ & docs/superpowers/plans/               │
-│       Blueprint kiến trúc & Kế hoạch thực thi TDD chi tiết cho AI/Dev   │
-└────────────────────────────────────────────────────────────────────────┘
++------------------------------------------------------------------------+
+|                        README.md (Tang Tiep Nhan)                      |
+|     Entrypoint duy nhat cho nguoi moi, Landing Page, Navigation Index  |
++-----------------------------------┬------------------------------------+
+                                    | tro truc tiep den
++-----------------------------------v------------------------------------+
+|                    docs/CONTEXT_RESUME.md (Tang SSOT)                  |
+|       Nguon Chan Ly Duy Nhat Toi Cao — Quy dinh luat game, API, CSDL,  |
+|         5 Boss Bots, Dynamic Schedule, vai tro 4 thanh vien va quy tac |
++──────────┬────────────────────────┬───────────────────────┬────────────+
+           |                        |                       |
+           v                        v                       v
++──────────────────────+ +──────────────────────+ +──────────────────────+
+| docs/ARCHITECTURE.md | |  docs/BOT_GUIDE.md   | | docs/ADMIN_GUIDE.md  |
+|  (Dac ta ky thuat)   | |  (Cam nang thi sinh) | | (Cam nang van hanh)  |
++──────────────────────+ +──────────────────────+ +──────────────────────+
+           |                        |                       |
+           +────────────────────────┼───────────────────────+
+                                    |
++───────────────────────────────────v------------------------------------+
+|                    TASKS.md (Tang Quan Tri Nhom)                       |
+|    Bang theo doi tien do Milestones (0 den 8) & phan chia trach nhiem  |
+|           (Danh cho con nguoi, giang vien cham diem & nghiem thu)      |
++───────────────────────────────────┬────────────────────────────────----+
+                                    | anh xa chi tiet sang
++───────────────────────────────────v------------------------------------+
+|         docs/superpowers/specs/ & docs/superpowers/plans/              |
+|       Blueprint kien truc & Ke hoach thuc thi TDD chi tiet cho AI/Dev  |
++────────────────────────────────────────────────────────────────--------+
 ```
 
-### 11.1 Vai Trò Cụ Thể Của Từng Tài Liệu
-1. **`README.md` (Entry Point Bắt Buộc)**:
-   - **Mục đích**: Trang hạ cánh (Landing Page) cho người mới, hướng dẫn khởi chạy trong 1 lệnh (`python main.py`), bản đồ chỉ mục điều hướng (Navigation Directory) và mục Hỏi-Đáp (FAQ).
-   - **Quy tắc**: Tuyệt đối không nhồi nhét chi tiết luật cờ hay code schema vào `README.md`. Mọi chi tiết kỹ thuật cốt lõi phải dẫn link về `docs/CONTEXT_RESUME.md`.
+### 14.1 Vai Tro Cu The Cua Tung Tai Lieu
+1. **`README.md` (Entry Point Bat Buoc)**:
+   - **Muc dich**: Trang ha canh (Landing Page) cho nguoi moi, huong dan khoi chay trong 1 lenh (`python main.py`), ban do chi muc dieu huong va FAQ.
+   - **Quy tac**: Tuyet doi khong nhoi nhet chi tiet code schema vao `README.md`. Moi chi tiet ky thuat cot loi dan link ve `docs/CONTEXT_RESUME.md`.
 2. **`docs/CONTEXT_RESUME.md` (Single Source of Truth - SSOT)**:
-   - **Mục đích**: Bộ nhớ ngữ cảnh trung tâm cho toàn bộ nhóm và mọi AI Agent.
-   - **Quy tắc**: Đây là tài liệu có thẩm quyền cao nhất. Mọi thay đổi kiến trúc, CSDL, luật game bắt buộc phải cập nhật vào file này đầu tiên.
-3. **Bộ tài liệu chuyên biệt (`docs/ARCHITECTURE.md`, `docs/BOT_GUIDE.md`, `docs/ADMIN_GUIDE.md`)**:
-   - Tách bạch phục vụ chính xác 3 đối tượng: Kỹ thuật viên/giáo viên chấm điểm, Thí sinh viết bot, và Ban tổ chức giải đấu.
-4. **Mối quan hệ giữa `TASKS.md` và `docs/superpowers/`**:
-   - **`TASKS.md` không bị redundant**: `TASKS.md` là bảng Kanban cấp cao dành cho **con người và chấm điểm học phần** (chia việc cho Member 1, 2, 3, 4 theo Milestones của đề bài, tiêu chí nghiệm thu môn học).
-   - **`docs/superpowers/specs/` & `plans/`**: Là tài liệu kỹ thuật vi mô dành cho **lập trình viên / AI** (chia nhỏ từng bước TDD, code diff, mock, test case).
-   - **Nguyên tắc phân định**: `TASKS.md` chỉ theo dõi ở mức Milestones và đầu mục công việc cấp cao, kèm link trỏ tới các file plan/spec tương ứng trong `docs/superpowers/`, tuyệt đối không chép lại từng dòng code TDD vào `TASKS.md`.
+   - **Muc dich**: Bo nho ngu canh trung tam cho toan bo nhom va moi AI Agent.
+   - **Quy tac**: Day la tai lieu co tham quyen cao nhat. Moi thay doi kien truc, CSDL, luat game bat buoc phai cap nhat vao file nay dau tien.
+3. **Bo tai lieu chuyen biet (`docs/ARCHITECTURE.md`, `docs/BOT_GUIDE.md`, `docs/ADMIN_GUIDE.md`)**:
+   - Tach bach phuc vu chinh xac 3 doi tuong: Ky thuat vien/giao vien cham diem, Thi sinh viet bot, va Ban to chuc giai dau.
+4. **Moi quan he giua `TASKS.md` va `docs/superpowers/`**:
+   - `TASKS.md` la bang Kanban cap cao danh cho con nguoi va cham diem hoc phan theo cac Milestones tu 0 den 8.
+   - `docs/superpowers/specs/` va `plans/` la tai lieu ky thuat vi mo danh cho lap trinh vien va AI thuc hien TDD.
 
-### 11.2 Nguyên Tắc Đồng Bộ Tuyệt Đối (Continuous Documentation Sync)
-- Khi có bất kỳ sự thay đổi nào về: API (`get_move`, endpoint REST), CSDL (`server/models.py`), luật cờ, hoặc quy trình triển khai:
-  1. Cập nhật **ngay lập tức** vào `docs/CONTEXT_RESUME.md` (SSOT).
-  2. Cập nhật tài liệu chuyên biệt tương ứng (`ARCHITECTURE.md`, `BOT_GUIDE.md`, hoặc `ADMIN_GUIDE.md`).
-  3. Cập nhật trạng thái nghiệm thu trong `TASKS.md`.
-  4. Đảm bảo `README.md` giữ vững vai trò là bản đồ chỉ mục điều hướng chính xác.
-
-
+### 14.2 Nguyen Tac Dong Bo Tuyet Doi (Continuous Documentation Sync)
+- Khi co bat ky su thay doi nao ve: API (`get_move`, endpoint REST), CSDL (`server/models.py`), luat co, boss moi, hoac quy trinh trien khai:
+  1. Cap nhat **ngay lap tuc** vao `docs/CONTEXT_RESUME.md` (SSOT).
+  2. Cap nhat tai lieu chuyen biet tuong ung (`ARCHITECTURE.md`, `BOT_GUIDE.md`, hoac `ADMIN_GUIDE.md`).
+  3. Cap nhat trang thai nghiem thu trong `TASKS.md`.
+  4. Dam bao `README.md` giu vung vai tro la ban do chi muc dieu huong chinh xac.
