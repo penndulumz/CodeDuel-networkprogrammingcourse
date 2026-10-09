@@ -64,6 +64,8 @@ FORBIDDEN_BUILTINS: Final[frozenset[str]] = frozenset(
         "__import__",
         "globals",
         "locals",
+        "setattr",
+        "delattr",
     }
 )
 
@@ -75,6 +77,14 @@ FORBIDDEN_DUNDERS: Final[frozenset[str]] = frozenset(
         "__globals__",
         "__code__",
         "__bases__",
+        "__base__",
+        "__class__",
+        "__mro__",
+        "__dict__",
+        "__subclasshook__",
+        "__init_subclass__",
+        "__reduce__",
+        "__reduce_ex__",
     }
 )
 
