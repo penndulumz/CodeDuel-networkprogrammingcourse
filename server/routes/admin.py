@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Union
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 from server.database import get_db
 from server.models import Bot, BracketMatch, TournamentSetting, User
 from server.routes.auth import get_current_admin
-from server.tournament import generate_bracket
+from server.tournament import generate_bracket, is_ffa_portal_open
 from server.tournament_config import load_tournament_config
 
 router = APIRouter(prefix="/admin", tags=["admin"])
@@ -18,7 +18,10 @@ router = APIRouter(prefix="/admin", tags=["admin"])
 
 class UpdateSettingsRequest(BaseModel):
     """Pydantic payload for updating tournament dynamic parameters."""
-    is_portal_open: Optional[bool] = None
+    is_portal_open: Optional[Union[bool, str]] = None
+    portal_mode: Optional[str] = None
+    start_time: Optional[str] = None
+    end_time: Optional[str] = None
     daily_multiplier_x: Optional[float] = Field(None, ge=0.1, le=10.0)
     current_day: Optional[int] = Field(None, ge=1)
     total_days: Optional[int] = Field(None, ge=1)
@@ -54,11 +57,19 @@ def _get_all_settings_dict(db: Session) -> Dict[str, Any]:
         s.key: s.value for s in db.query(TournamentSetting).all()
     }
 
-    # Portal open status
-    if "is_portal_open" in settings_map:
-        portal_open = settings_map["is_portal_open"].lower() in ("true", "1", "yes")
+    start_time = settings_map.get("start_time", daily_cfg.get("start_time", "19:00"))
+    end_time = settings_map.get("end_time", daily_cfg.get("end_time", "21:00"))
+    raw_mode = settings_map.get("portal_mode") or settings_map.get("is_portal_open", "auto")
+    raw_mode_str = str(raw_mode).strip().lower()
+    if raw_mode_str in ("true", "1", "yes"):
+        portal_mode = "true"
+    elif raw_mode_str in ("false", "0", "no"):
+        portal_mode = "false"
     else:
-        portal_open = bool(daily_cfg.get("is_portal_open", False))
+        portal_mode = "auto"
+
+    # Evaluate dynamic portal state
+    portal_open = is_ffa_portal_open(config, db_settings=settings_map)
 
     # Daily multiplier x
     if "daily_multiplier_x" in settings_map:
@@ -92,6 +103,9 @@ def _get_all_settings_dict(db: Session) -> Dict[str, Any]:
 
     return {
         "is_portal_open": portal_open,
+        "portal_mode": portal_mode,
+        "start_time": start_time,
+        "end_time": end_time,
         "daily_multiplier_x": multiplier_x,
         "current_day": current_day,
         "total_days": total_days,
@@ -116,9 +130,21 @@ def update_settings(
     current_admin: User = Depends(get_current_admin),
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
-    """Update tournament settings (portal status, daily multiplier, days limit)."""
-    if payload.is_portal_open is not None:
-        _upsert_setting(db, "is_portal_open", str(payload.is_portal_open).lower())
+    """Update tournament settings (portal status, schedule, daily multiplier, days limit)."""
+    if payload.portal_mode is not None:
+        p_mode = payload.portal_mode.strip().lower()
+        _upsert_setting(db, "portal_mode", p_mode)
+        _upsert_setting(db, "is_portal_open", p_mode)
+    elif payload.is_portal_open is not None:
+        p_mode = str(payload.is_portal_open).strip().lower()
+        _upsert_setting(db, "is_portal_open", p_mode)
+        _upsert_setting(db, "portal_mode", p_mode)
+
+    if payload.start_time is not None:
+        _upsert_setting(db, "start_time", payload.start_time.strip())
+
+    if payload.end_time is not None:
+        _upsert_setting(db, "end_time", payload.end_time.strip())
 
     if payload.daily_multiplier_x is not None:
         _upsert_setting(db, "daily_multiplier_x", str(payload.daily_multiplier_x))

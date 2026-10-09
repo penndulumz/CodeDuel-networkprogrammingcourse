@@ -22,12 +22,25 @@
     </div>
 
     <form id="adminSettingsForm" onsubmit="handleUpdateSettings(event)">
-      <div class="form-group" style="display: flex; align-items: center; gap: 10px;">
-        <input type="checkbox" id="is_portal_open" name="is_portal_open" style="width: 18px; height: 18px;"
-               {% if settings.is_portal_open %}checked{% endif %}>
-        <label class="form-label" for="is_portal_open" style="margin: 0; cursor: pointer;">
-          <b>Mở Cổng Thách đấu FFA (Portal Open)</b>
-        </label>
+      <div class="form-group">
+        <label class="form-label" for="portal_mode"><b>Chế độ Cổng Thách đấu FFA (Portal Mode)</b></label>
+        <select id="portal_mode" name="portal_mode" class="form-control" style="background: var(--bg-card); color: var(--text);">
+          <option value="auto" {% if settings.portal_mode == 'auto' or not settings.portal_mode %}selected{% endif %}>Auto (Theo Khung Giờ)</option>
+          <option value="true" {% if settings.portal_mode == 'true' %}selected{% endif %}>Force Open (Mở Khẩn Cấp)</option>
+          <option value="false" {% if settings.portal_mode == 'false' %}selected{% endif %}>Force Closed (Đóng Khẩn Cấp)</option>
+        </select>
+      </div>
+
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+        <div class="form-group">
+          <label class="form-label" for="start_time">Giờ mở cổng (Start Time)</label>
+          <input type="time" id="start_time" name="start_time" class="form-control" value="{{ settings.start_time or '19:00' }}" required>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="end_time">Giờ đóng cổng (End Time)</label>
+          <input type="time" id="end_time" name="end_time" class="form-control" value="{{ settings.end_time or '21:00' }}" required>
+        </div>
       </div>
 
       <div class="form-group">
@@ -152,8 +165,11 @@
     const msgEl = document.getElementById('settingsMsg');
     msgEl.style.display = 'none';
 
+    const portalMode = document.getElementById('portal_mode').value;
     const payload = {
-      is_portal_open: document.getElementById('is_portal_open').checked,
+      portal_mode: portalMode,
+      start_time: document.getElementById('start_time').value,
+      end_time: document.getElementById('end_time').value,
       daily_multiplier_x: parseFloat(document.getElementById('daily_multiplier_x').value),
       current_day: parseInt(document.getElementById('current_day').value, 10),
       total_days: parseInt(document.getElementById('total_days').value, 10),

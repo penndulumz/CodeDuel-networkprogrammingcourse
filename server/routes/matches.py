@@ -26,18 +26,14 @@ class ChallengeRequest(BaseModel):
 
 
 def _is_portal_open_now(db: Session) -> bool:
-    """Check if the FFA challenge portal is active based on settings and schedule.
+    """Check if the FFA challenge portal is active based on database settings and schedule.
 
-    If TournamentSetting for 'is_portal_open' is explicitly present in the database,
-    its value acts as an authoritative master override (True = open, False = closed).
-    Only falls back to the time schedule window if no database setting exists.
+    Queries all TournamentSetting records into a dictionary and delegates evaluation
+    to is_ffa_portal_open with dynamic database overrides.
     """
-    setting = db.query(TournamentSetting).filter(TournamentSetting.key == "is_portal_open").first()
-    if setting and setting.value is not None:
-        return setting.value.strip().lower() in ("true", "1", "yes")
-
+    settings_dict = {s.key: s.value for s in db.query(TournamentSetting).all()}
     config = load_tournament_config()
-    return is_ffa_portal_open(config)
+    return is_ffa_portal_open(config, db_settings=settings_dict)
 
 
 def _serialize_match(m: Match) -> Dict[str, Any]:

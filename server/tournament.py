@@ -91,40 +91,73 @@ def apply_elo_change(rating: int, delta: int) -> int:
     return max(0, int(rating) + int(delta))
 
 
-def is_ffa_portal_open(config: Dict[str, Any], current_time_str: Optional[str] = None) -> bool:
+def is_ffa_portal_open(
+    config: Dict[str, Any],
+    current_time_str: Optional[str] = None,
+    db_settings: Optional[Dict[str, Any]] = None,
+) -> bool:
     """Determine whether the FFA challenge portal is open for match submissions.
 
     Checks:
-    1. If `is_portal_open` is explicitly set to True (admin override), returns True.
-    2. Otherwise, verifies if `current_time_str` falls within `start_time` and `end_time` (HH:MM).
-       Overnight time intervals (where start_time > end_time) are seamlessly supported.
+    1. If `db_settings` is provided:
+       - Checks `is_portal_open` or `portal_mode`:
+         - "true": returns True (force open override).
+         - "false": returns False (force closed override).
+         - "auto" or None: checks `start_time` and `end_time` (falling back to `config`).
+    2. Otherwise, falls back to `config`:
+       - If `is_portal_open` is explicitly True, returns True.
+       - Checks time window defined by `start_time` and `end_time` (HH:MM).
+    3. Evaluates both standard daytime and overnight intervals spanning midnight.
 
     Args:
         config: Tournament configuration dictionary or subsection.
         current_time_str: Optional time string in 'HH:MM' 24h format. If omitted,
             uses current system local time.
+        db_settings: Optional dictionary of dynamic settings from the database.
 
     Returns:
         True if the portal is open, False otherwise.
     """
     if not isinstance(config, dict):
-        return False
+        t_cfg: Dict[str, Any] = {}
+        schedule: Dict[str, Any] = {}
+    else:
+        # Support nested tournament section or top-level schedule
+        t_cfg = config.get("tournament", config)
+        if not isinstance(t_cfg, dict):
+            schedule = {}
+        else:
+            schedule = t_cfg.get("daily_schedule", {})
+            if not isinstance(schedule, dict):
+                schedule = {}
 
-    # Support nested tournament section or top-level schedule
-    t_cfg = config.get("tournament", config)
-    if not isinstance(t_cfg, dict):
-        return False
+    if db_settings is not None:
+        mode = db_settings.get("is_portal_open")
+        if mode is None:
+            mode = db_settings.get("portal_mode")
 
-    schedule = t_cfg.get("daily_schedule", {})
-    if not isinstance(schedule, dict):
-        return False
+        if isinstance(mode, bool):
+            if mode is True:
+                return True
+            else:
+                return False
+        elif isinstance(mode, str):
+            m_lower = mode.strip().lower()
+            if m_lower in ("true", "1", "yes"):
+                return True
+            elif m_lower in ("false", "0", "no"):
+                return False
+            # "auto" or None falls through to time window evaluation
 
-    # Admin override takes priority
-    if schedule.get("is_portal_open") is True:
-        return True
+        start_time = db_settings.get("start_time") or schedule.get("start_time")
+        end_time = db_settings.get("end_time") or schedule.get("end_time")
+    else:
+        # Admin override in config takes priority
+        if schedule.get("is_portal_open") is True:
+            return True
 
-    start_time = schedule.get("start_time")
-    end_time = schedule.get("end_time")
+        start_time = schedule.get("start_time")
+        end_time = schedule.get("end_time")
 
     if not isinstance(start_time, str) or not isinstance(end_time, str):
         return False
