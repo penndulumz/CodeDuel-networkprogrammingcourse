@@ -12,7 +12,7 @@ from pathlib import Path
 from typing import Any, AsyncGenerator, Dict, List
 from fastapi import Depends, FastAPI, HTTPException, Request, status
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from sqlalchemy import or_
@@ -209,9 +209,20 @@ def replay_page(
 def admin_page(
     request: Request,
     db: Session = Depends(get_db),
-) -> HTMLResponse:
+) -> Response:
     """Render tournament configuration management and bracket generator page."""
     current_user = _get_optional_user(request, db)
+    if current_user is None:
+        return RedirectResponse(
+            url="/login?next=/admin",
+            status_code=status.HTTP_303_SEE_OTHER,
+        )
+    if not current_user.is_admin:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Administrative privileges required.",
+        )
+
     settings = _get_all_settings_dict(db)
     bracket_matches = (
         db.query(BracketMatch)

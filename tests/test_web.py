@@ -150,7 +150,19 @@ def test_replay_page_returns_200_and_renders_board_container(client: TestClient)
 
 
 def test_admin_page_returns_200_and_renders_settings_form(client: TestClient) -> None:
-    """Verify that /admin returns 200 with tournament settings and bracket generator."""
+    """Verify that /admin returns 200 with tournament settings and bracket generator for admin."""
+    db = SessionLocal()
+    admin_user = User(username="admin_tester", is_admin=True, elo=1500)
+    admin_user.set_password("adminpass123")
+    db.add(admin_user)
+    db.commit()
+    user_id = admin_user.id
+    db.close()
+
+    session_token = "admin_session_token_web"
+    ACTIVE_SESSIONS[session_token] = user_id
+    client.cookies.set("session_token", session_token)
+
     res = client.get("/admin")
     assert res.status_code == 200
     assert "text/html" in res.headers["content-type"]

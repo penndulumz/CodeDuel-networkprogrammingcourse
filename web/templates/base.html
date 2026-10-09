@@ -18,7 +18,9 @@
       <li><a href="/" class="{% if request.url.path == '/' %}active{% endif %}">Leaderboard</a></li>
       <li><a href="/bracket" class="{% if request.url.path == '/bracket' %}active{% endif %}">Bracket</a></li>
       <li><a href="/profile" class="{% if request.url.path == '/profile' %}active{% endif %}">Profile</a></li>
-      <li><a href="/admin" class="{% if request.url.path == '/admin' %}active{% endif %}">Admin</a></li>
+      {% if current_user and current_user.is_admin %}
+        <li><a href="/admin" class="{% if request.url.path == '/admin' %}active{% endif %}">Admin</a></li>
+      {% endif %}
     </ul>
 
     <div class="nav-user">
