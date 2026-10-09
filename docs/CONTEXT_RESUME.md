@@ -127,3 +127,34 @@ Mỗi trận đấu sau khi kết thúc sẽ sinh file replay chuẩn:
    - Khi có bất kỳ thay đổi mang tính bước ngoặt (Breaking Change) nào — bao gồm: thay đổi API endpoint, thay đổi hàm `get_move()`, sửa đổi luật game, thay đổi schema database trong `server/models.py`, đổi port hoặc workflow — người hoặc AI thực hiện **BẮT BUỘC PHẢI CẬP NHẬT TRỰC TIẾP VÀO FILE NÀY (`docs/CONTEXT_RESUME.md`) VÀ `TASKS.md` TRONG CÙNG COMMIT ĐÓ**.
 3. **Bảo Toàn Chu Trình Cho Người Đến Sau**:
    - Nếu ai đó thay đổi hệ thống mà không cập nhật `docs/CONTEXT_RESUME.md`, phiên làm việc tiếp theo của các AI khác (Claude, Gemini, Cursor) sẽ đọc dữ liệu cũ, gây ra xung đột phiên bản và phá vỡ tính liên tục của dự án. Mọi thay đổi không ghi vào đây đều bị coi là không hợp lệ.
+
+---
+
+## 8. Quy Tắc Bắt Buộc Cách Ly Bằng Git Worktrees (Mandatory Git Worktree Isolation)
+1. **Luôn dùng Worktree khi phát triển tính năng mới**:
+   - Mọi task mới hoặc refactor lớn bắt buộc phải tạo nhánh cách ly trong thư mục `.worktrees/<tên-nhánh>` thông qua kỹ năng `using-git-worktrees`.
+   - Tuyệt đối không code trực tiếp lên nhánh `main` khi chưa hoàn thành TDD và được review toàn diện.
+2. **Quy trình kết thúc nhánh**:
+   - Chỉ merge về `main` sau khi toàn bộ test suite (`pytest -v`) đạt 100% PASS và thực hiện clean up worktree đúng chuẩn.
+
+---
+
+## 9. Bảo Tồn Tuyệt Đối Thư Mục Gốc & File Meta (Root Preservation Law)
+1. **Thư mục `resources/` (Thư viện tham khảo của User)**:
+   - `resources/` là thư mục chứa tài liệu gốc và các dự án mẫu của User, đã được đưa vào `.gitignore`.
+   - **BẤT BIẾN**: `resources/` CHỈ NẰM DUY NHẤT TẠI THƯ MỤC GỐC (ROOT REPO). Tuyệt đối không di chuyển, không xóa và KHÔNG ĐƯỢC DUPLICATE/COPY vào bên trong các worktree `.worktrees/`.
+2. **Các thư mục và file meta**:
+   - `.git/`, `.gemini/`, `GEMINI.md`, `CLAUDE.md`, và `docs/CONTEXT_RESUME.md` luôn giữ nguyên vị trí chuẩn ở root.
+
+---
+
+## 10. Nguyên Tắc Single-Admin & Triển Khai Đa Máy (Multi-Machine LAN)
+1. **Duy Nhất Một Tài Khoản Quản Trị (Single-Admin Invariant)**:
+   - Hệ thống chỉ cho phép đúng **1 tài khoản Admin tối cao**.
+   - Cấu hình qua biến môi trường: `ADMIN_USERNAME` (mặc định: `admin`), `ADMIN_PASSWORD` (mặc định: `admin123`).
+   - Mọi nỗ lực đăng ký tài khoản mang tên `admin` (hoặc trùng `ADMIN_USERNAME`, không phân biệt hoa thường) đều bị API từ chối với mã lỗi HTTP 400.
+   - Khi khởi động seeder, bất kỳ tài khoản nào khác có `is_admin = True` đều tự động bị hạ quyền xuống `is_admin = False`.
+2. **Triển Khai Đa Máy Qua Mạng Nội Bộ (LAN Access)**:
+   - Server lắng nghe trên mọi giao diện mạng (`0.0.0.0:8000`).
+   - Banner khởi động tự động dò IP mạng nội bộ của máy chủ (`http://<LAN_IP>:8000`) để người tổ chức cung cấp cho các máy tính khác trong cùng Wi-Fi/LAN truy cập thi đấu.
+

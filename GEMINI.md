@@ -24,6 +24,9 @@ Before executing any action, answering questions, or proposing changes, you MUST
 - **Zero-Node.js**: Pure HTML5/CSS3/Vanilla JS served by FastAPI. Never introduce npm/node runtime dependencies.
 - **Code Comments**: All code comments, docstrings, and commit messages MUST be in clear, detailed English.
 - **Testing Before Completion**: Run `pytest -v` to verify any modifications before committing.
+- **Worktree Isolation**: Always develop new features in an isolated worktree via `using-git-worktrees` (`.worktrees/<branch-name>`).
+- **Root Reference Preservation**: `resources/` and root meta-files (`.gemini/`, `GEMINI.md`, `CLAUDE.md`, `docs/CONTEXT_RESUME.md`) must strictly stay at the repository root and NEVER be duplicated into worktrees.
+- **Single-Admin & LAN Access**: Only 1 admin account exists (configurable via `ADMIN_USERNAME`/`ADMIN_PASSWORD` env vars); server listens on `0.0.0.0:8000` with LAN URL auto-detection.
 
 ---
 
