@@ -13,6 +13,7 @@ from __future__ import annotations
 import argparse
 import os
 from pathlib import Path
+import socket
 import sys
 from typing import List, Optional
 
@@ -159,6 +160,41 @@ def seed_admin_and_starter_bots(db_session: Optional[Session] = None) -> None:
             db.close()
 
 
+def get_lan_ip() -> str:
+    """Detect the local machine's primary IPv4 address on the local network (LAN).
+
+    Attempts a UDP probe connection to resolve the outbound network interface IP.
+    Falls back to hostname resolution or '127.0.0.1' if disconnected or unavailable.
+
+    Returns:
+        str: IPv4 address string (e.g. '192.168.1.15').
+    """
+    probe_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    probe_socket.settimeout(0.5)
+    ip = "127.0.0.1"
+    try:
+        # Probe does not send network packets; resolves local routing table
+        probe_socket.connect(("8.8.8.8", 80))
+        ip = probe_socket.getsockname()[0]
+    except Exception:
+        try:
+            ip = socket.gethostbyname(socket.gethostname())
+        except Exception:
+            ip = "127.0.0.1"
+    finally:
+        probe_socket.close()
+
+    if not ip or ip.startswith("127."):
+        try:
+            host_ip = socket.gethostbyname(socket.gethostname())
+            if host_ip and not host_ip.startswith("127."):
+                ip = host_ip
+        except Exception:
+            pass
+
+    return ip or "127.0.0.1"
+
+
 def print_banner(host: str, port: int) -> None:
     """Print an informative startup banner displaying server endpoints and URLs.
 
@@ -169,14 +205,19 @@ def print_banner(host: str, port: int) -> None:
     display_host = "localhost" if host in ("0.0.0.0", "127.0.0.1") else host
     base_url = f"http://{display_host}:{port}"
     docs_url = f"{base_url}/docs"
+    admin_url = f"{base_url}/admin"
+    lan_ip = get_lan_ip()
+    lan_url = f"http://{lan_ip}:{port}"
+
     banner = f"""
 ========================================================================
            BATTLECODE 9x9 ROCK-PAPER-SCISSORS PLATFORM
 ========================================================================
-  Web Interface:      {base_url}
+  Local URL:          {base_url}
+  LAN Network URL:    {lan_url}  (Share with other machines on LAN)
+  Admin Dashboard:    {admin_url}
   API Documentation:  {docs_url}
-  Admin Dashboard:    {base_url}/admin
-  Listening Address:  http://{host}:{port}
+  Listening Interface:http://{host}:{port}
 ========================================================================
 """
     print(banner)
