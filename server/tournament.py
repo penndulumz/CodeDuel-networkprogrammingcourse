@@ -71,8 +71,9 @@ def calculate_elo_delta(
 
     score_b = 1.0 - score
 
-    delta_a = round(float(multiplier) * float(k) * (float(score) - expected_a))
-    delta_b = round(float(multiplier) * float(k) * (float(score_b) - expected_b))
+    safe_multiplier = max(0.0, float(multiplier))
+    delta_a = round(safe_multiplier * float(k) * (float(score) - expected_a))
+    delta_b = round(safe_multiplier * float(k) * (float(score_b) - expected_b))
 
     return int(delta_a), int(delta_b)
 
