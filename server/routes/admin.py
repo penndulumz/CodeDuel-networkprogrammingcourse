@@ -7,6 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
+from server.boss_manager import deploy_boss, get_all_bosses_status, retract_boss
 from server.database import get_db
 from server.models import Bot, BracketMatch, TournamentSetting, User
 from server.routes.auth import get_current_admin
@@ -14,6 +15,12 @@ from server.tournament import generate_bracket, is_ffa_portal_open
 from server.tournament_config import load_tournament_config
 
 router = APIRouter(prefix="/admin", tags=["admin"])
+
+
+class BossDeployRequest(BaseModel):
+    """Pydantic payload for deploying or retracting a benchmark boss bot."""
+    boss_slug: str
+    action: str = "deploy"
 
 
 class UpdateSettingsRequest(BaseModel):
@@ -112,6 +119,7 @@ def _get_all_settings_dict(db: Session) -> Dict[str, Any]:
         "max_turns": max_turns,
         "turn_timeout_seconds": timeout_seconds,
         "top_players_count": int(bracket_cfg.get("top_players_count", 8)),
+        "bosses": get_all_bosses_status(db),
     }
 
 
@@ -263,3 +271,43 @@ def get_bracket(
         }
         for bm in matches
     ]
+
+
+@router.get("/bosses")
+def list_bosses(
+    current_admin: User = Depends(get_current_admin),
+    db: Session = Depends(get_db),
+) -> List[Dict[str, Any]]:
+    """List all benchmark boss bots and their current deployment status."""
+    return get_all_bosses_status(db)
+
+
+@router.post("/bosses/deploy")
+def toggle_boss_deployment(
+    payload: BossDeployRequest,
+    current_admin: User = Depends(get_current_admin),
+    db: Session = Depends(get_db),
+) -> Dict[str, Any]:
+    """Deploy or retract a benchmark boss bot in the active tournament arena."""
+    action = payload.action.strip().lower()
+    if action == "deploy":
+        try:
+            return deploy_boss(db, payload.boss_slug)
+        except ValueError as err:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=str(err),
+            )
+    elif action == "retract":
+        try:
+            return retract_boss(db, payload.boss_slug)
+        except ValueError as err:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=str(err),
+            )
+    else:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Invalid action: '{payload.action}'. Expected 'deploy' or 'retract'.",
+        )

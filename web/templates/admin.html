@@ -105,6 +105,51 @@
   </div>
 </div>
 
+<!-- Benchmark Boss Arena Section -->
+<div class="card" style="margin-bottom: 24px;">
+  <div class="card-header">
+    <div>
+      <h2 class="card-title">Benchmark Boss Arena</h2>
+      <div style="font-size: 13px; color: var(--muted); margin-top: 4px;">Graduated AI benchmark bots for tournament calibration, testing, and student challenges</div>
+    </div>
+    <div id="bossGlobalMsg" style="font-size: 13px; display: none;"></div>
+  </div>
+
+  <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px;">
+    {% for boss in settings.bosses %}
+    <div class="card" style="background: var(--panel-2); border: 1px solid var(--border-subtle); display: flex; flex-direction: column; justify-content: space-between;" id="boss-card-{{ boss.boss_slug }}">
+      <div>
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+          <span style="font-size: 11px; font-weight: 700; text-transform: uppercase; color: var(--accent); letter-spacing: 0.5px;">Level {{ boss.level }}</span>
+          {% if boss.is_deployed %}
+            <span class="tag" style="background: rgba(46, 160, 67, 0.15); color: #3fb950; border: 1px solid rgba(46, 160, 67, 0.4);" id="badge-{{ boss.boss_slug }}">Deployed</span>
+          {% else %}
+            <span class="tag" style="background: rgba(110, 118, 129, 0.15); color: var(--muted); border: 1px solid var(--border-subtle);" id="badge-{{ boss.boss_slug }}">Inactive</span>
+          {% endif %}
+        </div>
+        <h3 style="margin: 0 0 6px 0; font-size: 15px; color: var(--text-primary);">{{ boss.name }}</h3>
+        <div style="font-size: 12px; color: var(--muted); font-family: var(--font-mono); margin-bottom: 10px;">Elo: {{ boss.elo }}</div>
+        <p style="font-size: 12px; color: var(--muted); line-height: 1.4; margin: 0 0 16px 0;">
+          {{ boss.description }}
+        </p>
+      </div>
+
+      <div style="margin-top: auto;">
+        {% if boss.is_deployed %}
+          <button class="btn btn-sm btn-danger" style="width: 100%;" id="btn-{{ boss.boss_slug }}" onclick="toggleBoss('{{ boss.boss_slug }}', 'retract')">
+            Retract Boss
+          </button>
+        {% else %}
+          <button class="btn btn-sm btn-primary" style="width: 100%;" id="btn-{{ boss.boss_slug }}" onclick="toggleBoss('{{ boss.boss_slug }}', 'deploy')">
+            Deploy Boss
+          </button>
+        {% endif %}
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+
 <!-- Bracket Matches Table -->
 <div class="card">
   <div class="card-header">
@@ -231,6 +276,75 @@
     } catch (err) {
       msgEl.style.color = '#f87171';
       msgEl.textContent = `Lỗi mạng: ${err.message}`;
+    }
+  }
+
+  async function toggleBoss(bossSlug, action) {
+    const btn = document.getElementById(`btn-${bossSlug}`);
+    const badge = document.getElementById(`badge-${bossSlug}`);
+    const msgEl = document.getElementById('bossGlobalMsg');
+
+    if (btn) btn.disabled = true;
+    if (msgEl) {
+      msgEl.style.display = 'block';
+      msgEl.style.color = 'var(--muted)';
+      msgEl.textContent = `Processing ${action} for ${bossSlug}...`;
+    }
+
+    try {
+      const res = await fetch('/api/admin/bosses/deploy', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ boss_slug: bossSlug, action: action })
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        if (msgEl) {
+          msgEl.style.color = '#f87171';
+          msgEl.textContent = `Error: ${data.detail || 'Failed to update boss status'}`;
+        }
+        if (btn) btn.disabled = false;
+        return;
+      }
+
+      if (msgEl) {
+        msgEl.style.color = '#34d399';
+        msgEl.textContent = `Boss ${data.name || bossSlug} successfully ${data.is_deployed ? 'deployed' : 'retracted'}!`;
+      }
+
+      if (data.is_deployed) {
+        if (badge) {
+          badge.textContent = 'Deployed';
+          badge.style.background = 'rgba(46, 160, 67, 0.15)';
+          badge.style.color = '#3fb950';
+          badge.style.border = '1px solid rgba(46, 160, 67, 0.4)';
+        }
+        if (btn) {
+          btn.textContent = 'Retract Boss';
+          btn.className = 'btn btn-sm btn-danger';
+          btn.onclick = () => toggleBoss(bossSlug, 'retract');
+        }
+      } else {
+        if (badge) {
+          badge.textContent = 'Inactive';
+          badge.style.background = 'rgba(110, 118, 129, 0.15)';
+          badge.style.color = 'var(--muted)';
+          badge.style.border = '1px solid var(--border-subtle)';
+        }
+        if (btn) {
+          btn.textContent = 'Deploy Boss';
+          btn.className = 'btn btn-sm btn-primary';
+          btn.onclick = () => toggleBoss(bossSlug, 'deploy');
+        }
+      }
+    } catch (err) {
+      if (msgEl) {
+        msgEl.style.color = '#f87171';
+        msgEl.textContent = `Network error: ${err.message}`;
+      }
+    } finally {
+      if (btn) btn.disabled = false;
     }
   }
 </script>
