@@ -11,6 +11,7 @@ Provides a unified single-command launcher (python main.py) that:
 from __future__ import annotations
 
 import argparse
+import os
 from pathlib import Path
 import sys
 from typing import List, Optional
@@ -81,24 +82,38 @@ def seed_admin_and_starter_bots(db_session: Optional[Session] = None) -> None:
         db = db_session
 
     try:
-        # 1. Ensure default admin user exists
-        admin = db.query(User).filter(User.username == "admin").first()
+        admin_username = os.getenv("ADMIN_USERNAME", "admin").strip()
+        admin_password = os.getenv("ADMIN_PASSWORD", "admin123").strip()
+
+        # 1. Demote any rogue admin accounts to preserve strict single-admin invariant
+        rogue_admins = (
+            db.query(User)
+            .filter(User.is_admin == True, User.username != admin_username)
+            .all()
+        )
+        for rogue in rogue_admins:
+            rogue.is_admin = False
+
+        # 2. Ensure default admin user exists and is up to date
+        admin = db.query(User).filter(User.username == admin_username).first()
         if not admin:
             admin = User(
-                username="admin",
+                username=admin_username,
                 is_admin=True,
                 elo=1200,
                 wins=0,
                 losses=0,
                 draws=0,
             )
-            admin.set_password("admin123")
+            admin.set_password(admin_password)
             db.add(admin)
             db.commit()
             db.refresh(admin)
-            print("[INFO] Seeded default administrator account: 'admin' / 'admin123'")
-        elif not admin.is_admin:
+            print(f"[INFO] Seeded default administrator account: '{admin_username}'")
+        else:
             admin.is_admin = True
+            if not admin.verify_password(admin_password):
+                admin.set_password(admin_password)
             db.commit()
             db.refresh(admin)
 

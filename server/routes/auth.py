@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import secrets
 from typing import Any, Dict
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
@@ -79,6 +80,13 @@ def register(
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Username cannot be empty",
+        )
+
+    target_admin = os.getenv("ADMIN_USERNAME", "admin").strip().lower()
+    if username.lower() == target_admin or username.lower() == "admin":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Username is reserved for administrator",
         )
 
     existing = db.query(User).filter(User.username == username).first()
