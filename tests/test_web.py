@@ -180,3 +180,16 @@ def test_static_files_served_properly(client: TestClient) -> None:
     assert js_res.status_code == 200
     assert "javascript" in js_res.headers["content-type"] or "text/plain" in js_res.headers["content-type"]
     assert "ReplayVisualizer" in js_res.text
+
+
+def test_minimalist_css_design_tokens_present(client: TestClient) -> None:
+    """Verify that style.css defines Slate/Charcoal design tokens and removes body radial gradients."""
+    res = client.get("/static/css/style.css")
+    assert res.status_code == 200
+    css = res.text
+    assert "--bg-main: #0d1117" in css
+    assert "--bg-surface: #161b22" in css
+    assert "--border-subtle: #30363d" in css
+    assert "--text-primary: #f0f6fc" in css
+    assert "--text-muted: #8b949e" in css
+    assert "radial-gradient" not in css.split("body")[1].split("}")[0]

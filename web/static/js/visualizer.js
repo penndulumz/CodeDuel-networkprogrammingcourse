@@ -284,7 +284,7 @@ class ReplayVisualizer {
     }
     this.isPlaying = true;
     if (this.dom.btnPlayPause) {
-      this.dom.btnPlayPause.textContent = '⏸ Pause';
+      this.dom.btnPlayPause.textContent = 'Pause';
     }
 
     const intervalMs = Math.max(100, Math.floor(800 / this.speed));
@@ -305,7 +305,7 @@ class ReplayVisualizer {
       this.timer = null;
     }
     if (this.dom.btnPlayPause) {
-      this.dom.btnPlayPause.textContent = '▶ Play';
+      this.dom.btnPlayPause.textContent = 'Play';
     }
   }
 
