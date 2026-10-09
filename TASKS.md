@@ -1,7 +1,7 @@
 # Kế Hoạch Thực Hiện & Theo Dõi Tiến Độ Dự Án (TASKS.md)
 
-> **Trạng thái**: 🎉 **100% HOÀN THÀNH VÀ TOÀN BỘ TEST PASS (171/171 tests passed in 5.86s)**
-> - Quy tắc: Đã kiểm chứng tự động toàn diện qua Subagent-Driven Development và Unit/Integration/E2E test suite.
+> **Trạng thái**: 🎉 **100% HOÀN THÀNH VÀ TOÀN BỘ TEST PASS (203/203 tests passed in 11.32s)**
+> - Quy tắc: Đã kiểm chứng tự động toàn diện qua Subagent-Driven Development, 6-domain Deep Testing Matrix, và Unit/Integration/E2E test suite.
 
 ---
 
@@ -78,4 +78,19 @@
 - *Liên kết chi tiết Spec & Plan*:
   - Spec: [`docs/superpowers/specs/2026-10-09-multi-machine-single-admin-docs-design.md`](docs/superpowers/specs/2026-10-09-multi-machine-single-admin-docs-design.md)
   - Plan: [`docs/superpowers/plans/2026-10-09-multi-machine-single-admin-docs.md`](docs/superpowers/plans/2026-10-09-multi-machine-single-admin-docs.md)
+
+---
+
+## 🛡️ Milestone 7: Deep Testing Matrix & Edge-Case Security Hardening (Cả Nhóm)
+- [x] **Task 7.1**: Domain 1 Game Engine Extremes (`tests/test_deep_engine.py`): Biên tọa độ âm, chặn quân đồng minh, chặn tấn công quân cùng cấp/hạ cấp, ưu tiên chạm đích trên turn 200, phát hiện thế cờ hòa/bế tắc không có nước đi, và kiểm tra từ chối tọa độ không phải số nguyên.
+- [x] **Task 7.2**: Domain 2 AST Sandbox Exploits (`tests/test_deep_sandbox.py`, `engine/sandbox.py`): Vá lỗ hổng Reflection (`__class__`, `__mro__`, `__dict__`, `__base__`, `setattr`, `delattr`, `__subclasshook__`, `__init_subclass__`), chặn AST recursion bombs, chặn dunder byte-escapes, và xử lý cú pháp lỗi.
+- [x] **Task 7.3**: Domain 3 Subprocess Runner Traps (`tests/test_deep_runner.py`): Ép timeout xử phạt vòng lặp vô tận `while True:`, chặn bot gọi `SystemExit`, xử lý an toàn dữ liệu nước đi bất thường (None, string, float, tuple sai kích thước), bẫy bùng nổ bộ nhớ (memory bomb), và bảo toàn tính bất biến của bàn cờ authoritative.
+- [x] **Task 7.4**: Domain 4 Concurrency & Data Integrity (`tests/test_deep_concurrency.py`): Kiểm tra truy cập đồng thời đa luồng trên SQLite WAL không bị race condition/lock, chặn sàn Elo không bao giờ âm (clamped at 0), kiểm tra an toàn SQL injection trong username với fixture CSDL cách ly hoàn toàn.
+- [x] **Task 7.5**: Domain 5 Tournament Edge Cases (`tests/test_deep_tournament.py`, `server/tournament.py`): Xử lý bốc thăm số lượng thí sinh lẻ (3, 5, 7 người), kiểm tra hội tụ Elo khi chênh lệch điểm cực lớn (50 vs 3000), chặn hệ số nhân âm gây đảo ngược thắng thua (`safe_multiplier = max(0.0, float(multiplier))`), và tính điểm tổng kết kết hợp.
+- [x] **Task 7.6**: Domain 6 REST API & Access Security (`tests/test_deep_api_security.py`): Chặn truy cập admin trái phép (401/403), từ chối session token giả mạo, trả lỗi 404 sạch khi replay không tồn tại, từ chối file bot upload vượt quá dung lượng (>5MB payload), chặn tự thách đấu chính mình, và dọn dẹp môi trường CSDL tự động (zero state pollution).
+- *Verification*: Full test suite `pytest -v` -> 203/203 tests PASS (100% Green in 11.32s).
+- *Liên kết chi tiết Spec & Plan*:
+  - Spec: [`docs/superpowers/specs/2026-10-09-deep-testing-matrix-design.md`](docs/superpowers/specs/2026-10-09-deep-testing-matrix-design.md)
+  - Plan: [`docs/superpowers/plans/2026-10-09-deep-testing-matrix.md`](docs/superpowers/plans/2026-10-09-deep-testing-matrix.md)
+
 
