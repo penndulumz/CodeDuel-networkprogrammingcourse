@@ -1,24 +1,42 @@
-"""Domain 6 Deep Testing: REST API authentication security, token spoofing, payload sizes, and forbidden access."""
-
 import io
+import os
+import shutil
+import pytest
 from fastapi.testclient import TestClient
 from server.main import app
-from server.database import SessionLocal, init_db
+from server.database import SessionLocal, init_db, engine
 from server.models import User, TournamentSetting
 from main import seed_admin_and_starter_bots
 
 
+@pytest.fixture(autouse=True)
+def setup_and_teardown_db():
+    """Ensure clean database and tables for every security test."""
+    init_db()
+    yield
+    engine.dispose()
+    for db_artifact in ["app.db", "app.db-shm", "app.db-wal"]:
+        if os.path.exists(db_artifact):
+            try:
+                os.remove(db_artifact)
+            except OSError:
+                pass
+    if os.path.exists("bots"):
+        shutil.rmtree("bots", ignore_errors=True)
+    if os.path.exists("replays"):
+        shutil.rmtree("replays", ignore_errors=True)
+
+
 def test_unauthenticated_admin_endpoint_rejected():
     """Verify that accessing admin settings without authentication returns 401."""
-    init_db()
     client = TestClient(app)
+
     res = client.get("/api/admin/settings")
     assert res.status_code == 401
 
 
 def test_non_admin_user_forbidden_from_admin_endpoints():
     """Verify that a regular authenticated user cannot access or modify admin settings."""
-    init_db()
     client = TestClient(app)
 
     # Register and login regular student user
@@ -62,7 +80,6 @@ def test_spoofed_or_expired_session_token():
 
 def test_nonexistent_replay_returns_404_not_500():
     """Verify that requesting a nonexistent match replay returns clean 404 rather than unhandled 500."""
-    init_db()
     client = TestClient(app)
     res = client.get("/api/matches/99999999/replay")
     assert res.status_code == 404
@@ -71,7 +88,6 @@ def test_nonexistent_replay_returns_404_not_500():
 
 def test_upload_oversized_bot_rejected():
     """Verify that uploading a bot exceeding 1MB is rejected with 400 Bad Request."""
-    init_db()
     client = TestClient(app)
 
     # Register and login
@@ -86,8 +102,8 @@ def test_upload_oversized_bot_rejected():
     token = login_res.json()["token"]
     headers = {"Authorization": f"Bearer {token}"}
 
-    # Generate 1.2MB dummy Python file
-    large_code = "def get_move(board, my_player, history):\n    return ((0, 0), (1, 1))\n" + "#" * (1_200_000)
+    # Generate 5.5MB dummy Python file (>5MB payload check)
+    large_code = "def get_move(board, my_player, history):\n    return ((0, 0), (1, 1))\n" + "#" * (5_500_000)
     file_bytes = io.BytesIO(large_code.encode("utf-8"))
 
     res = client.post(
@@ -101,7 +117,6 @@ def test_upload_oversized_bot_rejected():
 
 def test_challenge_self_strictly_rejected():
     """Verify user cannot challenge their own bot."""
-    init_db()
     client = TestClient(app)
 
     # Register & login

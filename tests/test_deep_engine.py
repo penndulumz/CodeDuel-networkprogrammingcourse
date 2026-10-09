@@ -131,3 +131,20 @@ def test_stalemate_zero_moves_detected_cleanly():
 
     moves_corner = [m for m in state.get_valid_moves(1) if m[0] == (0, 0)]
     assert moves_corner == []
+
+
+def test_coord_non_integer_inputs_rejected():
+    """Verify that passing non-integer coordinates (floats, strings) raises TypeError or ValueError."""
+    state = GameState()
+    with pytest.raises((TypeError, ValueError)):
+        state.apply_move((0.5, 1.2), (2, 3))  # type: ignore
+
+    with pytest.raises((TypeError, ValueError)):
+        state.apply_move(("a", "b"), (1, 2))  # type: ignore
+
+    with pytest.raises((TypeError, ValueError)):
+        coord_name(1.5, 2.5)  # type: ignore
+
+    with pytest.raises((TypeError, ValueError)):
+        coord_name("0", "0")  # type: ignore
+

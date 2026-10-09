@@ -1,10 +1,34 @@
 """Domain 4 Deep Testing: Concurrency, SQLite WAL thread-safety, Elo clamping, and SQL injection safety."""
 
 import concurrent.futures
-from sqlalchemy.orm import Session
-from server.database import SessionLocal, init_db
-from server.models import User, Match
+import pytest
+from sqlalchemy import create_engine, event
+from sqlalchemy.orm import Session, sessionmaker
+from server.database import Base
+from server.models import User
 from server.tournament import apply_elo_change, calculate_elo_delta
+
+
+@pytest.fixture
+def isolated_db_factory(tmp_path):
+    """Create an isolated, dedicated SQLite database with WAL mode for concurrency testing."""
+    db_file = tmp_path / "wal_concurrency.db"
+    test_engine = create_engine(
+        f"sqlite:///{db_file}",
+        connect_args={"check_same_thread": False},
+    )
+
+    @event.listens_for(test_engine, "connect")
+    def set_sqlite_pragma(dbapi_connection, connection_record):
+        cursor = dbapi_connection.cursor()
+        cursor.execute("PRAGMA journal_mode=WAL")
+        cursor.execute("PRAGMA synchronous=NORMAL")
+        cursor.close()
+
+    Base.metadata.create_all(bind=test_engine)
+    TestingSession = sessionmaker(autocommit=False, autoflush=False, bind=test_engine)
+    yield TestingSession
+    test_engine.dispose()
 
 
 def test_elo_floor_clamping_at_zero_extreme():
@@ -25,12 +49,10 @@ def test_elo_floor_clamping_at_zero_extreme():
     assert apply_elo_change(10, -500) == 0
 
 
-def test_sqlite_wal_multi_threaded_concurrency():
+def test_sqlite_wal_multi_threaded_concurrency(isolated_db_factory):
     """Verify that multiple concurrent threads can read and write to SQLite simultaneously without locks."""
-    init_db()
-
     def worker_task(thread_id: int) -> bool:
-        db: Session = SessionLocal()
+        db: Session = isolated_db_factory()
         try:
             # Create user
             username = f"worker_thread_user_{thread_id}"
@@ -62,10 +84,9 @@ def test_sqlite_wal_multi_threaded_concurrency():
     assert all(r is True for r in results)
 
 
-def test_sql_injection_username_safety():
+def test_sql_injection_username_safety(isolated_db_factory):
     """Verify that SQL injection patterns in usernames are handled safely as literal strings."""
-    init_db()
-    db = SessionLocal()
+    db = isolated_db_factory()
     try:
         malicious_usernames = [
             "user' OR '1'='1",
@@ -88,3 +109,4 @@ def test_sql_injection_username_safety():
             assert queried.username == mal_name
     finally:
         db.close()
+

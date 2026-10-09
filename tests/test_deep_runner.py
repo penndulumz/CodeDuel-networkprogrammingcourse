@@ -133,3 +133,34 @@ def get_move(board, my_player, history):
     assert first_move["player"] == 1
     assert first_move["from"] == [0, 0]
     assert first_move["to"] == [1, 0]
+
+
+def test_runner_catches_memory_explosion(temp_dir):
+    """Verify that a bot attempting excessive memory allocation is safely terminated via timeout or error."""
+    mem_bot = os.path.join(temp_dir, "mem_bot.py")
+    with open(mem_bot, "w") as f:
+        f.write("""
+def get_move(board, my_player, history):
+    # Attempt huge memory consumption
+    chunks = []
+    for _ in range(1000):
+        chunks.append(bytearray(20_000_000))
+    return ((0, 0), (1, 0))
+""")
+
+    normal_bot = os.path.join(temp_dir, "normal_bot.py")
+    with open(normal_bot, "w") as f:
+        f.write("""
+def get_move(board, my_player, history):
+    return ((8, 0), (7, 0))
+""")
+
+    result = run_match(
+        mem_bot,
+        normal_bot,
+        timeout_per_turn=0.5,
+    )
+
+    assert result["winner"] == 2
+    assert result["win_reason"] in ("timeout", "error", "invalid_move")
+
