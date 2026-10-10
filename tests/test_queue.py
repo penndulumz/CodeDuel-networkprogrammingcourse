@@ -395,3 +395,189 @@ def test_execute_match_job_honors_database_setting_overrides():
     assert kwargs["max_turns"] == 150
     assert kwargs["timeout_per_turn"] == 0.75
 
+
+def test_execute_match_job_honors_configured_rule_variant():
+    """Verify execute_match_job runs match under TournamentSetting rule_variant and records it."""
+    u1_id, u2_id, b1_id, b2_id, b1_path, b2_path = _create_test_pair("var_setting")
+
+    db = SessionLocal()
+    try:
+        setting = db.query(TournamentSetting).filter(TournamentSetting.key == "rule_variant").first()
+        if setting:
+            setting.value = "inverted_rps"
+        else:
+            db.add(TournamentSetting(key="rule_variant", value="inverted_rps"))
+        db.commit()
+
+        match = Match(
+            player1_id=u1_id,
+            player2_id=u2_id,
+            bot1_id=b1_id,
+            bot2_id=b2_id,
+            p1_elo_before=1200,
+            p2_elo_before=1200,
+            is_bracket=False,
+        )
+        db.add(match)
+        db.commit()
+        match_id = match.id
+    finally:
+        db.close()
+
+    fake_result = {
+        "winner": 1,
+        "win_reason": "goal",
+        "total_turns": 10,
+        "moves": [],
+        "board_history": [],
+        "rule_variant": "inverted_rps",
+    }
+
+    with patch("server.queue.run_match", return_value=fake_result) as mock_run, \
+         patch("server.queue.save_replay", return_value=None):
+        outcome = execute_match_job(
+            match_id=match_id,
+            bot1_path=b1_path,
+            bot2_path=b2_path,
+            db_factory=SessionLocal,
+        )
+
+    assert outcome == fake_result
+    mock_run.assert_called_once()
+    _, kwargs = mock_run.call_args
+    assert kwargs.get("variant") == "inverted_rps"
+
+    db_check = SessionLocal()
+    try:
+        m = db_check.query(Match).filter(Match.id == match_id).first()
+        assert m.rule_variant == "inverted_rps"
+    finally:
+        db_check.close()
+
+
+def test_execute_match_job_explicit_match_rule_variant_takes_precedence():
+    """Verify explicit match.rule_variant takes precedence over tournament settings."""
+    u1_id, u2_id, b1_id, b2_id, b1_path, b2_path = _create_test_pair("var_explicit")
+
+    db = SessionLocal()
+    try:
+        setting = db.query(TournamentSetting).filter(TournamentSetting.key == "rule_variant").first()
+        if setting:
+            setting.value = "standard"
+        else:
+            db.add(TournamentSetting(key="rule_variant", value="standard"))
+        db.commit()
+
+        match = Match(
+            player1_id=u1_id,
+            player2_id=u2_id,
+            bot1_id=b1_id,
+            bot2_id=b2_id,
+            p1_elo_before=1200,
+            p2_elo_before=1200,
+            is_bracket=False,
+            rule_variant="inverted_rps",
+        )
+        db.add(match)
+        db.commit()
+        match_id = match.id
+    finally:
+        db.close()
+
+    fake_result = {
+        "winner": 2,
+        "win_reason": "wipeout",
+        "total_turns": 15,
+        "moves": [],
+        "board_history": [],
+        "rule_variant": "inverted_rps",
+    }
+
+    with patch("server.queue.run_match", return_value=fake_result) as mock_run, \
+         patch("server.queue.save_replay", return_value=None):
+        outcome = execute_match_job(
+            match_id=match_id,
+            bot1_path=b1_path,
+            bot2_path=b2_path,
+            db_factory=SessionLocal,
+        )
+
+    assert outcome == fake_result
+    mock_run.assert_called_once()
+    _, kwargs = mock_run.call_args
+    assert kwargs.get("variant") == "inverted_rps"
+
+    db_check = SessionLocal()
+    try:
+        m = db_check.query(Match).filter(Match.id == match_id).first()
+        assert m.rule_variant == "inverted_rps"
+    finally:
+        db_check.close()
+
+
+def test_execute_match_job_default_rule_variant_fallback():
+    """Verify matches execute under 'standard' variant when no override is present."""
+    u1_id, u2_id, b1_id, b2_id, b1_path, b2_path = _create_test_pair("var_default")
+
+    db = SessionLocal()
+    try:
+        # Ensure rule_variant setting is not present
+        db.query(TournamentSetting).filter(TournamentSetting.key == "rule_variant").delete()
+        db.commit()
+
+        match = Match(
+            player1_id=u1_id,
+            player2_id=u2_id,
+            bot1_id=b1_id,
+            bot2_id=b2_id,
+            p1_elo_before=1200,
+            p2_elo_before=1200,
+            is_bracket=False,
+        )
+        db.add(match)
+        db.commit()
+        match_id = match.id
+    finally:
+        db.close()
+
+    fake_result = {
+        "winner": 1,
+        "win_reason": "goal",
+        "total_turns": 12,
+        "moves": [],
+        "board_history": [],
+        "rule_variant": "standard",
+    }
+
+    with patch("server.queue.run_match", return_value=fake_result) as mock_run, \
+         patch("server.queue.save_replay", return_value=None):
+        outcome = execute_match_job(
+            match_id=match_id,
+            bot1_path=b1_path,
+            bot2_path=b2_path,
+            db_factory=SessionLocal,
+        )
+
+    assert outcome == fake_result
+    mock_run.assert_called_once()
+    _, kwargs = mock_run.call_args
+    assert kwargs.get("variant") == "standard"
+
+    db_check = SessionLocal()
+    try:
+        m = db_check.query(Match).filter(Match.id == match_id).first()
+        assert m.rule_variant == "standard"
+    finally:
+        db_check.close()
+
+
+def test_runner_executes_with_rule_variant():
+    """Verify run_match initializes game with variant and includes rule_variant in result."""
+    from engine.runner import run_match
+    b1_path = str(Path("starter_kit/bot_template.py").resolve())
+    b2_path = str(Path("starter_kit/heuristic_bot.py").resolve())
+    res = run_match(b1_path, b2_path, max_turns=5, variant="inverted_rps")
+    assert res["rule_variant"] == "inverted_rps"
+
+
+

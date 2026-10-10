@@ -115,6 +115,7 @@ class Match(Base):
     p2_elo_after: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     replay_path: Mapped[Optional[str]] = mapped_column(String(512), nullable=True)
     is_bracket: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    rule_variant: Mapped[str] = mapped_column(String(32), default="standard", nullable=False)
     created_at: Mapped[datetime] = mapped_column(
         DateTime,
         default=lambda: datetime.now(timezone.utc),

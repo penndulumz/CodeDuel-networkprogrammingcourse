@@ -83,6 +83,19 @@ def execute_match_job(
             db, "turn_timeout_seconds", rules_cfg.get("turn_timeout_seconds", 1.0), float
         )
 
+        # Determine active rule variant
+        db_variant = _get_setting_value(db, "rule_variant", None, str)
+        match_variant = getattr(match, "rule_variant", None)
+        if match_variant and match_variant != "standard":
+            rule_variant = match_variant
+        elif db_variant:
+            rule_variant = db_variant
+        else:
+            rule_variant = match_variant or "standard"
+
+        if not rule_variant:
+            rule_variant = "standard"
+
         p1_meta = {
             "id": player1.id,
             "username": player1.username,
@@ -102,6 +115,7 @@ def execute_match_job(
             timeout_per_turn=timeout_seconds,
             player1_info=p1_meta,
             player2_info=p2_meta,
+            variant=rule_variant,
         )
 
         # Save replay JSON
@@ -118,6 +132,7 @@ def execute_match_job(
         match.replay_path = replay_filepath
         match.win_reason = win_reason
         match.total_turns = total_turns
+        match.rule_variant = rule_variant
 
         if winner_code == 1:
             match.winner_id = player1.id

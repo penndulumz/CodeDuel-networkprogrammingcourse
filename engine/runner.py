@@ -380,6 +380,7 @@ def run_match(
     timeout_per_turn: float = 1.0,
     player1_info: dict[str, Any] | None = None,
     player2_info: dict[str, Any] | None = None,
+    variant: str = "standard",
 ) -> dict[str, Any]:
     """Execute a complete 9x9 Rock-Paper-Scissors Chess match between two bot scripts.
 
@@ -394,6 +395,7 @@ def run_match(
         timeout_per_turn: Maximum duration in seconds allowed for get_move (default: 1.0).
         player1_info: Optional metadata dictionary for Player 1.
         player2_info: Optional metadata dictionary for Player 2.
+        variant: Game rule variant ('standard' or 'inverted_rps', default: 'standard').
 
     Returns:
         Dictionary containing standardized match result and replay log:
@@ -403,6 +405,7 @@ def run_match(
             - winner: Winning player (1, 2, or None for draw).
             - win_reason: Reason string ('goal', 'wipeout', 'max_turns', 'timeout',
                           'error', 'invalid_move').
+            - rule_variant: Game rule variant string ('standard' or 'inverted_rps').
             - total_turns: Total number of moves executed.
             - moves: Chronological list of move record dictionaries.
             - bot1_error: Error message string for Player 1, or None.
@@ -435,7 +438,7 @@ def run_match(
         p2_meta.update(copy.deepcopy(player2_info))
 
     initial_board = create_initial_board()
-    game = GameState(board=initial_board, turn=1, move_no=1, max_turns=max_turns)
+    game = GameState(board=initial_board, turn=1, move_no=1, max_turns=max_turns, variant=variant)
 
     bot1_error: str | None = None
     bot2_error: str | None = None
@@ -463,6 +466,7 @@ def run_match(
                 bot1_error=bot1_error,
                 bot2_error=bot2_error,
                 initial_board=initial_board,
+                variant=variant,
             )
 
         # Launch Worker 2
@@ -482,6 +486,7 @@ def run_match(
                 bot1_error=bot1_error,
                 bot2_error=bot2_error,
                 initial_board=initial_board,
+                variant=variant,
             )
 
         workers = {1: worker1, 2: worker2}
@@ -552,6 +557,7 @@ def run_match(
         bot1_error=bot1_error,
         bot2_error=bot2_error,
         initial_board=initial_board,
+        variant=variant,
     )
 
 
@@ -565,6 +571,7 @@ def _format_match_result(
     bot1_error: str | None,
     bot2_error: str | None,
     initial_board: list[list[dict[str, Any] | None]],
+    variant: str = "standard",
 ) -> dict[str, Any]:
     """Format match outcomes into a standardized dictionary.
 
@@ -578,6 +585,7 @@ def _format_match_result(
         bot1_error: Player 1 error string.
         bot2_error: Player 2 error string.
         initial_board: 9x9 starting board matrix.
+        variant: Game rule variant string.
 
     Returns:
         Structured result dictionary.
@@ -603,6 +611,7 @@ def _format_match_result(
         "player2": p2_meta,
         "winner": winner,
         "win_reason": win_reason,
+        "rule_variant": variant,
         "total_turns": len(formatted_moves),
         "moves": formatted_moves,
         "bot1_error": bot1_error,
