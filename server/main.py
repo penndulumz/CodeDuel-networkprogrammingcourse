@@ -10,7 +10,7 @@ from __future__ import annotations
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any, AsyncGenerator, Dict, List
-from fastapi import Depends, FastAPI, HTTPException, Request, status
+from fastapi import Depends, FastAPI, HTTPException, Query, Request, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
@@ -67,6 +67,17 @@ app.include_router(bots.router, prefix="/api")
 app.include_router(matches.router, prefix="/api")
 app.include_router(leaderboard.router, prefix="/api")
 app.include_router(admin.router, prefix="/api")
+
+
+@app.get("/api/users/{user_id}/rating-history", tags=["users"])
+def get_user_rating_history_alias(
+    user_id: int,
+    limit: int = Query(50, ge=5, le=100),
+    db: Session = Depends(get_db),
+) -> Dict[str, Any]:
+    """Retrieve chronological Elo trajectory for a specific user ID."""
+    return leaderboard.get_single_user_rating_history(user_id=user_id, limit=limit, db=db)
+
 
 
 def _get_optional_user(request: Request, db: Session) -> User | None:

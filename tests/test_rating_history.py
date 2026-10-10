@@ -6,13 +6,28 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
-from server.database import Base
+from fastapi.testclient import TestClient
+from server.database import Base, get_db
+from server.main import app
 from server.models import Match, User
 from server.rating_history import (
     PALETTE,
     get_top_teams_rating_history,
     get_user_rating_history,
 )
+
+
+@pytest.fixture
+def client(db_session):
+    """Create a FastAPI TestClient with the test db_session dependency override."""
+    def override_get_db():
+        yield db_session
+
+    app.dependency_overrides[get_db] = override_get_db
+    test_client = TestClient(app)
+    yield test_client
+    app.dependency_overrides.clear()
+
 
 
 @pytest.fixture
@@ -300,3 +315,113 @@ def test_get_top_teams_rating_history_ranking_and_palette(db_session):
     # Verify clamping: top=20 clamped to 10 (or total available users, which is 7)
     res_clamp_max = get_top_teams_rating_history(db=db_session, top=20)
     assert len(res_clamp_max["users"]) == 7
+
+
+def test_api_leaderboard_rating_history_endpoint(client, db_session):
+    """Verify GET /api/leaderboard/rating-history returns top teams trajectory schema."""
+    u1 = User(username="champion", elo=1500)
+    u2 = User(username="contender", elo=1400)
+    db_session.add_all([u1, u2])
+    db_session.commit()
+
+    response = client.get("/api/leaderboard/rating-history?top=2&limit=20")
+    assert response.status_code == 200
+    data = response.json()
+    assert "users" in data
+    assert len(data["users"]) == 2
+    assert data["users"][0]["username"] == "champion"
+    assert data["users"][0]["rank"] == 1
+    assert "points" in data["users"][0]
+    assert "color" in data["users"][0]
+    assert data["users"][1]["username"] == "contender"
+    assert data["users"][1]["rank"] == 2
+
+
+def test_api_user_rating_history_endpoint(client, db_session):
+    """Verify user rating history endpoints under both leaderboard and users route paths."""
+    base_time = datetime.now(timezone.utc) - timedelta(hours=2)
+    alice = User(username="alice", elo=1230, created_at=base_time)
+    bob = User(username="bob", elo=1170, created_at=base_time)
+    db_session.add_all([alice, bob])
+    db_session.commit()
+
+    m = Match(
+        player1_id=alice.id,
+        player2_id=bob.id,
+        winner_id=alice.id,
+        win_reason="goal",
+        p1_elo_before=1200,
+        p1_elo_after=1230,
+        p2_elo_before=1200,
+        p2_elo_after=1170,
+        is_bracket=False,
+        created_at=base_time + timedelta(hours=1),
+    )
+    db_session.add(m)
+    db_session.commit()
+
+    # Route 1: /api/leaderboard/users/{user_id}/rating-history
+    res1 = client.get(f"/api/leaderboard/users/{alice.id}/rating-history")
+    assert res1.status_code == 200
+    data1 = res1.json()
+    assert data1["user_id"] == alice.id
+    assert data1["username"] == "alice"
+    assert data1["current_elo"] == 1230
+    assert len(data1["points"]) == 2
+    assert data1["points"][1]["opponent"] == "bob"
+
+    # Route 2: /api/users/{user_id}/rating-history
+    res2 = client.get(f"/api/users/{alice.id}/rating-history")
+    assert res2.status_code == 200
+    data2 = res2.json()
+    assert data2["user_id"] == alice.id
+    assert data2["username"] == "alice"
+    assert data2["current_elo"] == 1230
+    assert len(data2["points"]) == 2
+    assert data2["points"][1]["opponent"] == "bob"
+
+
+def test_api_user_rating_history_404(client, db_session):
+    """Verify non-existent user ID returns HTTP 404 on both route variants."""
+    res1 = client.get("/api/leaderboard/users/99999/rating-history")
+    assert res1.status_code == 404
+    assert res1.json()["detail"] == "User not found."
+
+    res2 = client.get("/api/users/99999/rating-history")
+    assert res2.status_code == 404
+    assert res2.json()["detail"] == "User not found."
+
+
+def test_api_query_validation(client, db_session):
+    """Verify FastAPI Query parameter bounds enforce 422 Unprocessable Entity."""
+    user = User(username="tester", elo=1200)
+    db_session.add(user)
+    db_session.commit()
+
+    # Leaderboard rating-history top validation: ge=1, le=10
+    res_top_low = client.get("/api/leaderboard/rating-history?top=0")
+    assert res_top_low.status_code == 422
+
+    res_top_high = client.get("/api/leaderboard/rating-history?top=11")
+    assert res_top_high.status_code == 422
+
+    # Leaderboard rating-history limit validation: ge=5, le=100
+    res_lim_low = client.get("/api/leaderboard/rating-history?limit=4")
+    assert res_lim_low.status_code == 422
+
+    res_lim_high = client.get("/api/leaderboard/rating-history?limit=101")
+    assert res_lim_high.status_code == 422
+
+    # Single user rating-history limit validation: ge=5, le=100
+    res_u_low1 = client.get(f"/api/leaderboard/users/{user.id}/rating-history?limit=4")
+    assert res_u_low1.status_code == 422
+
+    res_u_high1 = client.get(f"/api/leaderboard/users/{user.id}/rating-history?limit=101")
+    assert res_u_high1.status_code == 422
+
+    res_u_low2 = client.get(f"/api/users/{user.id}/rating-history?limit=4")
+    assert res_u_low2.status_code == 422
+
+    res_u_high2 = client.get(f"/api/users/{user.id}/rating-history?limit=101")
+    assert res_u_high2.status_code == 422
+
