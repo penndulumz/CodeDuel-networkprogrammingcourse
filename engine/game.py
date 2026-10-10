@@ -3,7 +3,8 @@
 This module provides the complete game simulation for the 9x9 RPS chess variant:
 - Board coordinates: 9x9 matrix where row 0 = rank 1, row 8 = rank 9; col 0 = file a, col 8 = file i.
 - Pieces: 'R' (Rock), 'P' (Paper), 'S' (Scissors).
-- Combat rules: Rock beats Scissors, Scissors beats Paper, Paper beats Rock.
+- Combat rules: Rock beats Scissors, Scissors beats Paper, Paper beats Rock (Standard),
+  or Scissors beats Rock, Rock beats Paper, Paper beats Scissors (Inverted).
 - Movement rules: 1 square in any of the 8 directions (like a King in chess).
 - Win conditions:
     1. Reaching the opponent's home goal square (P1 -> i9 (8,8); P2 -> a1 (0,0)).
@@ -34,6 +35,14 @@ TYPE_ICONS: dict[str, str] = {
     "S": "✌",
 }
 
+# Rule variants
+RULE_VARIANT_STANDARD: str = "standard"
+RULE_VARIANT_INVERTED_RPS: str = "inverted_rps"
+SUPPORTED_RULE_VARIANTS: list[str] = [
+    RULE_VARIANT_STANDARD,
+    RULE_VARIANT_INVERTED_RPS,
+]
+
 # Goal squares for each player: P1 targets (8, 8) [i9], P2 targets (0, 0) [a1]
 GOALS: dict[int, tuple[int, int]] = {
     1: (8, 8),
@@ -56,16 +65,33 @@ DIRECTIONS: list[tuple[int, int]] = [
 ]
 
 
-def beats(a: str, b: str) -> bool:
-    """Check if piece type 'a' beats piece type 'b' in Rock-Paper-Scissors.
+def beats(a: str, b: str, variant: str = RULE_VARIANT_STANDARD) -> bool:
+    """Check if piece type 'a' beats piece type 'b' according to the specified rule variant.
+
+    Under standard RPS rules:
+        - Rock beats Scissors
+        - Scissors beats Paper
+        - Paper beats Rock
+
+    Under inverted_rps rules:
+        - Scissors beats Rock
+        - Rock beats Paper
+        - Paper beats Scissors
 
     Args:
         a: Attacking piece type ('R', 'P', or 'S').
         b: Defending piece type ('R', 'P', or 'S').
+        variant: Game rule variant identifier (default: "standard").
 
     Returns:
-        True if 'a' beats 'b', False otherwise.
+        True if 'a' beats 'b' under the given variant, False otherwise.
     """
+    if variant == RULE_VARIANT_INVERTED_RPS:
+        return (
+            (a == "S" and b == "R")
+            or (a == "R" and b == "P")
+            or (a == "P" and b == "S")
+        )
     return (
         (a == "R" and b == "S")
         or (a == "S" and b == "P")
@@ -168,7 +194,176 @@ def create_initial_board() -> list[list[dict[str, Any] | None]]:
     return board
 
 
-class GameState:
+def _parse_move_positions(
+    move: Any,
+) -> tuple[tuple[int, int], tuple[int, int]] | None:
+    """Extract origin and destination coordinate tuples from various move formats.
+
+    Args:
+        move: Move representation: ((fr, fc), (tr, tc)), dict with 'from'/'to' keys, or 4-tuple.
+
+    Returns:
+        Tuple of ((from_row, from_col), (to_row, to_col)) or None if malformed.
+    """
+    if isinstance(move, dict):
+        fr_pos = move.get("from")
+        to_pos = move.get("to")
+        if (
+            isinstance(fr_pos, (tuple, list))
+            and len(fr_pos) == 2
+            and isinstance(to_pos, (tuple, list))
+            and len(to_pos) == 2
+            and not isinstance(fr_pos[0], bool)
+            and not isinstance(fr_pos[1], bool)
+            and not isinstance(to_pos[0], bool)
+            and not isinstance(to_pos[1], bool)
+        ):
+            return ((int(fr_pos[0]), int(fr_pos[1])), (int(to_pos[0]), int(to_pos[1])))
+        return None
+
+    if isinstance(move, (tuple, list)):
+        if len(move) == 2:
+            fr_pos, to_pos = move[0], move[1]
+            if (
+                isinstance(fr_pos, (tuple, list))
+                and len(fr_pos) == 2
+                and isinstance(to_pos, (tuple, list))
+                and len(to_pos) == 2
+                and not isinstance(fr_pos[0], bool)
+                and not isinstance(fr_pos[1], bool)
+                and not isinstance(to_pos[0], bool)
+                and not isinstance(to_pos[1], bool)
+            ):
+                return ((int(fr_pos[0]), int(fr_pos[1])), (int(to_pos[0]), int(to_pos[1])))
+        elif len(move) == 4:
+            if not any(isinstance(v, bool) for v in move):
+                return ((int(move[0]), int(move[1])), (int(move[2]), int(move[3])))
+
+    return None
+
+
+def is_valid_move(
+    board: list[list[dict[str, Any] | None]],
+    move: Any,
+    player: int,
+    variant: str = RULE_VARIANT_STANDARD,
+) -> bool:
+    """Validate whether a proposed move is legal under the specified rule variant.
+
+    Args:
+        board: 9x9 board matrix.
+        move: Move representation ((fr, fc), (tr, tc)) or dict.
+        player: Player number (1 or 2) making the move.
+        variant: Game rule variant identifier (default: "standard").
+
+    Returns:
+        True if the move is strictly legal, False otherwise.
+    """
+    coords = _parse_move_positions(move)
+    if coords is None:
+        return False
+
+    (fr, fc), (tr, tc) = coords
+    if not (0 <= fr < 9 and 0 <= fc < 9 and 0 <= tr < 9 and 0 <= tc < 9):
+        return False
+
+    piece = board[fr][fc]
+    if piece is None or piece.get("player") != player:
+        return False
+
+    dr, dc = tr - fr, tc - fc
+    if not (abs(dr) <= 1 and abs(dc) <= 1 and (dr != 0 or dc != 0)):
+        return False
+
+    target = board[tr][tc]
+    if target is None:
+        return True
+
+    if target.get("player") == player:
+        return False
+
+    return beats(piece["type"], target["type"], variant=variant)
+
+
+def make_move(
+    board: list[list[dict[str, Any] | None]],
+    move: Any,
+    player: int,
+    variant: str = RULE_VARIANT_STANDARD,
+) -> tuple[list[list[dict[str, Any] | None]], dict[str, Any]]:
+    """Execute a move on a board matrix copy, validating rules under the specified variant.
+
+    Args:
+        board: 9x9 board matrix.
+        move: Move representation ((fr, fc), (tr, tc)) or dict.
+        player: Player number (1 or 2) making the move.
+        variant: Game rule variant identifier (default: "standard").
+
+    Returns:
+        Tuple of (new_board, move_dict) containing updated board matrix and move metadata.
+
+    Raises:
+        ValueError: If the move violates game rules under the active variant.
+    """
+    if not is_valid_move(board, move, player, variant=variant):
+        raise ValueError(
+            f"Illegal move {move} for player {player} under variant '{variant}'."
+        )
+
+    coords = _parse_move_positions(move)
+    assert coords is not None
+    (fr, fc), (tr, tc) = coords
+
+    new_board = copy.deepcopy(board)
+    piece = copy.deepcopy(new_board[fr][fc])
+    assert piece is not None
+    captured = copy.deepcopy(new_board[tr][tc])
+
+    new_board[tr][tc] = piece
+    new_board[fr][fc] = None
+
+    san = notation(piece, fr, fc, tr, tc, captured)
+    move_dict: dict[str, Any] = {
+        "player": player,
+        "from": (fr, fc),
+        "to": (tr, tc),
+        "piece": piece["type"],
+        "captured": captured["type"] if captured else None,
+        "san": san,
+    }
+
+    return new_board, move_dict
+
+
+def generate_legal_moves(
+    board: list[list[dict[str, Any] | None]],
+    player: int,
+    variant: str = RULE_VARIANT_STANDARD,
+) -> list[tuple[tuple[int, int], tuple[int, int]]]:
+    """Generate all legal moves available for a player under the specified variant.
+
+    Args:
+        board: 9x9 board matrix.
+        player: Player number (1 or 2).
+        variant: Game rule variant identifier (default: "standard").
+
+    Returns:
+        List of ((from_row, from_col), (to_row, to_col)) coordinate tuples.
+    """
+    legal_moves: list[tuple[tuple[int, int], tuple[int, int]]] = []
+    for r in range(9):
+        for c in range(9):
+            piece = board[r][c]
+            if piece and piece.get("player") == player:
+                for dr, dc in DIRECTIONS:
+                    nr, nc = r + dr, c + dc
+                    candidate = ((r, c), (nr, nc))
+                    if is_valid_move(board, candidate, player, variant=variant):
+                        legal_moves.append(candidate)
+    return legal_moves
+
+
+class Game:
     """Represents the complete state and rule evaluation of a 9x9 RPS chess match."""
 
     def __init__(
@@ -177,6 +372,7 @@ class GameState:
         turn: int = 1,
         move_no: int = 1,
         max_turns: int = MAX_TURNS,
+        variant: str = RULE_VARIANT_STANDARD,
     ) -> None:
         """Initialize game state.
 
@@ -185,6 +381,7 @@ class GameState:
             turn: Current player turn (1 or 2). Defaults to 1.
             move_no: Move sequence number (starts at 1). Defaults to 1.
             max_turns: Maximum number of moves before tiebreaker triggers. Defaults to 200.
+            variant: Active rule variant identifier (e.g. 'standard' or 'inverted_rps').
         """
         if board is None:
             self.board = create_initial_board()
@@ -194,6 +391,13 @@ class GameState:
         self.turn: int = turn
         self.move_no: int = move_no
         self.max_turns: int = max_turns
+
+        self.variant: str = (
+            variant
+            if variant in SUPPORTED_RULE_VARIANTS
+            else RULE_VARIANT_STANDARD
+        )
+        self.rule_variant: str = self.variant
 
         self.winner: int | None = None
         self.win_reason: str | None = None  # 'goal', 'wipeout', 'max_turns'
@@ -247,7 +451,7 @@ class GameState:
                     # Move to empty square
                     valid.append((nr, nc))
                 elif target["player"] != piece["player"] and beats(
-                    piece["type"], target["type"]
+                    piece["type"], target["type"], variant=self.variant
                 ):
                     # Capture opponent piece with winning RPS type
                     valid.append((nr, nc))
@@ -268,23 +472,35 @@ class GameState:
             return []
 
         active_player = self.turn if player is None else player
-        moves: list[tuple[tuple[int, int], tuple[int, int]]] = []
+        return generate_legal_moves(self.board, active_player, variant=self.variant)
 
-        for r in range(9):
-            for c in range(9):
-                piece = self.board[r][c]
-                if piece and piece["player"] == active_player:
-                    for dr, dc in DIRECTIONS:
-                        nr, nc = r + dr, c + dc
-                        if 0 <= nr < 9 and 0 <= nc < 9:
-                            target = self.board[nr][nc]
-                            if target is None:
-                                moves.append(((r, c), (nr, nc)))
-                            elif target["player"] != active_player and beats(
-                                piece["type"], target["type"]
-                            ):
-                                moves.append(((r, c), (nr, nc)))
-        return moves
+    def is_valid_move(self, move: Any, player: int | None = None) -> bool:
+        """Check if a move is valid under this game's active variant.
+
+        Args:
+            move: Move coordinates ((fr, fc), (tr, tc)) or dict.
+            player: Player number (1 or 2). Defaults to current turn.
+
+        Returns:
+            True if legal, False otherwise.
+        """
+        if self.is_game_over:
+            return False
+        active_player = self.turn if player is None else player
+        return is_valid_move(self.board, move, active_player, variant=self.variant)
+
+    def generate_legal_moves(
+        self, player: int | None = None
+    ) -> list[tuple[tuple[int, int], tuple[int, int]]]:
+        """Generate all legal moves available under the active variant.
+
+        Args:
+            player: Player number (1 or 2). Defaults to current turn.
+
+        Returns:
+            List of ((from_row, from_col), (to_row, to_col)) tuples.
+        """
+        return self.get_valid_moves(player=player)
 
     def apply_move(
         self, from_pos: tuple[int, int], to_pos: tuple[int, int]
@@ -337,9 +553,9 @@ class GameState:
         if target is not None:
             if target["player"] == piece["player"]:
                 raise ValueError(f"Square {to_pos} is occupied by friendly piece.")
-            if not beats(piece["type"], target["type"]):
+            if not beats(piece["type"], target["type"], variant=self.variant):
                 raise ValueError(
-                    f"Combat blocked: {piece['type']} does not beat {target['type']} at {to_pos}."
+                    f"Combat blocked: {piece['type']} does not beat {target['type']} at {to_pos} under variant '{self.variant}'."
                 )
 
         # Move execution
@@ -407,6 +623,26 @@ class GameState:
             "move_no": current_move_no,
         }
 
+    def make_move(self, move: Any, player: int | None = None) -> dict[str, Any]:
+        """Apply a move to this game state under the active variant.
+
+        Args:
+            move: Move coordinates ((fr, fc), (tr, tc)) or dict.
+            player: Optional player making the move.
+
+        Returns:
+            Dictionary containing move result details.
+        """
+        coords = _parse_move_positions(move)
+        if coords is None:
+            raise ValueError(f"Invalid move format: {move}")
+        from_pos, to_pos = coords
+        if player is not None and player != self.turn:
+            raise ValueError(
+                f"Cannot move: Current turn is Player {self.turn}, not {player}."
+            )
+        return self.apply_move(from_pos, to_pos)
+
     def to_dict(self) -> dict[str, Any]:
         """Serialize complete game state into a dictionary.
 
@@ -418,26 +654,45 @@ class GameState:
             "turn": self.turn,
             "move_no": self.move_no,
             "max_turns": self.max_turns,
+            "variant": self.variant,
+            "rule_variant": self.variant,
             "winner": self.winner,
             "win_reason": self.win_reason,
             "wiped_type": self.wiped_type,
             "history": copy.deepcopy(self.history),
         }
 
-    def clone(self) -> GameState:
+    def export_history(self) -> dict[str, Any]:
+        """Export serialized move history with rule variant metadata.
+
+        Returns:
+            Dictionary containing rule_variant, total_turns, and history move records.
+        """
+        return {
+            "rule_variant": self.variant,
+            "variant": self.variant,
+            "total_turns": len(self.history),
+            "history": copy.deepcopy(self.history),
+        }
+
+    def clone(self) -> Game:
         """Create an independent deep copy of the current game state.
 
         Returns:
-            A cloned GameState instance with isolated memory.
+            A cloned Game instance with isolated memory.
         """
-        new_state = GameState(
+        new_state = Game(
             board=self.board,
             turn=self.turn,
             move_no=self.move_no,
             max_turns=self.max_turns,
+            variant=self.variant,
         )
         new_state.winner = self.winner
         new_state.win_reason = self.win_reason
         new_state.wiped_type = self.wiped_type
         new_state.history = copy.deepcopy(self.history)
         return new_state
+
+
+GameState = Game
