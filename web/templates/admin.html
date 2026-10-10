@@ -31,6 +31,14 @@
         </select>
       </div>
 
+      <div class="form-group">
+        <label class="form-label" for="rule_variant"><b>Quy tắc Chiến đấu (Rule Variant)</b></label>
+        <select id="rule_variant" name="rule_variant" class="form-control" style="background: var(--bg-card); color: var(--text);">
+          <option value="standard" {% if settings.rule_variant == 'standard' or not settings.rule_variant %}selected{% endif %}>Tiêu chuẩn (Standard: Búa > Kéo > Bao)</option>
+          <option value="inverted_rps" {% if settings.rule_variant == 'inverted_rps' %}selected{% endif %}>Đảo chiều ngũ hành (Inverted Combat: Kéo > Búa > Bao)</option>
+        </select>
+      </div>
+
       <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
         <div class="form-group">
           <label class="form-label" for="start_time">Giờ mở cổng (Start Time)</label>
@@ -211,8 +219,10 @@
     msgEl.style.display = 'none';
 
     const portalMode = document.getElementById('portal_mode').value;
+    const ruleVariant = document.getElementById('rule_variant').value;
     const payload = {
       portal_mode: portalMode,
+      rule_variant: ruleVariant,
       start_time: document.getElementById('start_time').value,
       end_time: document.getElementById('end_time').value,
       daily_multiplier_x: parseFloat(document.getElementById('daily_multiplier_x').value),

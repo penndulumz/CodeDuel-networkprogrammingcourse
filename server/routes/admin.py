@@ -7,6 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
+from engine.game import SUPPORTED_RULE_VARIANTS
 from server.boss_manager import deploy_boss, get_all_bosses_status, retract_boss
 from server.database import get_db
 from server.models import Bot, BracketMatch, TournamentSetting, User
@@ -34,6 +35,7 @@ class UpdateSettingsRequest(BaseModel):
     total_days: Optional[int] = Field(None, ge=1)
     max_turns: Optional[int] = Field(None, ge=10, le=1000)
     turn_timeout_seconds: Optional[float] = Field(None, ge=0.1, le=10.0)
+    rule_variant: Optional[str] = None
 
 
 def _get_setting_row(db: Session, key: str) -> TournamentSetting | None:
@@ -111,6 +113,7 @@ def _get_all_settings_dict(db: Session) -> Dict[str, Any]:
     return {
         "is_portal_open": portal_open,
         "portal_mode": portal_mode,
+        "rule_variant": settings_map.get("rule_variant", "standard"),
         "start_time": start_time,
         "end_time": end_time,
         "daily_multiplier_x": multiplier_x,
@@ -168,6 +171,15 @@ def update_settings(
 
     if payload.turn_timeout_seconds is not None:
         _upsert_setting(db, "turn_timeout_seconds", str(payload.turn_timeout_seconds))
+
+    if payload.rule_variant is not None:
+        candidate_variant = payload.rule_variant.strip()
+        if candidate_variant not in SUPPORTED_RULE_VARIANTS:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Unsupported rule variant.",
+            )
+        _upsert_setting(db, "rule_variant", candidate_variant)
 
     db.commit()
     return _get_all_settings_dict(db)

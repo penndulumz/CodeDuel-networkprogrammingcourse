@@ -7,7 +7,7 @@ from fastapi.testclient import TestClient
 
 from server.database import SessionLocal, engine, init_db
 from server.main import app
-from server.models import Bot, TournamentSetting, User
+from server.models import Bot, Match, TournamentSetting, User
 from server.tournament import is_ffa_portal_open
 from server.tournament_config import load_tournament_config
 
@@ -228,3 +228,87 @@ def test_challenge_opponent_honors_dynamic_schedule():
     res_auto_closed = client.post("/api/matches/challenge", json={"opponent_id": u2["id"]}, headers=h1)
     assert res_auto_closed.status_code == 400
     assert "portal" in res_auto_closed.json()["detail"].lower()
+
+
+def test_admin_settings_rule_variant_get_and_update():
+    """Verify GET/POST /api/admin/settings handles rule_variant retrieval and updates."""
+    admin_headers = _create_admin_and_login()
+
+    # Initial GET should return standard rule variant by default
+    res_get = client.get("/api/admin/settings", headers=admin_headers)
+    assert res_get.status_code == 200
+    assert res_get.json().get("rule_variant") == "standard"
+
+    # Update to inverted_rps
+    res_post = client.post(
+        "/api/admin/settings",
+        json={"rule_variant": "inverted_rps"},
+        headers=admin_headers,
+    )
+    assert res_post.status_code == 200
+    assert res_post.json().get("rule_variant") == "inverted_rps"
+
+    # Verify persisted in database
+    db = SessionLocal()
+    try:
+        setting = db.query(TournamentSetting).filter(TournamentSetting.key == "rule_variant").first()
+        assert setting is not None
+        assert setting.value == "inverted_rps"
+    finally:
+        db.close()
+
+    # Subsequent GET returns updated variant
+    res_get2 = client.get("/api/admin/settings", headers=admin_headers)
+    assert res_get2.status_code == 200
+    assert res_get2.json().get("rule_variant") == "inverted_rps"
+
+
+def test_admin_settings_rule_variant_invalid_rejected():
+    """Verify POST /api/admin/settings rejects invalid rule variant with HTTP 400."""
+    admin_headers = _create_admin_and_login()
+
+    # Attempt setting an unsupported rule variant
+    res = client.post(
+        "/api/admin/settings",
+        json={"rule_variant": "unsupported"},
+        headers=admin_headers,
+    )
+    assert res.status_code == 400
+    assert "unsupported" in res.json()["detail"].lower() or "variant" in res.json()["detail"].lower()
+
+
+def test_challenge_opponent_inherits_active_rule_variant():
+    """Verify /api/matches/challenge creates match inheriting active rule variant."""
+    admin_headers = _create_admin_and_login()
+    h1, u1 = _create_user_and_login("player_var1")
+    h2, u2 = _create_user_and_login("player_var2")
+
+    bot_code = Path("starter_kit/bot_template.py").read_text(encoding="utf-8")
+    client.post("/api/bots/upload", files={"file": ("b1.py", bot_code.encode("utf-8"), "text/plain")}, headers=h1)
+    client.post("/api/bots/upload", files={"file": ("b2.py", bot_code.encode("utf-8"), "text/plain")}, headers=h2)
+
+    # Set portal open and rule variant to inverted_rps
+    client.post(
+        "/api/admin/settings",
+        json={"portal_mode": "true", "rule_variant": "inverted_rps"},
+        headers=admin_headers,
+    )
+
+    res_challenge = client.post("/api/matches/challenge", json={"opponent_id": u2["id"]}, headers=h1)
+    assert res_challenge.status_code in (200, 201)
+    match_id = res_challenge.json()["match_id"]
+
+    # Verify Match row in DB has rule_variant == "inverted_rps"
+    db = SessionLocal()
+    try:
+        match_row = db.query(Match).filter(Match.id == match_id).first()
+        assert match_row is not None
+        assert match_row.rule_variant == "inverted_rps"
+    finally:
+        db.close()
+
+    # Verify GET /api/matches/{match_id} returns rule_variant
+    res_detail = client.get(f"/api/matches/{match_id}")
+    assert res_detail.status_code == 200
+    assert res_detail.json().get("rule_variant") == "inverted_rps"
+

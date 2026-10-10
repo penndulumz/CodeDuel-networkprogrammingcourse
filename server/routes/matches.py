@@ -55,6 +55,7 @@ def _serialize_match(m: Match) -> Dict[str, Any]:
         "p2_elo_after": m.p2_elo_after,
         "replay_path": m.replay_path,
         "is_bracket": m.is_bracket,
+        "rule_variant": getattr(m, "rule_variant", "standard"),
         "created_at": m.created_at.isoformat() if m.created_at else None,
     }
 
@@ -109,6 +110,10 @@ def challenge_opponent(
             detail="Opponent does not have an active bot uploaded.",
         )
 
+    # Retrieve active tournament rule variant
+    setting = db.query(TournamentSetting).filter(TournamentSetting.key == "rule_variant").first()
+    active_variant = setting.value if setting and setting.value else "standard"
+
     # Create pending Match record
     match = Match(
         player1_id=current_user.id,
@@ -118,6 +123,7 @@ def challenge_opponent(
         p1_elo_before=current_user.elo,
         p2_elo_before=opponent.elo,
         is_bracket=False,
+        rule_variant=active_variant,
     )
     db.add(match)
     db.commit()
