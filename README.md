@@ -27,6 +27,17 @@ The boot routine outputs active network endpoints:
 - **Tournament Admin Dashboard**: [http://localhost:8000/admin](http://localhost:8000/admin) *(Default credentials: `admin` / `admin123`)*
 - **Interactive OpenAPI Documentation**: [http://localhost:8000/docs](http://localhost:8000/docs)
 
+### Offline Arena & Dynamic Rule Variants
+Test bot implementations offline under standard or inverted combat rules:
+```bash
+# Standard 9x9 combat: Rock > Scissors > Paper > Rock
+python starter_kit/local_arena.py starter_kit/heuristic_bot.py starter_kit/heuristic_bot.py --rounds 5
+
+# Inverted combat rule variant: Scissors > Rock > Paper > Scissors
+python starter_kit/local_arena.py starter_kit/heuristic_bot.py starter_kit/heuristic_bot.py --variant inverted_rps --rounds 5
+```
+
+
 ---
 
 ## 2. Documentation Directory
@@ -79,7 +90,7 @@ Battlecode-clone0810/
 ├── starter_kit/                 # Offline development bundle for competitors
 │   ├── bot_template.py          # Baseline bot skeleton
 │   ├── heuristic_bot.py         # Sample heuristic competitor
-│   ├── local_arena.py           # CLI tournament simulator for offline bot duels
+│   ├── local_arena.py           # CLI tournament simulator for offline bot duels (standard & inverted_rps)
 │   └── README.md                # Quickstart instructions for competitors
 │
 ├── docs/                        # Formal documentation library
@@ -120,11 +131,13 @@ A bot instantly forfeits a match if it:
 **Yes.** Competitors can download the [`starter_kit/`](starter_kit/) directory and run:
 ```bash
 python starter_kit/local_arena.py my_bot.py starter_kit/heuristic_bot.py --rounds 10
+# For Inverted Combat rule variant (Scissors > Rock > Paper > Scissors):
+python starter_kit/local_arena.py my_bot.py starter_kit/heuristic_bot.py --variant inverted_rps --rounds 10
 ```
 This utility executes locally without external networking or server configuration. See [`docs/BOT_GUIDE.md`](docs/BOT_GUIDE.md).
 
 ### Q6: How does dynamic tournament scheduling operate?
-Administrators configure matchmaking operational modes (`auto`, `true`, `false`) and daily operating windows (`start_time` and `end_time`, such as `19:00` to `21:00`) directly from the web Admin Dashboard. The system also supports overnight windows and custom daily Elo multipliers $x \in [1.0, 3.0]$.
+Administrators configure matchmaking operational modes (`auto`, `true`, `false`), tournament rule variants (`standard` or `inverted_rps`), and daily operating windows (`start_time` and `end_time`, such as `19:00` to `21:00`) directly from the web Admin Dashboard. The system also supports overnight windows and custom daily Elo multipliers $x \in [1.0, 3.0]$.
 
 ---
 

@@ -152,4 +152,27 @@
   - Spec: [`docs/superpowers/specs/2026-10-10-rating-history-visualizer-design.md`](docs/superpowers/specs/2026-10-10-rating-history-visualizer-design.md)
   - Plan: [`docs/superpowers/plans/2026-10-10-rating-history-visualizer.md`](docs/superpowers/plans/2026-10-10-rating-history-visualizer.md)
 
+---
+
+## Milestone 11: Hệ Thống Biến Thể Luật Chơi Động & Đảo Chiều Ngũ Hành (Inverted Combat Rule Variant) (Cả Nhóm)
+- [x] **Task 11.1**: Engine Layer Rule Variant Support (`engine/game.py`, `tests/test_game_variants.py`).
+  - Định nghĩa các hằng số biến thể `RULE_VARIANT_STANDARD = "standard"`, `RULE_VARIANT_INVERTED_RPS = "inverted_rps"`, và `SUPPORTED_RULE_VARIANTS`. Cập nhật hàm `beats(a, b, variant)` hỗ trợ đảo chiều ngũ hành ($S > R > P > S$), truyền tham số `variant` qua `is_valid_move`, `make_move`, `generate_legal_moves`, và khởi tạo `Game(variant=...)`, bảo toàn qua `clone()`, xuất `rule_variant` trong `export_history()`.
+  - *Verification*: `pytest tests/test_game_variants.py tests/test_engine.py` -> 13/13 tests PASS.
+- [x] **Task 11.2**: Database Schema & Background Queue Variant Execution (`server/models.py`, `engine/runner.py`, `server/queue.py`, `tests/test_queue.py`).
+  - Thêm cột `rule_variant` (String(32), default="standard", nullable=False) vào mô hình `Match` và `TournamentSetting`. Nâng cấp `GameRunner.play_match(..., variant=...)` truyền `variant` vào `Game`. Cập nhật `server/queue.py` trích xuất `rule_variant` từ `TournamentSetting` hoặc `match.rule_variant`, thực thi và lưu kết quả vào CSDL.
+  - *Verification*: `pytest tests/test_queue.py` -> 9/9 tests PASS.
+- [x] **Task 11.3**: Admin Web Management & Tournament API Integration (`server/routes/admin.py`, `server/routes/matches.py`, `web/templates/admin.html`, `tests/test_admin_schedule.py`).
+  - Mở rộng schema `TournamentSettingUpdate` với trường `rule_variant`, kiểm thực hợp lệ thuộc `SUPPORTED_RULE_VARIANTS`. Tích hợp trường chọn biến thể luật chơi trên giao diện Admin (`admin.html`). Đồng bộ `match.rule_variant` khi tạo thách đấu qua `POST /api/matches/challenge`.
+  - *Verification*: `pytest tests/test_admin_schedule.py` -> 15/15 tests PASS.
+- [x] **Task 11.4**: Starter Kit Local Arena & Replay Visualizer Integration (`starter_kit/local_arena.py`, `starter_kit/README.md`, `web/templates/replay.html`, `web/static/js/visualizer.js`, `tests/test_starter_kit.py`, `tests/test_web.py`).
+  - Bổ sung cờ dòng lệnh `--variant` (choices: `standard`, `inverted_rps`, default: `standard`) vào CLI `local_arena.py`, hỗ trợ thí sinh kiểm thử offline. Bổ sung huy hiệu hiển thị biến thể luật chơi trên giao diện trình phát lại Replay khi `rule_variant == "inverted_rps"`.
+  - *Verification*: `pytest tests/test_starter_kit.py tests/test_web.py` -> 16/16 tests PASS.
+- [x] **Task 11.5**: Documentation Harmonization & Continuous Feedback Loop (`docs/CONTEXT_RESUME.md`, `TASKS.md`, `README.md`, `tests/test_documentation_integrity.py`).
+  - Bổ sung Mục 17 vào SSOT `docs/CONTEXT_RESUME.md`, cập nhật Milestone 11 vào `TASKS.md`, cập nhật `README.md` về kiểm thử CLI ngoại tuyến với cờ `--variant`, kiểm chứng 100% không chứa biểu tượng trang trí.
+  - *Verification*: `pytest tests/test_documentation_integrity.py` -> 16/16 tests PASS.
+- *Liên kết chi tiết Spec & Plan*:
+  - Spec: [`docs/superpowers/specs/2026-10-10-inverted-combat-rule-variant-design.md`](docs/superpowers/specs/2026-10-10-inverted-combat-rule-variant-design.md)
+  - Plan: [`docs/superpowers/plans/2026-10-10-inverted-combat-rule-variant.md`](docs/superpowers/plans/2026-10-10-inverted-combat-rule-variant.md)
+
+
 

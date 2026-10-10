@@ -112,3 +112,26 @@ def test_tasks_milestone_10_content():
     assert "10.4" in content
     assert "10.5" in content
 
+
+def test_context_resume_rule_variant_content():
+    """Verify docs/CONTEXT_RESUME.md documents Section 17 Inverted Combat Rule Variant."""
+    cr_path = REPO_ROOT / "docs" / "CONTEXT_RESUME.md"
+    content = cr_path.read_text(encoding="utf-8")
+    assert "17. " in content or "## 17." in content
+    assert "inverted_rps" in content
+    assert "rule_variant" in content
+    assert "Inverted Combat" in content
+
+
+def test_tasks_milestone_11_content():
+    """Verify TASKS.md documents Milestone 11 and subtasks 11.1 through 11.5."""
+    tasks_path = REPO_ROOT / "TASKS.md"
+    content = tasks_path.read_text(encoding="utf-8")
+    assert "Milestone 11" in content
+    assert "11.1" in content
+    assert "11.2" in content
+    assert "11.3" in content
+    assert "11.4" in content
+    assert "11.5" in content
+
+

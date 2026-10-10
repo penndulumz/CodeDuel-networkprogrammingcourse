@@ -327,3 +327,31 @@ Nhằm nâng cao động lực thi đấu và tinh thần cạnh tranh trong gi�
    - Màn hình thông báo nhắc nhở thân thiện: Khi chưa có đủ 2 trận đấu, hiển thị thông báo hướng dẫn người chơi tham gia thi đấu thêm để biểu đồ xuất hiện.
    - Tương thích hoàn toàn với hệ thống CSS Design Tokens (Slate/Charcoal) của nền tảng.
 
+---
+
+## 17. Hệ Thống Biến Thể Luật Chơi & Đấu Trường Đảo Chiều Ngũ Hành (Tournament Rule Variants & Inverted Combat Cycle)
+
+Nhằm đánh giá năng lực thích ứng thuật toán thực chiến của các đội thi trong các phiên bảo vệ trực tiếp (offline defense) hoặc các vòng thi đấu đặc biệt, hệ thống cung cấp cơ chế hỗ trợ Biến Thể Luật Chơi Động (Dynamic Rule Variants).
+
+1. **Chu Trình Tác Chiến Đảo Chiều Ngũ Hành (Inverted Combat Cycle - `inverted_rps`)**:
+   - Quy tắc chuẩn (`standard`): Búa thắng Kéo, Kéo thắng Bao, Bao thắng Búa ($R > S > P > R$).
+   - Quy tắc đảo chiều (`inverted_rps`): Kéo thắng Búa, Búa thắng Bao, Bao thắng Kéo ($S > R > P > S$).
+   - Quy tắc di chuyển cờ và điều kiện thắng cuộc (chạm đích hàng 9/hàng 1 hoặc tiêu diệt toàn bộ quân đối phương) được giữ nguyên, đảm bảo tính nhất quán của mô hình 9x9.
+   - Các hằng số định danh biến thể trong `engine/game.py`: `RULE_VARIANT_STANDARD = "standard"`, `RULE_VARIANT_INVERTED_RPS = "inverted_rps"`, và danh sách hợp lệ `SUPPORTED_RULE_VARIANTS = ["standard", "inverted_rps"]`.
+   - Hàm `beats(a, b, variant=RULE_VARIANT_STANDARD)` và các phương thức `is_valid_move`, `make_move`, `generate_legal_moves` trong `engine/game.py` nhận tham số `variant` để kiểm tra tính hợp lệ của nước đi ăn quân theo đúng chu trình tác chiến.
+   - Lớp đối tượng `Game(variant=...)` hỗ trợ phương thức `clone()` bảo toàn biến thể và xuất siêu dữ liệu `rule_variant` trong lịch sử trận đấu (`export_history`).
+
+2. **Lưu Trữ & Khởi Tạo Trận Đấu (`server/models.py`, `server/queue.py`)**:
+   - Trường dữ liệu `rule_variant` (kiểu chuỗi ký tự, mặc định `"standard"`, không rỗng) được bổ sung vào mô hình bảng CSDL `TournamentSetting` và `Match`.
+   - Hàng đợi bất đồng bộ (`server/queue.py`): Khi thực thi trận đấu, hệ thống truy xuất giá trị `rule_variant` từ cài đặt giải đấu hiện hành `TournamentSetting` (hoặc từ chính thực thể `Match.rule_variant` nếu đã được chỉ định trước) và chuyển giao qua `GameRunner.play_match(..., variant=...)`. Sau khi trận đấu kết thúc, giá trị biến thể được lưu vết vĩnh viễn trên bản ghi `Match`.
+   - Endpoint tạo trận đấu thách đấu `POST /api/matches/challenge` (`server/routes/matches.py`) tự động sao chép cấu hình `rule_variant` đang hoạt động của giải đấu sang trận đấu mới.
+
+3. **Quản Trị Giải Đấu & Kiểm Thử Thí Sinh (Admin & Competitor Interfaces)**:
+   - **Bảng Điều Khiển Quản Trị (`/admin`, `/api/admin/settings`)**: Quản trị viên có thể chuyển đổi biến thể giải đấu theo thời gian thực thông qua menu chọn (dropdown) trên giao diện quản trị mà không cần dừng máy chủ. Schema `TournamentSettingUpdate` thực hiện xác thực nghiêm ngặt để từ chối các mã biến thể không hợp lệ (HTTP 422/400).
+   - **Bộ Công Cụ Thí Sinh Offline (`starter_kit/local_arena.py`)**: Thí sinh có thể mô phỏng và kiểm thử bot ngoại tuyến độc lập với máy chủ thông qua tham số dòng lệnh `--variant`:
+     ```bash
+     python starter_kit/local_arena.py my_bot.py starter_kit/heuristic_bot.py --variant inverted_rps --rounds 10
+     ```
+   - **Trình Trực Quan Hóa Replay (`web/templates/replay.html`, `web/static/js/visualizer.js`)**: Khi xem lại các trận đấu thuộc biến thể `inverted_rps`, giao diện hiển thị huy hiệu nhận diện nổi bật "Chế độ: Đảo chiều ngũ hành (Kéo > Búa > Bao)" trên thanh điều hướng phát lại.
+
+
