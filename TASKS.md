@@ -1,6 +1,6 @@
 # Kế Hoạch Thực Hiện & Theo Dõi Tiến Độ Dự Án (TASKS.md)
 
-> **Trạng thái**: Hoàn thành toàn diện và toàn bộ test pass (298/298 tests pass).
+> **Trạng thái**: Hoàn thành toàn diện và toàn bộ test pass (316/316 tests pass).
 > - Quy tắc: Đã kiểm chứng tự động toàn diện qua Subagent-Driven Development, 6-domain Deep Testing Matrix, Boss Arena Benchmark Simulation, và Unit/Integration/E2E test suite.
 
 ---
@@ -129,4 +129,27 @@
 - [x] **Task 9.3**: Đồng bộ SSOT `docs/CONTEXT_RESUME.md` (Mục 15: Quy Trình Vận Hành Nhà Máy Tự Động).
   - Cập nhật quy chuẩn kỹ thuật, lưu trữ báo cáo ngày tại `scratch/maintenance-log-<YYYY-MM-DD>.md`.
   - *Verification*: `pytest tests/test_documentation_integrity.py` -> 12/12 tests PASS.
+
+---
+
+## Milestone 10: Hệ Thống Trực Quan Hóa Lịch Sử Rating & Quỹ Đạo Elo Top Đội Ngũ (Rating History Visualizer) (Cả Nhóm)
+- [x] **Task 10.1**: Rating History Backend Service & Data Reconstruction (`server/rating_history.py`, `tests/test_rating_history.py`).
+  - Xây dựng module tái thiết lập chuỗi điểm số Elo lịch sử theo thứ tự thời gian (`created_at ASC`) trực tiếp từ các thực thể `Match` đã hoàn thành, loại bỏ dư thừa dữ liệu. Cung cấp hàm `get_user_rating_history` và `get_top_teams_rating_history`, xử lý an toàn mốc khởi đầu 1200 cho người chơi 0 trận, giới hạn tham số `top` [1, 10] và `limit` [5, 100].
+  - *Verification*: `pytest tests/test_rating_history.py` -> 7/7 tests PASS.
+- [x] **Task 10.2**: Leaderboard & User Rating History API Routes (`server/routes/leaderboard.py`, `tests/test_rating_history.py`).
+  - Bổ sung 2 REST API endpoints bất đồng bộ: `GET /api/leaderboard/rating-history` (trả về danh sách top đội với màu sắc phân biệt) và `GET /api/users/{user_id}/rating-history` (trả về quỹ đạo cá nhân, xử lý HTTP 404 sạch khi user không tồn tại).
+  - *Verification*: `pytest tests/test_rating_history.py` -> 7/7 tests PASS.
+- [x] **Task 10.3**: Vanilla JS Pure SVG Chart Visualizer Engine & Styling (`web/static/js/rating_chart.js`, `web/static/css/style.css`, `tests/test_web.py`).
+  - Phát triển engine vẽ biểu đồ vector thuần `RatingChart` (Zero-npm) với SVG đa đường nét, lưới tọa độ động theo mốc 100 Elo, điểm mốc tương tác, tooltip hover `#chart-tooltip`, bảng chú giải (legend) tương tác lọc sáng/mờ, và thông báo nhắc nhở thân thiện khi chưa đủ dữ liệu.
+  - *Verification*: `pytest tests/test_web.py` -> 13/13 tests PASS.
+- [x] **Task 10.4**: Template Integration on Leaderboard & Profile Pages (`web/templates/index.html`, `web/templates/profile.html`, `tests/test_web.py`).
+  - Tích hợp khung biểu đồ `#rating-chart-card` trên trang chủ / Leaderboard phía trên bảng xếp hạng và `#user-rating-chart-card` trên trang hồ sơ cá nhân Profile, tự động tải dữ liệu API và khởi tạo `RatingChart`.
+  - *Verification*: `pytest tests/test_web.py` -> 15/15 tests PASS.
+- [x] **Task 10.5**: Documentation Harmonization & Continuous Feedback Loop (`docs/CONTEXT_RESUME.md`, `TASKS.md`, `README.md`, `tests/test_documentation_integrity.py`).
+  - Đồng bộ SSOT với Mục 16 mô tả kiến trúc Rating Trajectory Visualizer, cập nhật Milestone 10 trong `TASKS.md`, bổ sung cấu trúc thư mục trong `README.md`, và kiểm chứng toàn vẹn tài liệu không chứa biểu tượng trang trí.
+  - *Verification*: `pytest tests/test_documentation_integrity.py` -> 14/14 tests PASS.
+- *Liên kết chi tiết Spec & Plan*:
+  - Spec: [`docs/superpowers/specs/2026-10-10-rating-history-visualizer-design.md`](docs/superpowers/specs/2026-10-10-rating-history-visualizer-design.md)
+  - Plan: [`docs/superpowers/plans/2026-10-10-rating-history-visualizer.md`](docs/superpowers/plans/2026-10-10-rating-history-visualizer.md)
+
 

@@ -67,12 +67,13 @@ Battlecode-clone0810/
 │   ├── models.py                # Database models: User, Bot, Match, TournamentSetting, BracketMatch
 │   ├── queue.py                 # Asynchronous background match execution queue
 │   ├── tournament.py            # Elo calculation, schedule checks, bracket seeding
+│   ├── rating_history.py        # Rating history and Elo trajectory reconstruction service
 │   ├── boss_manager.py          # Server boss deployment lifecycle and accounts
 │   ├── bosses/                  # Benchmark boss bots: novice, rusher, sentinel, tactician, apex
 │   └── routes/                  # REST API endpoints (auth, bots, matches, leaderboard, admin)
 │
 ├── web/                         # Frontend presentation layer (Zero-Node.js)
-│   ├── static/                  # Slate/Charcoal CSS design tokens and replay visualizer.js
+│   ├── static/                  # CSS tokens, replay visualizer.js, and rating_chart.js
 │   └── templates/               # Jinja2 templates (Leaderboard, Profile, Replay, Admin, Bracket)
 │
 ├── starter_kit/                 # Offline development bundle for competitors

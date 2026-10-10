@@ -90,3 +90,25 @@ def test_tasks_milestone_8_content():
     assert "Milestone 8" in content
     assert "8.1" in content
     assert "8.6" in content
+
+
+def test_context_resume_rating_history_content():
+    """Verify docs/CONTEXT_RESUME.md documents Section 16 Rating History Visualizer."""
+    cr_path = REPO_ROOT / "docs" / "CONTEXT_RESUME.md"
+    content = cr_path.read_text(encoding="utf-8")
+    assert "rating_history" in content
+    assert "/rating-history" in content
+    assert "RatingChart" in content
+
+
+def test_tasks_milestone_10_content():
+    """Verify TASKS.md documents Milestone 10 and subtasks 10.1 through 10.5."""
+    tasks_path = REPO_ROOT / "TASKS.md"
+    content = tasks_path.read_text(encoding="utf-8")
+    assert "Milestone 10" in content
+    assert "10.1" in content
+    assert "10.2" in content
+    assert "10.3" in content
+    assert "10.4" in content
+    assert "10.5" in content
+

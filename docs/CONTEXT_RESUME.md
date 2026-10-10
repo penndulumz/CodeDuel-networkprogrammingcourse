@@ -89,11 +89,11 @@ Mỗi trận đấu sau khi kết thúc sẽ sinh file replay JSON có định d
    - Quản lý: `engine/runner.py`, `server/queue.py`, `tests/test_runner.py`.
    - Nhiệm vụ: Chạy ván đấu giữa 2 file bot, giám sát tiến trình con, timeout 1.0s, bắt lỗi crash, tạo file `replays/match_<id>.json`.
 3. **Member 3 (Backend & Tournament Lead)**:
-   - Quản lý: `server/models.py`, `server/routes/`, `server/tournament.py`, `server/boss_manager.py`, `server/bosses/`, `config/tournament.yaml`.
-   - Nhiệm vụ: API xác thực, lưu bot, hàng đợi thách đấu FFA, công thức tính Elo nhân hệ số x, quản lý Boss Arena, bộ đánh giá lịch trình động và bốc thăm bảng Bracket.
+   - Quản lý: `server/models.py`, `server/routes/`, `server/tournament.py`, `server/boss_manager.py`, `server/bosses/`, `server/rating_history.py`, `config/tournament.yaml`.
+   - Nhiệm vụ: API xác thực, lưu bot, hàng đợi thách đấu FFA, công thức tính Elo nhân hệ số x, tái thiết lập lịch sử rating và API quỹ đạo Elo, quản lý Boss Arena, bộ đánh giá lịch trình động và bốc thăm bảng Bracket.
 4. **Member 4 (Frontend & Visualizer Lead)**:
-   - Quản lý: `web/templates/`, `web/static/js/visualizer.js`, `web/static/css/`.
-   - Nhiệm vụ: Bảng xếp hạng Elo (Leaderboard), trang hồ sơ người chơi & nộp code, visualizer bàn cờ 9x9 xem replay mượt mà với design tokens Charcoal, trang quản trị admin bảo mật.
+   - Quản lý: `web/templates/`, `web/static/js/visualizer.js`, `web/static/js/rating_chart.js`, `web/static/css/`.
+   - Nhiệm vụ: Bảng xếp hạng Elo (Leaderboard), trang hồ sơ người chơi & nộp code, visualizer bàn cờ 9x9 xem replay mượt mà với design tokens Charcoal, biểu đồ quỹ đạo rating SVG đa đường nét (RatingChart), trang quản trị admin bảo mật.
 
 ---
 
@@ -297,4 +297,33 @@ Hệ thống thiết lập cơ chế vận hành như một nhà máy kỹ thu�
    - **03:00 AM (Khám Phá & Nâng Cấp)**: Kiểm tra sức khỏe hệ thống (`pytest -q`), brainstorm ý tưởng nâng cấp qua 5 danh mục (Hiệu năng, Bảo mật, Trải nghiệm, Chất lượng mã nguồn, Tính năng), chọn giải pháp tác động cao nhất / rủi ro thấp nhất, cô lập trong worktree, triển khai TDD, tự kiểm tra và merge.
    - **05:00 AM (Kiểm Thử Sâu & Đấu Trường Boss Benchmark)**: Thu hồi nhánh dang dở nếu có, chạy mô phỏng đối đầu 10 trận Boss Arena (`scripts/independent_boss_arena_simulation.py`), đánh giá hành vi chiến thuật, nâng cấp thuật toán và phòng thủ bảo mật sandbox, merge vào `main`.
    - **07:00 AM (Tổng Hợp, Dọn Dẹp & Lập Kế Hoạch Tiếp Theo)**: Dọn dẹp các worktree và nhánh tạm, chạy toàn diện test suite hồi quy, kiểm toán tính toàn vẹn tài liệu theo luật SSOT, thực hiện nâng cấp chất lượng mã nguồn (QoL), và tổng hợp báo cáo ngày tại `scratch/maintenance-log-<YYYY-MM-DD>.md`.
+
+---
+
+## 16. Hệ Thống Trực Quan Hóa Lịch Sử Rating & Quỹ Đạo Elo (Rating Trajectory Visualizer)
+
+Nhằm nâng cao động lực thi đấu và tinh thần cạnh tranh trong giải đấu Battlecode RPS 9x9, hệ thống cung cấp công cụ trực quan hóa quỹ đạo Elo tương tác:
+
+1. **Kiến Trúc Tái Thiết Lập Dữ Liệu (`server/rating_history.py`)**:
+   - Tái thiết lập các mốc điểm rating trong quá khứ trực tiếp từ các thực thể `Match` đã hoàn thành (`player1_id`, `player2_id`, `p1_elo_after`, `p2_elo_after`, `created_at`) sắp xếp theo thứ tự thời gian (`created_at ASC`), loại bỏ hoàn toàn việc lưu trữ trùng lặp dữ liệu.
+   - Hàm `get_user_rating_history(user_id, db, limit=50)`: Trích xuất lịch sử rating của một người chơi cụ thể. Với người chơi chưa thi đấu ván nào (0 matches), hệ thống tự động trả về mốc xuất phát chuẩn (`match_id: 0`, `elo: 1200`, `delta: 0`).
+   - Hàm `get_top_teams_rating_history(db, top=5, limit=30)`: Lấy dữ liệu quỹ đạo của Top N đội dẫn đầu trên bảng xếp hạng (tham số `top` được kẹp an toàn trong khoảng [1, 10], `limit` trong khoảng [5, 100]). Mỗi đội được gán một mã màu phân biệt từ bảng màu tối ưu:
+     - Hạng 1: Cyan/Teal `#2dd4bf`
+     - Hạng 2: Sky Blue `#38bdf8`
+     - Hạng 3: Amber `#fbbf24`
+     - Hạng 4: Purple `#c084fc`
+     - Hạng 5: Rose `#f43f5e`
+
+2. **REST API Endpoints**:
+   - `GET /api/leaderboard/rating-history`: Nhận tham số `top: int = 5`, `limit: int = 30`. Trả về JSON chứa danh sách người chơi, thông tin `current_elo`, mã màu nhận diện `color`, và chuỗi các điểm mốc `points` (`match_id`, `created_at`, `elo`, `delta`, `opponent`).
+   - `GET /api/users/{user_id}/rating-history`: Nhận tham số `limit: int = 50`. Trả về dữ liệu chi tiết người chơi, điểm hiện tại, điểm cao nhất (peak Elo), điểm thấp nhất (lowest Elo), số trận, và chuỗi lịch sử thi đấu; trả về HTTP 404 sạch khi `user_id` không tồn tại.
+
+3. **Engine Biểu Đồ Vector Thuần (`web/static/js/rating_chart.js` - `RatingChart`)**:
+   - Thiết kế theo triết lý Zero-Node.js / Zero-npm bằng Pure SVG và Vanilla JavaScript.
+   - Lớp đối tượng `RatingChart` tự động tính toán hệ tọa độ co giãn linh hoạt: trục Y co giãn giữa `min_elo - 50` và `max_elo + 50`, vẽ đường lưới ngang (gridlines) tại các mốc bội số 100 điểm Elo.
+   - Vẽ đường đa giác mượt mà `<polyline>` với độ dày 2px và phát sáng tinh tế, cùng các điểm tròn `<circle>` tại từng cột mốc trận đấu.
+   - Tích hợp khung thông tin hover tương tác `#chart-tooltip` hiển thị đầy đủ: tên đấu thủ, mã trận, điểm Elo, biến động (+/- delta), đối thủ, và thời gian.
+   - Bảng chú giải (legend) tương tác: click hoặc hover vào huy hiệu đội để làm nổi bật đường quỹ đạo tương ứng và làm mờ các đường còn lại.
+   - Màn hình thông báo nhắc nhở thân thiện: Khi chưa có đủ 2 trận đấu, hiển thị thông báo hướng dẫn người chơi tham gia thi đấu thêm để biểu đồ xuất hiện.
+   - Tương thích hoàn toàn với hệ thống CSS Design Tokens (Slate/Charcoal) của nền tảng.
 
