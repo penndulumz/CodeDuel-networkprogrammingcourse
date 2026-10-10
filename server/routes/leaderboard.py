@@ -70,7 +70,6 @@ def get_single_user_rating_history(
 
 
 @router.get("/users/{user_id}")
-
 def get_user_profile(
     user_id: int,
     db: Session = Depends(get_db),
