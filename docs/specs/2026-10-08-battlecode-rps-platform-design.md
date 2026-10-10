@@ -56,8 +56,9 @@ Battlecode-clone0810/
 ├── docs/                        # Tài liệu dự án & ngữ cảnh cho LLM
 │   ├── ARCHITECTURE.md          # Chi tiết thiết kế kỹ thuật
 │   ├── BOT_GUIDE.md             # Hướng dẫn thí sinh viết bot & hàm API
-│   ├── CONTEXT_RESUME.md        # File ngữ cảnh nạp cho LLM khi luân chuyển máy/người
-│   └── superpowers/specs/       # Bản đặc tả kỹ thuật chi tiết
+│   ├── CONTEXT_RESUME.md        # Single Source of Truth
+│   ├── specs/                   # Bản đặc tả kỹ thuật chi tiết
+│   └── plans/                   # Kế hoạch triển khai chi tiết
 ├── engine/                      # Core Game Logic (Python thuần, không phụ thuộc Web)
 │   ├── __init__.py
 │   ├── game.py                  # Khởi tạo bàn cờ, kiểm tra hợp lệ, luật ăn quân, tính thắng

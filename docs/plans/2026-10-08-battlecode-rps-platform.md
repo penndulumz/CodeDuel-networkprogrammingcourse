@@ -1,6 +1,6 @@
 # Battlecode RPS 9x9 Platform Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **Implementation Guide:** Follow Test-Driven Development (TDD) task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Build a complete Battlecode-style tournament platform for 9×9 Rock-Paper-Scissors Chess where students submit Python bot scripts, participate in daily FFA ladders with randomized Elo multipliers, and compete in final-day elimination bracket tournaments with an interactive web replay visualizer.
 
@@ -8,7 +8,7 @@
 
 **Tech Stack:** Python 3.10+, FastAPI, Uvicorn, SQLAlchemy (SQLite), PyYAML, Jinja2, HTML5/CSS3/Vanilla JS, Pytest.
 
-**Spec:** [docs/superpowers/specs/2026-10-08-battlecode-rps-platform-design.md](file:///c:/Users/Admin/Desktop/Battlecode-clone0810/.worktrees/feat-battlecode-platform/docs/superpowers/specs/2026-10-08-battlecode-rps-platform-design.md)
+**Spec:** [`docs/specs/2026-10-08-battlecode-rps-platform-design.md`](docs/specs/2026-10-08-battlecode-rps-platform-design.md)
 
 ---
 

@@ -76,8 +76,8 @@
   - `docs/ADMIN_GUIDE.md` (Cẩm nang ban tổ chức, mạng LAN, cài firewall, hệ số x, bracket BO3).
 - [x] **Task 6.4**: Tinh gọn `README.md` làm Entry Point duy nhất, bản đồ chỉ mục điều hướng (Index Directory) và FAQ.
 - *Liên kết chi tiết Spec & Plan*:
-  - Spec: [`docs/superpowers/specs/2026-10-09-multi-machine-single-admin-docs-design.md`](docs/superpowers/specs/2026-10-09-multi-machine-single-admin-docs-design.md)
-  - Plan: [`docs/superpowers/plans/2026-10-09-multi-machine-single-admin-docs.md`](docs/superpowers/plans/2026-10-09-multi-machine-single-admin-docs.md)
+  - Spec: [`docs/specs/2026-10-09-multi-machine-single-admin-docs-design.md`](docs/specs/2026-10-09-multi-machine-single-admin-docs-design.md)
+  - Plan: [`docs/plans/2026-10-09-multi-machine-single-admin-docs.md`](docs/plans/2026-10-09-multi-machine-single-admin-docs.md)
 
 ---
 
@@ -90,8 +90,8 @@
 - [x] **Task 7.6**: Domain 6 REST API & Access Security (`tests/test_deep_api_security.py`): Chặn truy cập admin trái phép (401/403), từ chối session token giả mạo, trả lỗi 404 sạch khi replay không tồn tại, từ chối file bot upload vượt quá dung lượng (>5MB payload), chặn tự thách đấu chính mình, và dọn dẹp môi trường CSDL tự động (zero state pollution).
 - *Verification*: Full test suite `pytest -v` -> 203/203 tests PASS (100% Green in 11.32s).
 - *Liên kết chi tiết Spec & Plan*:
-  - Spec: [`docs/superpowers/specs/2026-10-09-deep-testing-matrix-design.md`](docs/superpowers/specs/2026-10-09-deep-testing-matrix-design.md)
-  - Plan: [`docs/superpowers/plans/2026-10-09-deep-testing-matrix.md`](docs/superpowers/plans/2026-10-09-deep-testing-matrix.md)
+  - Spec: [`docs/specs/2026-10-09-deep-testing-matrix-design.md`](docs/specs/2026-10-09-deep-testing-matrix-design.md)
+  - Plan: [`docs/plans/2026-10-09-deep-testing-matrix.md`](docs/plans/2026-10-09-deep-testing-matrix.md)
 
 ---
 
@@ -115,14 +115,14 @@
   - Đồng bộ toàn diện SSOT và tất cả cẩm nang theo giọng văn học thuật chuyên nghiệp, loại bỏ 100% biểu tượng trang trí (icons/emojis), bổ sung chi tiết kiến trúc 5 Boss bot, cấu hình lịch trình động và hướng dẫn thuật toán Minimax.
   - *Verification*: `pytest tests/test_documentation_integrity.py` -> 12/12 tests PASS.
 - *Liên kết chi tiết Spec & Plan*:
-  - Spec: [`docs/superpowers/specs/2026-10-09-pro-ui-boss-arena-admin-config-design.md`](docs/superpowers/specs/2026-10-09-pro-ui-boss-arena-admin-config-design.md)
-  - Plan: [`docs/superpowers/plans/2026-10-09-pro-ui-boss-arena-admin-config.md`](docs/superpowers/plans/2026-10-09-pro-ui-boss-arena-admin-config.md)
+  - Spec: [`docs/specs/2026-10-09-pro-ui-boss-arena-admin-config-design.md`](docs/specs/2026-10-09-pro-ui-boss-arena-admin-config-design.md)
+  - Plan: [`docs/plans/2026-10-09-pro-ui-boss-arena-admin-config.md`](docs/plans/2026-10-09-pro-ui-boss-arena-admin-config.md)
 
 ---
 
 ## Milestone 9: Autonomous Factory Operating Model & System Queue Hardening (Cả Nhóm)
 - [x] **Task 9.1**: Tích hợp thông báo và quy chuẩn vận hành nhà máy tự động không cần can thiệp (Factory Mode Notice) vào kỹ năng `.gemini/skills/autonomous-daily-maintainer/SKILL.md`.
-  - Thiết lập chuẩn vận hành Zero-Human-Intervention Invariant và lịch trình 3 chu trình (03:00 AM, 05:00 AM, 07:00 AM) thực hiện end-to-end chu trình Superpowers tự động.
+  - Thiết lập chuẩn vận hành Zero-Human-Intervention Invariant và lịch trình 3 chu trình (03:00 AM, 05:00 AM, 07:00 AM) thực hiện end-to-end chu trình bảo trì và phát triển tự động.
 - [x] **Task 9.2**: Xây dựng bộ kiểm thử chuyên sâu cho hàng đợi trận đấu `server/queue.py` (`tests/test_queue.py`).
   - Bao phủ toàn diện 8 trường hợp biên: trận đấu không tồn tại, người chơi bị xóa, kết quả hòa, người chơi 2 chiến thắng, ngoại lệ tiến trình con runner, bảo toàn Elo trong bracket, và ghi đè cấu hình giải đấu động từ CSDL.
   - *Verification*: `pytest tests/test_queue.py` -> 8/8 tests PASS.
@@ -149,8 +149,8 @@
   - Đồng bộ SSOT với Mục 16 mô tả kiến trúc Rating Trajectory Visualizer, cập nhật Milestone 10 trong `TASKS.md`, bổ sung cấu trúc thư mục trong `README.md`, và kiểm chứng toàn vẹn tài liệu không chứa biểu tượng trang trí.
   - *Verification*: `pytest tests/test_documentation_integrity.py` -> 14/14 tests PASS.
 - *Liên kết chi tiết Spec & Plan*:
-  - Spec: [`docs/superpowers/specs/2026-10-10-rating-history-visualizer-design.md`](docs/superpowers/specs/2026-10-10-rating-history-visualizer-design.md)
-  - Plan: [`docs/superpowers/plans/2026-10-10-rating-history-visualizer.md`](docs/superpowers/plans/2026-10-10-rating-history-visualizer.md)
+  - Spec: [`docs/specs/2026-10-10-rating-history-visualizer-design.md`](docs/specs/2026-10-10-rating-history-visualizer-design.md)
+  - Plan: [`docs/plans/2026-10-10-rating-history-visualizer.md`](docs/plans/2026-10-10-rating-history-visualizer.md)
 
 ---
 
@@ -171,8 +171,8 @@
   - Bổ sung Mục 17 vào SSOT `docs/CONTEXT_RESUME.md`, cập nhật Milestone 11 vào `TASKS.md`, cập nhật `README.md` về kiểm thử CLI ngoại tuyến với cờ `--variant`, kiểm chứng 100% không chứa biểu tượng trang trí.
   - *Verification*: `pytest tests/test_documentation_integrity.py` -> 16/16 tests PASS.
 - *Liên kết chi tiết Spec & Plan*:
-  - Spec: [`docs/superpowers/specs/2026-10-10-inverted-combat-rule-variant-design.md`](docs/superpowers/specs/2026-10-10-inverted-combat-rule-variant-design.md)
-  - Plan: [`docs/superpowers/plans/2026-10-10-inverted-combat-rule-variant.md`](docs/superpowers/plans/2026-10-10-inverted-combat-rule-variant.md)
+  - Spec: [`docs/specs/2026-10-10-inverted-combat-rule-variant-design.md`](docs/specs/2026-10-10-inverted-combat-rule-variant-design.md)
+  - Plan: [`docs/plans/2026-10-10-inverted-combat-rule-variant.md`](docs/plans/2026-10-10-inverted-combat-rule-variant.md)
 
 
 

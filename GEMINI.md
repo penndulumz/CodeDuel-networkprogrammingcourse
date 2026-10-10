@@ -24,17 +24,17 @@ Before executing any action, answering questions, or proposing changes, you MUST
 - **Zero-Node.js**: Pure HTML5/CSS3/Vanilla JS served by FastAPI. Never introduce npm/node runtime dependencies.
 - **Code Comments**: All code comments, docstrings, and commit messages MUST be in clear, detailed English.
 - **Testing Before Completion**: Run `pytest -v` to verify any modifications before committing.
-- **Worktree Isolation**: Always develop new features in an isolated worktree via `using-git-worktrees` (`.worktrees/<branch-name>`).
+- **Worktree Isolation**: Always develop new features in an isolated worktree (`.worktrees/<branch-name>`).
 - **Root Reference Preservation**: `resources/` and root meta-files (`.gemini/`, `GEMINI.md`, `CLAUDE.md`, `docs/CONTEXT_RESUME.md`) must strictly stay at the repository root and NEVER be duplicated into worktrees.
 - **Single-Admin & LAN Access**: Only 1 admin account exists (configurable via `ADMIN_USERNAME`/`ADMIN_PASSWORD` env vars); server listens on `0.0.0.0:8000` with LAN URL auto-detection.
 
 ---
 
-## 3. Superpowers Skill Lifecycle Integration
-When prompted for features, fixes, or maintenance:
-1. **Explore & Design**: Use `brainstorming` before making changes.
-2. **Plan**: Use `writing-plans` to generate bite-sized TDD tasks.
-3. **Execute**: Use `subagent-driven-development` or `test-driven-development`.
-4. **Debug**: Use `systematic-debugging` if encountering any test failure.
-5. **Verify**: Use `verification-before-completion` with `pytest`.
-6. **Finish**: Use `finishing-a-development-branch` to cleanly integrate into `main`.
+## 3. Engineering Development Lifecycle
+When implementing features, fixes, or maintenance:
+1. **Explore & Design**: Clarify requirements and architectural specifications before making changes.
+2. **Plan**: Generate bite-sized TDD implementation tasks with clear verification criteria.
+3. **Execute**: Implement via Test-Driven Development (TDD).
+4. **Debug**: Systematically isolate root cause before modifying code.
+5. **Verify**: Run full test verification with `pytest -v`.
+6. **Finish**: Cleanly integrate verified changes into `main`.

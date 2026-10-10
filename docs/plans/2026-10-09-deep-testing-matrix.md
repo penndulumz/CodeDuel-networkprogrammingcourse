@@ -1,6 +1,6 @@
 # 📋 Comprehensive 6-Domain Edge-Case & Stress Testing Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development or native TDD execution to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **Implementation Guide:** Follow Test-Driven Development (TDD) task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Implement 40+ exhaustive edge-case, boundary, stress, and security tests across 6 domains, ensuring 0 bugs, 0 process hangs, and 0 security bypasses in the entire system.
 
@@ -14,7 +14,7 @@
 
 **Tech Stack:** Python 3.10+, pytest, concurrent.futures, FastAPI TestClient, SQLAlchemy SQLite WAL.
 
-**Spec:** `docs/superpowers/specs/2026-10-09-deep-testing-matrix-design.md`
+**Spec:** [`docs/specs/2026-10-09-deep-testing-matrix-design.md`](docs/specs/2026-10-09-deep-testing-matrix-design.md)
 
 ## Global Constraints
 - Zero Node.js / npm dependencies.

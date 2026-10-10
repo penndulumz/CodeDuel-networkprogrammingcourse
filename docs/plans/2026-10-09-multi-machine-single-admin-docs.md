@@ -1,6 +1,6 @@
 # Multi-Machine, Single-Admin Enforcement, and Documentation Hierarchy Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **Implementation Guide:** Follow Test-Driven Development (TDD) task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Implement single-admin account enforcement with configurable env credentials, auto-detected LAN network startup banner for multi-machine access, persistent git-worktree & meta-folder preservation rules in SSOT, and a clean documentation hierarchy (`docs/ARCHITECTURE.md`, `docs/BOT_GUIDE.md`, `docs/ADMIN_GUIDE.md`, streamlined `README.md` with FAQ).
 
@@ -12,7 +12,7 @@
 
 **Tech Stack:** Python 3.10+, FastAPI, SQLAlchemy, SQLite WAL mode, pytest, Markdown.
 
-**Spec:** `docs/superpowers/specs/2026-10-09-multi-machine-single-admin-docs-design.md`
+**Spec:** [`docs/specs/2026-10-09-multi-machine-single-admin-docs-design.md`](docs/specs/2026-10-09-multi-machine-single-admin-docs-design.md)
 
 ## Global Constraints
 - Pure Python & Zero Node.js / npm dependencies.

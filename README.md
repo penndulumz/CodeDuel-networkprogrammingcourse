@@ -98,7 +98,8 @@ Battlecode-clone0810/
 │   ├── ARCHITECTURE.md          # In-depth architectural specifications
 │   ├── BOT_GUIDE.md             # Competitor and bot engineering manual
 │   ├── ADMIN_GUIDE.md           # Tournament administration operations manual
-│   └── superpowers/             # Architecture specifications and implementation plans
+│   ├── specs/                   # Technical architectural specifications
+│   └── plans/                   # Feature implementation plans and verification checklists
 │
 └── tests/                       # Comprehensive automated test suite
 ```

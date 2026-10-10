@@ -133,7 +133,7 @@ Mỗi trận đấu sau khi kết thúc sẽ sinh file replay JSON có định d
 
 ## 8. Quy Tắc Bắt Buộc Cách Ly Bằng Git Worktrees (Mandatory Git Worktree Isolation)
 1. **Luôn dùng Worktree khi phát triển tính năng mới**:
-   - Mỗi task mới hoặc refactor lớn bắt buộc phải tạo nhánh cách ly trong thư mục `.worktrees/<tên-nhánh>` thông qua kỹ năng `using-git-worktrees`.
+   - Mỗi task mới hoặc refactor lớn bắt buộc phải tạo nhánh cách ly trong thư mục `.worktrees/<tên-nhánh>` thông qua `git worktree`.
    - Tuyệt đối không code trực tiếp lên nhánh `main` khi chưa hoàn thành TDD và được review toàn diện.
 2. **Quy trình kết thúc nhánh**:
    - Chỉ merge về `main` sau khi toàn bộ test suite (`pytest -v`) đạt 100% PASS và thực hiện clean up worktree đúng chuẩn.
@@ -259,7 +259,7 @@ Tài liệu dự án được tổ chức theo hệ thống phân tầng nghiêm
 +───────────────────────────────────┬────────────────────────────────----+
                                     | ánh xạ chi tiết sang
 +───────────────────────────────────v------------------------------------+
-|         docs/superpowers/specs/ & docs/superpowers/plans/              |
+|               docs/specs/ & docs/plans/                                |
 |       Blueprint kiến trúc & Kế hoạch thực thi TDD chi tiết cho AI/Dev  |
 +------------------------------------------------------------------------+
 ```
@@ -273,9 +273,9 @@ Tài liệu dự án được tổ chức theo hệ thống phân tầng nghiêm
    - **Quy tắc**: Đây là tài liệu có thẩm quyền cao nhất. Mọi thay đổi kiến trúc, CSDL, luật game bắt buộc phải cập nhật vào file này đầu tiên.
 3. **Bộ tài liệu chuyên biệt (`docs/ARCHITECTURE.md`, `docs/BOT_GUIDE.md`, `docs/ADMIN_GUIDE.md`)**:
    - Tách bạch phục vụ chính xác 3 đối tượng: Kỹ thuật viên/giáo viên chấm điểm, Thí sinh viết bot, và Ban tổ chức giải đấu.
-4. **Mối quan hệ giữa `TASKS.md` và `docs/superpowers/`**:
+4. **Mối quan hệ giữa `TASKS.md` và `docs/specs/` & `docs/plans/`**:
    - `TASKS.md` là bảng Kanban cấp cao dành cho con người và chấm điểm học phần theo các Milestones từ 0 đến 8.
-   - `docs/superpowers/specs/` và `plans/` là tài liệu kỹ thuật vi mô dành cho lập trình viên và AI thực hiện TDD.
+   - `docs/specs/` và `docs/plans/` là tài liệu kỹ thuật chi tiết dành cho lập trình viên thực hiện TDD.
 
 ### 14.2 Nguyên Tắc Đồng Bộ Tuyệt Đối (Continuous Documentation Sync)
 - Khi có bất kỳ sự thay đổi nào về: API (`get_move`, endpoint REST), CSDL (`server/models.py`), luật cờ, boss mới, hoặc quy trình triển khai:

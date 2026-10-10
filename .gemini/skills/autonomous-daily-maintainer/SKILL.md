@@ -1,6 +1,6 @@
 ---
 name: autonomous-daily-maintainer
-description: Use when running automated maintenance, continuous upgrades, regression testing, or autonomous feature development on the Battlecode RPS Platform using the Superpowers skill lifecycle
+description: Use when running automated maintenance, continuous upgrades, regression testing, or autonomous feature development on the Battlecode RPS Platform
 ---
 
 # Autonomous Daily Maintainer
@@ -9,7 +9,7 @@ description: Use when running automated maintenance, continuous upgrades, regres
 
 > **MANDATORY FACTORY INVARIANT**:
 > This platform operates as a fully autonomous software engineering factory.
-> All maintenance, exploration, brainstorming, planning, TDD implementation, code reviews,
+> All maintenance, exploration, design, planning, TDD implementation, code reviews,
 > and integration merges across the designated schedule (03:00 AM, 05:00 AM, and 07:00 AM)
 > MUST execute end-to-end WITHOUT requiring human intervention or manual prompts.
 > The autonomous agent possesses full authority to identify technical debt, test coverage gaps,
@@ -22,20 +22,20 @@ description: Use when running automated maintenance, continuous upgrades, regres
 
 | Time | Factory Cycle | Core Autonomous Mission |
 |:---|:---|:---|
-| **03:00 AM** | Exploration & Upgrade Cycle | Baseline health check (`pytest -q`), autonomous brainstorming across 5 domains (Performance, Security, UX, Code Quality, Features), pick highest-impact/lowest-risk item, isolate in worktree, implement via TDD, self-review, and merge. |
+| **03:00 AM** | Exploration & Upgrade Cycle | Baseline health check (`pytest -q`), autonomous exploration across 5 domains (Performance, Security, UX, Code Quality, Features), pick highest-impact/lowest-risk item, isolate in worktree, implement via TDD, self-review, and merge. |
 | **05:00 AM** | Deep Testing & Boss Arena Benchmark | Check for unmerged worktrees from 3:00 AM, execute 10-match Boss Arena round-robin simulation, analyze AI behavior, brainstorm tactical & security hardening, implement improvements via TDD, and merge. |
 | **07:00 AM** | Daily Summary, Cleanup & Forward Planning | Clean stale worktrees/branches, run full regression test suite, verify documentation consistency (`docs/CONTEXT_RESUME.md` SSOT law), execute QoL upgrade, and generate consolidated daily report in `scratch/maintenance-log-<date>.md`. |
 
 ---
 
-## The Superpowers Autonomous Lifecycle Pipeline
+## Autonomous Engineering Lifecycle Pipeline
 
 ```mermaid
 flowchart TD
     Start["Trigger Daily Run (3AM / 5AM / 7AM)"] --> Check["1. Regression Suite (pytest -q)"]
-    Check -->|Tests Fail| Debug["Invoke superpowers:systematic-debugging"]
-    Debug --> TDD["Invoke superpowers:test-driven-development"]
-    TDD --> VerifyFix["Invoke superpowers:verification-before-completion"]
+    Check -->|Tests Fail| Debug["Systematic Debugging & Root Cause Analysis"]
+    Debug --> TDD["Test-Driven Development (TDD) Fix"]
+    TDD --> VerifyFix["Regression Verification (pytest)"]
     VerifyFix --> Check
 
     Check -->|Tests Pass (100% Green)| Benchmark["2. Boss Arena Benchmark (independent_boss_arena_simulation.py)"]
@@ -45,11 +45,11 @@ flowchart TD
     Schedule --> Report["4. Daily Health Report (scratch/maintenance-log-date.md)"]
     Report --> Commit["5. Commit Clean State"]
 
-    Decision -->|Enhancement / Upgrade| Brainstorm["Invoke superpowers:brainstorming"]
-    Brainstorm --> Plan["Invoke superpowers:writing-plans"]
-    Plan --> SDD["Invoke superpowers:subagent-driven-development or Inline TDD"]
-    SDD --> LoopLaw["Enforce Continuous Feedback Loop Law (Update docs/CONTEXT_RESUME.md)"]
-    LoopLaw --> Finish["Invoke superpowers:finishing-a-development-branch"]
+    Decision -->|Enhancement / Upgrade| Explore["Explore Requirements & Architecture"]
+    Explore --> Plan["Write TDD Implementation Plan"]
+    Plan --> Execute["Execute TDD in Worktree"]
+    Execute --> LoopLaw["Enforce Continuous Feedback Loop Law (Update docs/CONTEXT_RESUME.md)"]
+    LoopLaw --> Finish["Integrate Branch & Cleanup Worktree"]
     Finish --> Commit
 ```
 
@@ -63,17 +63,10 @@ flowchart TD
    pytest -q
    ```
 2. **If ANY test fails or bug is detected**:
-   - **MUST INVOKE** `superpowers:systematic-debugging`:
-     - Reproduce with minimal command.
-     - Inspect exact stack traces and isolate root cause.
-     - Formulate testable hypothesis before touching code.
-   - **MUST INVOKE** `superpowers:test-driven-development`:
-     - Write failing test reproducing the issue.
-     - Verify test fails.
-     - Implement minimal code fix.
-     - Verify test passes.
-   - **MUST INVOKE** `superpowers:verification-before-completion`:
-     - Re-run full test suite (`pytest -q`) to confirm zero regressions.
+   - Isolate root cause with a minimal reproducible command.
+   - Author a minimal failing test reproducing the defect.
+   - Implement the minimal fix.
+   - Re-run full test suite (`pytest -q`) to confirm zero regressions.
 
 ### Phase 2: Boss Arena Benchmark & Tactical Hardening
 Run 10 head-to-head round-robin matches among all 5 benchmark bosses:
@@ -84,15 +77,15 @@ Verify zero timeouts, zero process crashes, and valid replay JSON logs.
 
 ### Phase 3: Autonomous System Upgrades & Enhancements
 When upgrading features (e.g. queue robustness, AST security, tournament analytics):
-1. **MUST INVOKE** `superpowers:brainstorming`:
+1. **Explore Requirements & Architecture**:
    - Explore requirements and identify highest-impact / lowest-risk opportunities.
-2. **MUST INVOKE** `superpowers:writing-plans`:
+2. **Author Implementation Plan**:
    - Decompose into bite-sized TDD tasks with file paths and interfaces.
-3. **MUST INVOKE** `superpowers:test-driven-development`:
+3. **Test-Driven Development (TDD)**:
    - Write failing tests first, verify failure, implement cleanly, verify pass.
-4. **ENFORCE CONTINUOUS FEEDBACK LOOP LAW**:
+4. **Enforce Continuous Feedback Loop Law**:
    - If any API, schema, rule, or interface changed, **IMMEDIATELY UPDATE** `docs/CONTEXT_RESUME.md` and `TASKS.md` in the same commit.
-5. **MUST INVOKE** `superpowers:finishing-a-development-branch`:
+5. **Integrate Branch & Cleanup**:
    - Merge back to `main` locally once all tests pass. Clean up worktrees and temporary branches.
 
 ### Phase 4: Daily Consolidation & Reporting

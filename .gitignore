@@ -30,3 +30,4 @@ resources/
 .idea/
 .DS_Store
 Thumbs.db
+.superpowers/

@@ -1,6 +1,6 @@
 # Inverted Combat Rule Variant Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **Implementation Guide:** Follow Test-Driven Development (TDD) task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Implement dynamic tournament rule variant support with the Inverted Combat Cycle (`inverted_rps`: Scissors > Rock > Paper > Scissors) across game engine, runner, persistence, admin portal, replay visualizer, and offline starter kit.
 
@@ -8,7 +8,7 @@
 
 **Tech Stack:** Python 3.10+, FastAPI, SQLAlchemy 2.0 (SQLite WAL), Jinja2, HTML5/CSS3 (Charcoal design tokens), Vanilla JS.
 
-**Spec:** `docs/superpowers/specs/2026-10-10-inverted-combat-rule-variant-design.md`
+**Spec:** [`docs/specs/2026-10-10-inverted-combat-rule-variant-design.md`](docs/specs/2026-10-10-inverted-combat-rule-variant-design.md)
 
 ## Global Constraints
 - Zero Node.js or npm runtime dependencies. Pure Python 3.10+, FastAPI, SQLite WAL, HTML5, CSS3, Vanilla JS.

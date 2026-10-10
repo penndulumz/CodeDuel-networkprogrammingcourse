@@ -1,6 +1,6 @@
 # Implementation Plan: Professional Minimalist UI, Admin Boss Arena, and Non-Tech Tournament Scheduling
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **Implementation Guide:** Follow Test-Driven Development (TDD) task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Transform the web interface into a clean, minimalist developer-grade theme without decorative gradients, harden admin access control, implement five server-side benchmark boss bots for administrators, enable web-based tournament schedule configuration, and synchronize all documentation in a professional icon-free tone.
 
@@ -8,7 +8,7 @@
 
 **Tech Stack:** Python 3.10+, FastAPI, SQLAlchemy, SQLite WAL, Jinja2, Vanilla JavaScript (ES2020+), CSS3 (Design Tokens), Pytest.
 
-**Spec:** `docs/superpowers/specs/2026-10-09-pro-ui-boss-arena-admin-config-design.md`
+**Spec:** [`docs/specs/2026-10-09-pro-ui-boss-arena-admin-config-design.md`](docs/specs/2026-10-09-pro-ui-boss-arena-admin-config-design.md)
 
 ## Global Constraints
 
