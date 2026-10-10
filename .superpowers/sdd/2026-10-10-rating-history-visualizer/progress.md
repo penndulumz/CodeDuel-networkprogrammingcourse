@@ -1,0 +1,18 @@
+# SDD ledger — plan: docs/superpowers/plans/2026-10-10-rating-history-visualizer.md
+
+## Preflight Plan Scan
+| Tasks | Shared Interface / File | Status | Notes |
+|:---|:---|:---|:---|
+| Task 1 -> Task 2 | `server/rating_history.py` functions imported in `server/routes/leaderboard.py` | Clean | Signatures match exactly |
+| Task 3 -> Task 4 | `web/static/js/rating_chart.js` included in templates | Clean | DOM container IDs match |
+| Task 1-4 -> Task 5 | Docs synchronization for new endpoints and UI | Clean | Covers SSOT updates |
+
+## Progress
+- [x] Task 1: Rating History Backend Service & Data Reconstruction
+- [x] Task 2: Leaderboard & User Rating History API Routes
+- [ ] Task 3: Vanilla JS Pure SVG Chart Visualizer Engine & Styling
+- [ ] Task 4: Template Integration on Leaderboard & Profile Pages
+- [ ] Task 5: Documentation Harmonization & Continuous Feedback Loop
+
+Task 1: complete (commits 4e2aa03..f67d267, review clean)
+Task 2: complete (commits f67d267..8e8864e, review clean)
