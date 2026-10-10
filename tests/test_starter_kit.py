@@ -176,6 +176,37 @@ class TestLocalArena:
         assert "Round 1" in proc.stdout
         assert "TOURNAMENT RESULTS SUMMARY" in proc.stdout.upper()
 
+    def test_local_arena_cli_with_variant(self) -> None:
+        """Executing local_arena.py with --variant inverted_rps should run successfully and log variant."""
+        cmd = [
+            sys.executable,
+            str(LOCAL_ARENA_PATH),
+            str(BOT_TEMPLATE_PATH),
+            str(HEURISTIC_BOT_PATH),
+            "--variant",
+            "inverted_rps",
+            "--rounds",
+            "1",
+            "--max-turns",
+            "10",
+        ]
+        proc = subprocess.run(cmd, capture_output=True, text=True, check=False)
+        assert proc.returncode == 0, f"CLI exited with {proc.returncode}. Stderr: {proc.stderr}"
+        assert "inverted_rps" in proc.stdout
+        assert "Round 1" in proc.stdout
+
+    def test_local_arena_play_match_variant(self) -> None:
+        """play_match should accept variant parameter and simulate under inverted_rps rules."""
+        sys.path.insert(0, str(STARTER_KIT_DIR.parent))
+        from starter_kit.bot_template import get_move as bot1
+        from starter_kit.heuristic_bot import get_move as bot2
+        from starter_kit.local_arena import play_match
+
+        result = play_match(bot1, bot2, max_turns=10, variant="inverted_rps")
+        assert "winner" in result
+        assert result["winner"] in (1, 2, None)
+        assert "turns" in result
+
 
 class TestDocumentation:
     """Verify documentation quality and presence."""
@@ -187,3 +218,10 @@ class TestDocumentation:
         assert "get_move" in content
         assert "local_arena.py" in content
         assert "Rock" in content or "RPS" in content
+
+    def test_readme_contains_rule_variant_instructions(self) -> None:
+        """README.md must document the --variant flag for inverted_rps."""
+        assert README_PATH.is_file(), "README.md does not exist"
+        content = README_PATH.read_text(encoding="utf-8")
+        assert "--variant" in content
+        assert "inverted_rps" in content

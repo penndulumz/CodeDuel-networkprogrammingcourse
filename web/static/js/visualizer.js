@@ -227,6 +227,17 @@ class ReplayVisualizer {
       this.dom.slider.value = 0;
     }
 
+    // Display rule variant indicator if match was played under inverted RPS rules
+    if (data.rule_variant === 'inverted_rps') {
+      const variantBadge = document.getElementById('ruleVariantBadge');
+      if (variantBadge) {
+        variantBadge.style.display = 'block';
+        if (!variantBadge.innerHTML.includes('Đảo chiều')) {
+          variantBadge.innerHTML = 'Chế độ: <span class="tag purple">Đảo chiều ngũ hành (Kéo > Búa > Bao)</span>';
+        }
+      }
+    }
+
     this.populateMoveLog();
     this.goToTurn(0);
   }
@@ -439,13 +450,14 @@ class ReplayVisualizer {
 
     this.dom.turnBanner.classList.remove('p1', 'p2');
     const isFinished = turn === this.totalTurns && this.replayData;
+    const variantSuffix = (this.replayData && this.replayData.rule_variant === 'inverted_rps') ? ' [Đảo chiều RPS]' : '';
 
     if (isFinished) {
       const winner = this.replayData.winner;
       const reason = this.replayData.win_reason || 'finished';
       const winnerText = winner ? `Player ${winner} won!` : 'Match drawn!';
 
-      this.dom.turnBanner.textContent = `Match Ended — ${winnerText} (${reason})`;
+      this.dom.turnBanner.textContent = `Match Ended — ${winnerText} (${reason})${variantSuffix}`;
       if (winner) {
         this.dom.turnBanner.classList.add(`p${winner}`);
       }
@@ -468,7 +480,7 @@ class ReplayVisualizer {
       }
 
       const nextPlayer = (turn % 2 === 0) ? 1 : 2;
-      this.dom.turnBanner.textContent = `Turn ${turn + 1}: Player ${nextPlayer}'s Move`;
+      this.dom.turnBanner.textContent = `Turn ${turn + 1}: Player ${nextPlayer}'s Move${variantSuffix}`;
       this.dom.turnBanner.classList.add(`p${nextPlayer}`);
     }
   }

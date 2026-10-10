@@ -22,6 +22,9 @@ python starter_kit/local_arena.py starter_kit/bot_template.py starter_kit/heuris
 
 # Watch turn-by-turn move details
 python starter_kit/local_arena.py starter_kit/bot_template.py starter_kit/heuristic_bot.py --verbose
+
+# Test rule variants offline (inverted combat: Scissors > Rock > Paper)
+python starter_kit/local_arena.py starter_kit/bot_template.py starter_kit/heuristic_bot.py --variant inverted_rps
 ```
 
 ---
@@ -55,6 +58,16 @@ Each player starts with **9 pieces**:
 - **Paper ('P')** defeats **Rock ('R')**
 
 You may only move onto an opponent piece's square if your piece **beats** the opponent's piece in Rock-Paper-Scissors. If types are identical (tie) or your piece loses, the move is **illegal**. Friendly pieces can never land on friendly squares.
+
+### Rule Variants
+The arena engine supports rule variants configurable both on the server and locally:
+- **`standard` (default)**: Classic cycle — Rock beats Scissors, Scissors beats Paper, Paper beats Rock.
+- **`inverted_rps`**: Inverted cycle — Scissors beats Rock, Rock beats Paper, Paper beats Scissors.
+
+Test your bots offline under inverted rules via:
+```bash
+python starter_kit/local_arena.py bot1.py bot2.py --variant inverted_rps
+```
 
 ### Movement
 - Pieces move **1 square in any of the 8 directions** (horizontal, vertical, or diagonal), identical to a King in traditional chess:
@@ -142,7 +155,7 @@ Bots will be **immediately rejected** if they contain:
 `local_arena.py` provides rich options for local benchmarking:
 
 ```text
-usage: local_arena.py [-h] [-r ROUNDS] [-m MAX_TURNS] [-v] [--swap-sides] bot1 bot2
+usage: local_arena.py [-h] [-r ROUNDS] [-m MAX_TURNS] [-v] [--swap-sides] [--variant {standard,inverted_rps}] bot1 bot2
 
 positional arguments:
   bot1                  Path to Player 1 Python bot file
@@ -155,6 +168,8 @@ options:
                         Max turns per round (default: 200)
   -v, --verbose         Print move-by-move details during match
   --swap-sides          Alternate bot starting positions every round
+  --variant {standard,inverted_rps}
+                        Game rule variant (default: standard)
 ```
 
 ### Example Output

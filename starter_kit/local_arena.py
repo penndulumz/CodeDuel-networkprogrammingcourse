@@ -79,6 +79,7 @@ def play_match(
     verbose: bool = False,
     bot1_name: str = "Player 1",
     bot2_name: str = "Player 2",
+    variant: str = "standard",
 ) -> dict[str, Any]:
     """Simulate a single match between two bot functions.
 
@@ -89,6 +90,7 @@ def play_match(
         verbose: If True, print move-by-move actions.
         bot1_name: Label for Player 1 in output.
         bot2_name: Label for Player 2 in output.
+        variant: Game rule variant ('standard' or 'inverted_rps', default: 'standard').
 
     Returns:
         Dictionary containing match results:
@@ -100,7 +102,7 @@ def play_match(
             - p1_pieces: Final piece count for Player 1
             - p2_pieces: Final piece count for Player 2
     """
-    game = GameState(max_turns=max_turns)
+    game = GameState(max_turns=max_turns, variant=variant)
     bot_map = {1: (bot1_fn, bot1_name), 2: (bot2_fn, bot2_name)}
 
     while not game.is_game_over:
@@ -175,6 +177,7 @@ def run_arena(
     max_turns: int = MAX_TURNS,
     verbose: bool = False,
     swap_sides: bool = False,
+    variant: str = "standard",
 ) -> dict[str, Any]:
     """Execute a series of matches between two bot scripts and output summary statistics.
 
@@ -185,6 +188,7 @@ def run_arena(
         max_turns: Maximum half-moves per round.
         verbose: Whether to print detailed move-by-move traces.
         swap_sides: Whether to alternate starting player on each round.
+        variant: Game rule variant ('standard' or 'inverted_rps', default: 'standard').
 
     Returns:
         Dictionary containing overall tournament statistics.
@@ -203,6 +207,7 @@ def run_arena(
     print(f"  Bot 1: {b1_label} ({p1_path.name})")
     print(f"  Bot 2: {b2_label} ({p2_path.name})")
     print(f"  Rounds: {rounds} | Max Turns: {max_turns} | Swap Sides: {swap_sides}")
+    print(f"  Rule Variant: {variant}")
     print("=" * 60)
 
     b1_wins = 0
@@ -233,6 +238,7 @@ def run_arena(
             verbose=verbose,
             bot1_name=first_name,
             bot2_name=second_name,
+            variant=variant,
         )
         elapsed = time.perf_counter() - start_time
 
@@ -282,6 +288,7 @@ def run_arena(
     print("\n" + "=" * 60)
     print("  TOURNAMENT RESULTS SUMMARY")
     print("=" * 60)
+    print(f"  Rule Variant: {variant}")
     print(f"  {b1_label:20s}: {b1_wins:3d} wins ({b1_pct:5.1f}%)")
     print(f"  {b2_label:20s}: {b2_wins:3d} wins ({b2_pct:5.1f}%)")
     print(f"  {'Draws':20s}: {draws:3d}      ({draw_pct:5.1f}%)")
@@ -292,6 +299,7 @@ def run_arena(
         "bot1": b1_label,
         "bot2": b2_label,
         "rounds": rounds,
+        "variant": variant,
         "bot1_wins": b1_wins,
         "bot2_wins": b2_wins,
         "draws": draws,
@@ -311,6 +319,12 @@ def main() -> None:
     parser.add_argument("-m", "--max-turns", type=int, default=MAX_TURNS, help=f"Max turns per round (default: {MAX_TURNS})")
     parser.add_argument("-v", "--verbose", action="store_true", help="Print move-by-move details during match")
     parser.add_argument("--swap-sides", action="store_true", help="Alternate bot starting positions every round")
+    parser.add_argument(
+        "--variant",
+        choices=["standard", "inverted_rps"],
+        default="standard",
+        help="Game rule variant ('standard' or 'inverted_rps', default: 'standard')",
+    )
 
     args = parser.parse_args()
 
@@ -322,6 +336,7 @@ def main() -> None:
             max_turns=args.max_turns,
             verbose=args.verbose,
             swap_sides=args.swap_sides,
+            variant=args.variant,
         )
     except Exception as exc:
         print(f"Arena Error: {exc}", file=sys.stderr)
@@ -330,3 +345,4 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+

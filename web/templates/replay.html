@@ -34,6 +34,15 @@
       <div style="display: flex; flex-direction: column; gap: 6px;">
         <div>Mã trận: <b>#{{ match_id }}</b></div>
         <div>Phím tắt: <b>←</b> Lùi / <b>→</b> Tiến / <b>Space</b> Dừng</div>
+        {% if match and match.rule_variant == 'inverted_rps' %}
+        <div id="ruleVariantBadge" class="variant-badge">
+          Chế độ: <span class="tag purple">Đảo chiều ngũ hành (Kéo > Búa > Bao)</span>
+        </div>
+        {% else %}
+        <div id="ruleVariantBadge" class="variant-badge" style="display: none;">
+          Chế độ: <span class="tag purple">Đảo chiều ngũ hành (Kéo > Búa > Bao)</span>
+        </div>
+        {% endif %}
       </div>
     </div>
   </aside>
@@ -118,6 +127,10 @@
         }
         if (m.player2) {
           document.getElementById('p2Name').textContent = m.player2.username;
+        }
+        if (m.rule_variant === 'inverted_rps') {
+          const badge = document.getElementById('ruleVariantBadge');
+          if (badge) badge.style.display = 'block';
         }
       }
     } catch (err) {

@@ -276,3 +276,36 @@ def test_profile_template_anonymous_omits_rating_chart(client: TestClient) -> No
     assert 'id="user-rating-chart-card"' not in res.text
 
 
+def test_replay_page_renders_variant_badge_for_inverted_rps(client: TestClient) -> None:
+    """Verify that /replay/{match_id} displays the rule variant badge when match is inverted_rps."""
+    db = SessionLocal()
+    user = User(username="variant_tester", elo=1500)
+    user.set_password("pass123")
+    db.add(user)
+    db.commit()
+
+    bot = Bot(user_id=user.id, filename="v_bot.py", filepath="bots/v_bot.py", is_active=True)
+    db.add(bot)
+    db.commit()
+
+    match = Match(
+        player1_id=user.id,
+        player2_id=user.id,
+        bot1_id=bot.id,
+        bot2_id=bot.id,
+        winner_id=user.id,
+        win_reason="goal",
+        total_turns=10,
+        rule_variant="inverted_rps",
+    )
+    db.add(match)
+    db.commit()
+    match_id = match.id
+    db.close()
+
+    res = client.get(f"/replay/{match_id}")
+    assert res.status_code == 200
+    assert "Đảo chiều ngũ hành (Kéo > Búa > Bao)" in res.text
+    assert "ruleVariantBadge" in res.text
+
+

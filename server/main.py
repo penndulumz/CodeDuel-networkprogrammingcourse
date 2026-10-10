@@ -206,14 +206,17 @@ def replay_page(
 ) -> HTMLResponse:
     """Render the interactive 9x9 visual replay arena."""
     current_user = _get_optional_user(request, db)
+    match = db.query(Match).filter(Match.id == match_id).first()
     return templates.TemplateResponse(
         request=request,
         name="replay.html",
         context={
             "match_id": match_id,
+            "match": match,
             "current_user": current_user,
         },
     )
+
 
 
 @app.get("/admin", response_class=HTMLResponse, tags=["web"])
