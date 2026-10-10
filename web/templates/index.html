@@ -28,6 +28,13 @@
   </div>
 </div>
 
+<div id="rating-chart-card" class="chart-card" style="margin-bottom: 24px;">
+  <div class="chart-header">
+    <h2 class="chart-title">Biến động xếp hạng Elo (Top 5)</h2>
+  </div>
+  <div id="rating-chart-container"></div>
+</div>
+
 <div class="table-wrap">
   <table class="table-dark">
     <thead>
@@ -97,7 +104,20 @@
 {% endblock %}
 
 {% block scripts %}
+<script src="/static/js/rating_chart.js"></script>
 <script>
+  document.addEventListener('DOMContentLoaded', async function () {
+    try {
+      const res = await fetch('/api/leaderboard/rating-history?top=5&limit=30');
+      if (res.ok) {
+        const data = await res.json();
+        RatingChart.render('rating-chart-container', data);
+      }
+    } catch (err) {
+      console.error('Failed to load leaderboard rating history:', err);
+    }
+  });
+
   async function challengePlayer(opponentId, username) {
     if (!confirm(`Bạn có chắc muốn gửi thách đấu tới ${username}?`)) {
       return;

@@ -234,3 +234,45 @@ def test_rating_chart_css_classes_present(client: TestClient) -> None:
     assert ".legend-color" in css
     assert ".chart-empty-state" in css
 
+
+def test_leaderboard_template_contains_rating_chart_elements(client: TestClient) -> None:
+    """Verify that index.html contains rating chart container and script integration."""
+    res = client.get("/")
+    assert res.status_code == 200
+    assert 'id="rating-chart-card"' in res.text
+    assert 'id="rating-chart-container"' in res.text
+    assert "/static/js/rating_chart.js" in res.text
+    assert "/api/leaderboard/rating-history?top=5&limit=30" in res.text
+    assert "RatingChart.render" in res.text
+
+
+def test_profile_template_contains_rating_chart_elements(client: TestClient) -> None:
+    """Verify that profile.html contains rating chart container and script for authenticated user."""
+    db = SessionLocal()
+    user = User(username="chart_user", elo=1450, wins=2, losses=1, draws=0)
+    user.set_password("pass123")
+    db.add(user)
+    db.commit()
+    user_id = user.id
+    db.close()
+
+    session_token = "chart_token_abc"
+    ACTIVE_SESSIONS[session_token] = user_id
+    client.cookies.set("session_token", session_token)
+
+    res = client.get("/profile")
+    assert res.status_code == 200
+    assert 'id="user-rating-chart-card"' in res.text
+    assert 'id="user-rating-chart-container"' in res.text
+    assert "/static/js/rating_chart.js" in res.text
+    assert f"/api/users/{user_id}/rating-history?limit=50" in res.text
+    assert "RatingChart.render" in res.text
+
+
+def test_profile_template_anonymous_omits_rating_chart(client: TestClient) -> None:
+    """Verify that profile.html does not render rating chart card when user is not logged in."""
+    res = client.get("/profile")
+    assert res.status_code == 200
+    assert 'id="user-rating-chart-card"' not in res.text
+
+

@@ -110,6 +110,14 @@
   </div>
 </div>
 
+<!-- User Rating Trajectory Chart -->
+<div id="user-rating-chart-card" class="chart-card" style="margin-bottom: 24px;">
+  <div class="chart-header">
+    <h2 class="chart-title">Biến động Elo cá nhân</h2>
+  </div>
+  <div id="user-rating-chart-container"></div>
+</div>
+
 <!-- Recent Matches History -->
 <div class="card">
   <div class="card-header">
@@ -172,7 +180,22 @@
 {% endblock %}
 
 {% block scripts %}
+<script src="/static/js/rating_chart.js"></script>
 <script>
+  {% if current_user %}
+  document.addEventListener('DOMContentLoaded', async function () {
+    try {
+      const res = await fetch('/api/users/{{ current_user.id }}/rating-history?limit=50');
+      if (res.ok) {
+        const data = await res.json();
+        RatingChart.render('user-rating-chart-container', data);
+      }
+    } catch (err) {
+      console.error('Failed to load user rating history:', err);
+    }
+  });
+  {% endif %}
+
   let selectedFile = null;
 
   function handleFileSelect(e) {
