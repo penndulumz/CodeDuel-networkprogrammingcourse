@@ -1,0 +1,372 @@
+diff --git a/server/main.py b/server/main.py
+index 7cce169..3576a45 100644
+--- a/server/main.py
++++ b/server/main.py
+@@ -206,16 +206,19 @@ def replay_page(
+ ) -> HTMLResponse:
+     """Render the interactive 9x9 visual replay arena."""
+     current_user = _get_optional_user(request, db)
++    match = db.query(Match).filter(Match.id == match_id).first()
+     return templates.TemplateResponse(
+         request=request,
+         name="replay.html",
+         context={
+             "match_id": match_id,
++            "match": match,
+             "current_user": current_user,
+         },
+     )
+ 
+ 
++
+ @app.get("/admin", response_class=HTMLResponse, tags=["web"])
+ def admin_page(
+     request: Request,
+diff --git a/starter_kit/README.md b/starter_kit/README.md
+index ec111ea..3e65694 100644
+--- a/starter_kit/README.md
++++ b/starter_kit/README.md
+@@ -22,6 +22,9 @@ python starter_kit/local_arena.py starter_kit/bot_template.py starter_kit/heuris
+ 
+ # Watch turn-by-turn move details
+ python starter_kit/local_arena.py starter_kit/bot_template.py starter_kit/heuristic_bot.py --verbose
++
++# Test rule variants offline (inverted combat: Scissors > Rock > Paper)
++python starter_kit/local_arena.py starter_kit/bot_template.py starter_kit/heuristic_bot.py --variant inverted_rps
+ ```
+ 
+ ---
+@@ -56,6 +59,16 @@ Each player starts with **9 pieces**:
+ 
+ You may only move onto an opponent piece's square if your piece **beats** the opponent's piece in Rock-Paper-Scissors. If types are identical (tie) or your piece loses, the move is **illegal**. Friendly pieces can never land on friendly squares.
+ 
++### Rule Variants
++The arena engine supports rule variants configurable both on the server and locally:
++- **`standard` (default)**: Classic cycle — Rock beats Scissors, Scissors beats Paper, Paper beats Rock.
++- **`inverted_rps`**: Inverted cycle — Scissors beats Rock, Rock beats Paper, Paper beats Scissors.
++
++Test your bots offline under inverted rules via:
++```bash
++python starter_kit/local_arena.py bot1.py bot2.py --variant inverted_rps
++```
++
+ ### Movement
+ - Pieces move **1 square in any of the 8 directions** (horizontal, vertical, or diagonal), identical to a King in traditional chess:
+   `(-1, -1)`, `(-1, 0)`, `(-1, 1)`, `(0, -1)`, `(0, 1)`, `(1, -1)`, `(1, 0)`, `(1, 1)`.
+@@ -142,7 +155,7 @@ Bots will be **immediately rejected** if they contain:
+ `local_arena.py` provides rich options for local benchmarking:
+ 
+ ```text
+-usage: local_arena.py [-h] [-r ROUNDS] [-m MAX_TURNS] [-v] [--swap-sides] bot1 bot2
++usage: local_arena.py [-h] [-r ROUNDS] [-m MAX_TURNS] [-v] [--swap-sides] [--variant {standard,inverted_rps}] bot1 bot2
+ 
+ positional arguments:
+   bot1                  Path to Player 1 Python bot file
+@@ -155,6 +168,8 @@ options:
+                         Max turns per round (default: 200)
+   -v, --verbose         Print move-by-move details during match
+   --swap-sides          Alternate bot starting positions every round
++  --variant {standard,inverted_rps}
++                        Game rule variant (default: standard)
+ ```
+ 
+ ### Example Output
+diff --git a/starter_kit/local_arena.py b/starter_kit/local_arena.py
+index 7297e6f..2c0aecf 100644
+--- a/starter_kit/local_arena.py
++++ b/starter_kit/local_arena.py
+@@ -79,6 +79,7 @@ def play_match(
+     verbose: bool = False,
+     bot1_name: str = "Player 1",
+     bot2_name: str = "Player 2",
++    variant: str = "standard",
+ ) -> dict[str, Any]:
+     """Simulate a single match between two bot functions.
+ 
+@@ -89,6 +90,7 @@ def play_match(
+         verbose: If True, print move-by-move actions.
+         bot1_name: Label for Player 1 in output.
+         bot2_name: Label for Player 2 in output.
++        variant: Game rule variant ('standard' or 'inverted_rps', default: 'standard').
+ 
+     Returns:
+         Dictionary containing match results:
+@@ -100,7 +102,7 @@ def play_match(
+             - p1_pieces: Final piece count for Player 1
+             - p2_pieces: Final piece count for Player 2
+     """
+-    game = GameState(max_turns=max_turns)
++    game = GameState(max_turns=max_turns, variant=variant)
+     bot_map = {1: (bot1_fn, bot1_name), 2: (bot2_fn, bot2_name)}
+ 
+     while not game.is_game_over:
+@@ -175,6 +177,7 @@ def run_arena(
+     max_turns: int = MAX_TURNS,
+     verbose: bool = False,
+     swap_sides: bool = False,
++    variant: str = "standard",
+ ) -> dict[str, Any]:
+     """Execute a series of matches between two bot scripts and output summary statistics.
+ 
+@@ -185,6 +188,7 @@ def run_arena(
+         max_turns: Maximum half-moves per round.
+         verbose: Whether to print detailed move-by-move traces.
+         swap_sides: Whether to alternate starting player on each round.
++        variant: Game rule variant ('standard' or 'inverted_rps', default: 'standard').
+ 
+     Returns:
+         Dictionary containing overall tournament statistics.
+@@ -203,6 +207,7 @@ def run_arena(
+     print(f"  Bot 1: {b1_label} ({p1_path.name})")
+     print(f"  Bot 2: {b2_label} ({p2_path.name})")
+     print(f"  Rounds: {rounds} | Max Turns: {max_turns} | Swap Sides: {swap_sides}")
++    print(f"  Rule Variant: {variant}")
+     print("=" * 60)
+ 
+     b1_wins = 0
+@@ -233,6 +238,7 @@ def run_arena(
+             verbose=verbose,
+             bot1_name=first_name,
+             bot2_name=second_name,
++            variant=variant,
+         )
+         elapsed = time.perf_counter() - start_time
+ 
+@@ -282,6 +288,7 @@ def run_arena(
+     print("\n" + "=" * 60)
+     print("  TOURNAMENT RESULTS SUMMARY")
+     print("=" * 60)
++    print(f"  Rule Variant: {variant}")
+     print(f"  {b1_label:20s}: {b1_wins:3d} wins ({b1_pct:5.1f}%)")
+     print(f"  {b2_label:20s}: {b2_wins:3d} wins ({b2_pct:5.1f}%)")
+     print(f"  {'Draws':20s}: {draws:3d}      ({draw_pct:5.1f}%)")
+@@ -292,6 +299,7 @@ def run_arena(
+         "bot1": b1_label,
+         "bot2": b2_label,
+         "rounds": rounds,
++        "variant": variant,
+         "bot1_wins": b1_wins,
+         "bot2_wins": b2_wins,
+         "draws": draws,
+@@ -311,6 +319,12 @@ def main() -> None:
+     parser.add_argument("-m", "--max-turns", type=int, default=MAX_TURNS, help=f"Max turns per round (default: {MAX_TURNS})")
+     parser.add_argument("-v", "--verbose", action="store_true", help="Print move-by-move details during match")
+     parser.add_argument("--swap-sides", action="store_true", help="Alternate bot starting positions every round")
++    parser.add_argument(
++        "--variant",
++        choices=["standard", "inverted_rps"],
++        default="standard",
++        help="Game rule variant ('standard' or 'inverted_rps', default: 'standard')",
++    )
+ 
+     args = parser.parse_args()
+ 
+@@ -322,6 +336,7 @@ def main() -> None:
+             max_turns=args.max_turns,
+             verbose=args.verbose,
+             swap_sides=args.swap_sides,
++            variant=args.variant,
+         )
+     except Exception as exc:
+         print(f"Arena Error: {exc}", file=sys.stderr)
+@@ -330,3 +345,4 @@ def main() -> None:
+ 
+ if __name__ == "__main__":
+     main()
++
+diff --git a/tests/test_starter_kit.py b/tests/test_starter_kit.py
+index 6a0124b..274cf31 100644
+--- a/tests/test_starter_kit.py
++++ b/tests/test_starter_kit.py
+@@ -176,6 +176,37 @@ class TestLocalArena:
+         assert "Round 1" in proc.stdout
+         assert "TOURNAMENT RESULTS SUMMARY" in proc.stdout.upper()
+ 
++    def test_local_arena_cli_with_variant(self) -> None:
++        """Executing local_arena.py with --variant inverted_rps should run successfully and log variant."""
++        cmd = [
++            sys.executable,
++            str(LOCAL_ARENA_PATH),
++            str(BOT_TEMPLATE_PATH),
++            str(HEURISTIC_BOT_PATH),
++            "--variant",
++            "inverted_rps",
++            "--rounds",
++            "1",
++            "--max-turns",
++            "10",
++        ]
++        proc = subprocess.run(cmd, capture_output=True, text=True, check=False)
++        assert proc.returncode == 0, f"CLI exited with {proc.returncode}. Stderr: {proc.stderr}"
++        assert "inverted_rps" in proc.stdout
++        assert "Round 1" in proc.stdout
++
++    def test_local_arena_play_match_variant(self) -> None:
++        """play_match should accept variant parameter and simulate under inverted_rps rules."""
++        sys.path.insert(0, str(STARTER_KIT_DIR.parent))
++        from starter_kit.bot_template import get_move as bot1
++        from starter_kit.heuristic_bot import get_move as bot2
++        from starter_kit.local_arena import play_match
++
++        result = play_match(bot1, bot2, max_turns=10, variant="inverted_rps")
++        assert "winner" in result
++        assert result["winner"] in (1, 2, None)
++        assert "turns" in result
++
+ 
+ class TestDocumentation:
+     """Verify documentation quality and presence."""
+@@ -187,3 +218,10 @@ class TestDocumentation:
+         assert "get_move" in content
+         assert "local_arena.py" in content
+         assert "Rock" in content or "RPS" in content
++
++    def test_readme_contains_rule_variant_instructions(self) -> None:
++        """README.md must document the --variant flag for inverted_rps."""
++        assert README_PATH.is_file(), "README.md does not exist"
++        content = README_PATH.read_text(encoding="utf-8")
++        assert "--variant" in content
++        assert "inverted_rps" in content
+diff --git a/tests/test_web.py b/tests/test_web.py
+index b01a23a..d31cd77 100644
+--- a/tests/test_web.py
++++ b/tests/test_web.py
+@@ -276,3 +276,36 @@ def test_profile_template_anonymous_omits_rating_chart(client: TestClient) -> No
+     assert 'id="user-rating-chart-card"' not in res.text
+ 
+ 
++def test_replay_page_renders_variant_badge_for_inverted_rps(client: TestClient) -> None:
++    """Verify that /replay/{match_id} displays the rule variant badge when match is inverted_rps."""
++    db = SessionLocal()
++    user = User(username="variant_tester", elo=1500)
++    user.set_password("pass123")
++    db.add(user)
++    db.commit()
++
++    bot = Bot(user_id=user.id, filename="v_bot.py", filepath="bots/v_bot.py", is_active=True)
++    db.add(bot)
++    db.commit()
++
++    match = Match(
++        player1_id=user.id,
++        player2_id=user.id,
++        bot1_id=bot.id,
++        bot2_id=bot.id,
++        winner_id=user.id,
++        win_reason="goal",
++        total_turns=10,
++        rule_variant="inverted_rps",
++    )
++    db.add(match)
++    db.commit()
++    match_id = match.id
++    db.close()
++
++    res = client.get(f"/replay/{match_id}")
++    assert res.status_code == 200
++    assert "Đảo chiều ngũ hành (Kéo > Búa > Bao)" in res.text
++    assert "ruleVariantBadge" in res.text
++
++
+diff --git a/web/static/css/style.css b/web/static/css/style.css
+index b215cf2..518a62e 100644
+--- a/web/static/css/style.css
++++ b/web/static/css/style.css
+@@ -244,6 +244,19 @@ a:hover {
+   color: #58a6ff;
+   border: 1px solid rgba(88, 166, 255, 0.4);
+ }
++.tag.purple {
++  background: rgba(187, 134, 252, 0.15);
++  color: #bb86fc;
++  border: 1px solid rgba(187, 134, 252, 0.4);
++}
++.variant-badge {
++  font-size: 12px;
++  color: var(--text-muted);
++  display: flex;
++  align-items: center;
++  gap: 6px;
++  margin-top: 4px;
++}
+ 
+ /* ================== BUTTONS ================== */
+ .btn {
+diff --git a/web/static/js/visualizer.js b/web/static/js/visualizer.js
+index d49e617..9e39058 100644
+--- a/web/static/js/visualizer.js
++++ b/web/static/js/visualizer.js
+@@ -227,6 +227,17 @@ class ReplayVisualizer {
+       this.dom.slider.value = 0;
+     }
+ 
++    // Display rule variant indicator if match was played under inverted RPS rules
++    if (data.rule_variant === 'inverted_rps') {
++      const variantBadge = document.getElementById('ruleVariantBadge');
++      if (variantBadge) {
++        variantBadge.style.display = 'block';
++        if (!variantBadge.innerHTML.includes('Đảo chiều')) {
++          variantBadge.innerHTML = 'Chế độ: <span class="tag purple">Đảo chiều ngũ hành (Kéo > Búa > Bao)</span>';
++        }
++      }
++    }
++
+     this.populateMoveLog();
+     this.goToTurn(0);
+   }
+@@ -439,13 +450,14 @@ class ReplayVisualizer {
+ 
+     this.dom.turnBanner.classList.remove('p1', 'p2');
+     const isFinished = turn === this.totalTurns && this.replayData;
++    const variantSuffix = (this.replayData && this.replayData.rule_variant === 'inverted_rps') ? ' [Đảo chiều RPS]' : '';
+ 
+     if (isFinished) {
+       const winner = this.replayData.winner;
+       const reason = this.replayData.win_reason || 'finished';
+       const winnerText = winner ? `Player ${winner} won!` : 'Match drawn!';
+ 
+-      this.dom.turnBanner.textContent = `Match Ended — ${winnerText} (${reason})`;
++      this.dom.turnBanner.textContent = `Match Ended — ${winnerText} (${reason})${variantSuffix}`;
+       if (winner) {
+         this.dom.turnBanner.classList.add(`p${winner}`);
+       }
+@@ -468,7 +480,7 @@ class ReplayVisualizer {
+       }
+ 
+       const nextPlayer = (turn % 2 === 0) ? 1 : 2;
+-      this.dom.turnBanner.textContent = `Turn ${turn + 1}: Player ${nextPlayer}'s Move`;
++      this.dom.turnBanner.textContent = `Turn ${turn + 1}: Player ${nextPlayer}'s Move${variantSuffix}`;
+       this.dom.turnBanner.classList.add(`p${nextPlayer}`);
+     }
+   }
+diff --git a/web/templates/replay.html b/web/templates/replay.html
+index cf3f1a8..a40bffa 100644
+--- a/web/templates/replay.html
++++ b/web/templates/replay.html
+@@ -34,6 +34,15 @@
+       <div style="display: flex; flex-direction: column; gap: 6px;">
+         <div>Mã trận: <b>#{{ match_id }}</b></div>
+         <div>Phím tắt: <b>←</b> Lùi / <b>→</b> Tiến / <b>Space</b> Dừng</div>
++        {% if match and match.rule_variant == 'inverted_rps' %}
++        <div id="ruleVariantBadge" class="variant-badge">
++          Chế độ: <span class="tag purple">Đảo chiều ngũ hành (Kéo > Búa > Bao)</span>
++        </div>
++        {% else %}
++        <div id="ruleVariantBadge" class="variant-badge" style="display: none;">
++          Chế độ: <span class="tag purple">Đảo chiều ngũ hành (Kéo > Búa > Bao)</span>
++        </div>
++        {% endif %}
+       </div>
+     </div>
+   </aside>
+@@ -119,6 +128,10 @@
+         if (m.player2) {
+           document.getElementById('p2Name').textContent = m.player2.username;
+         }
++        if (m.rule_variant === 'inverted_rps') {
++          const badge = document.getElementById('ruleVariantBadge');
++          if (badge) badge.style.display = 'block';
++        }
+       }
+     } catch (err) {
+       console.warn('Could not fetch match summary details:', err);
