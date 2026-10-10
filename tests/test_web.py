@@ -205,3 +205,32 @@ def test_minimalist_css_design_tokens_present(client: TestClient) -> None:
     assert "--text-primary: #f0f6fc" in css
     assert "--text-muted: #8b949e" in css
     assert "radial-gradient" not in css.split("body")[1].split("}")[0]
+
+
+def test_rating_chart_static_asset_served(client: TestClient) -> None:
+    """Verify that rating_chart.js is served properly with the RatingChart namespace."""
+    res = client.get("/static/js/rating_chart.js")
+    assert res.status_code == 200
+    assert "javascript" in res.headers["content-type"] or "text/plain" in res.headers["content-type"]
+    assert "RatingChart" in res.text
+    assert "render" in res.text
+
+
+def test_rating_chart_css_classes_present(client: TestClient) -> None:
+    """Verify that style.css includes all required rating chart styling classes."""
+    res = client.get("/static/css/style.css")
+    assert res.status_code == 200
+    css = res.text
+    assert ".chart-card" in css
+    assert ".chart-wrapper" in css
+    assert ".chart-svg" in css
+    assert ".chart-grid-line" in css
+    assert ".chart-axis-text" in css
+    assert ".chart-line" in css
+    assert ".chart-point" in css
+    assert ".chart-tooltip" in css
+    assert ".chart-legend" in css
+    assert ".legend-item" in css
+    assert ".legend-color" in css
+    assert ".chart-empty-state" in css
+
