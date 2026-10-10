@@ -283,3 +283,18 @@ Tài liệu dự án được tổ chức theo hệ thống phân tầng nghiêm
   2. Cập nhật tài liệu chuyên biệt tương ứng (`ARCHITECTURE.md`, `BOT_GUIDE.md`, hoặc `ADMIN_GUIDE.md`).
   3. Cập nhật trạng thái nghiệm thu trong `TASKS.md`.
   4. Đảm bảo `README.md` giữ vững vai trò là bản đồ chỉ mục điều hướng chính xác.
+
+---
+
+## 15. Quy Trình Vận Hành Nhà Máy Tự Động (Autonomous Factory Pipeline)
+
+Hệ thống thiết lập cơ chế vận hành như một nhà máy kỹ thuật phần mềm tự động (Autonomous Engineering Factory), tự động thực hiện chu trình bảo trì, kiểm thử và nâng cấp mà không cần sự can thiệp thủ công của người dùng:
+
+1. **Nguyên Tắc Bất Biến Vận Hành Tự Động (Zero-Human-Intervention Invariant)**:
+   - Các chu trình bảo trì và nâng cấp tự động diễn ra theo lịch trình định sẵn (03:00 AM, 05:00 AM, 07:00 AM).
+   - AI Agent được trao toàn quyền tự động phát hiện nợ kỹ thuật (technical debt), lỗ hổng kiểm thử, tối ưu hóa hiệu năng, tự động lập kế hoạch, triển khai TDD trên Git Worktree, tự review và merge vào `main`.
+2. **Lịch Trình Vận Hành 3 Giai Đoạn (Khung Giờ 3 - 5 - 7)**:
+   - **03:00 AM (Khám Phá & Nâng Cấp)**: Kiểm tra sức khỏe hệ thống (`pytest -q`), brainstorm ý tưởng nâng cấp qua 5 danh mục (Hiệu năng, Bảo mật, Trải nghiệm, Chất lượng mã nguồn, Tính năng), chọn giải pháp tác động cao nhất / rủi ro thấp nhất, cô lập trong worktree, triển khai TDD, tự kiểm tra và merge.
+   - **05:00 AM (Kiểm Thử Sâu & Đấu Trường Boss Benchmark)**: Thu hồi nhánh dang dở nếu có, chạy mô phỏng đối đầu 10 trận Boss Arena (`scripts/independent_boss_arena_simulation.py`), đánh giá hành vi chiến thuật, nâng cấp thuật toán và phòng thủ bảo mật sandbox, merge vào `main`.
+   - **07:00 AM (Tổng Hợp, Dọn Dẹp & Lập Kế Hoạch Tiếp Theo)**: Dọn dẹp các worktree và nhánh tạm, chạy toàn diện test suite hồi quy, kiểm toán tính toàn vẹn tài liệu theo luật SSOT, thực hiện nâng cấp chất lượng mã nguồn (QoL), và tổng hợp báo cáo ngày tại `scratch/maintenance-log-<YYYY-MM-DD>.md`.
+

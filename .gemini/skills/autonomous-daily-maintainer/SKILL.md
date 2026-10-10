@@ -5,12 +5,26 @@ description: Use when running automated maintenance, continuous upgrades, regres
 
 # Autonomous Daily Maintainer
 
-## Overview
-Synthesizes and invokes the entire **Superpowers skill lifecycle** (`using-superpowers`, `systematic-debugging`, `test-driven-development`, `brainstorming`, `writing-plans`, `subagent-driven-development`, `verification-before-completion`, `finishing-a-development-branch`) for non-interactive, autonomous maintenance and platform upgrades.
+## Factory Operating Notice (Zero-Human-Intervention Invariant)
 
-## When to Use
-- Triggered on a daily schedule or manual prompt to maintain and evolve the Battlecode platform.
-- When unattended bug detection, regression patching, bot tactical balancing, or continuous feature enhancement is requested.
+> **MANDATORY FACTORY INVARIANT**:
+> This platform operates as a fully autonomous software engineering factory.
+> All maintenance, exploration, brainstorming, planning, TDD implementation, code reviews,
+> and integration merges across the designated schedule (03:00 AM, 05:00 AM, and 07:00 AM)
+> MUST execute end-to-end WITHOUT requiring human intervention or manual prompts.
+> The autonomous agent possesses full authority to identify technical debt, test coverage gaps,
+> performance optimizations, and feature enhancements, implement them via Git Worktrees and TDD,
+> and merge verified increments into `main`.
+
+---
+
+## Autonomous Factory Schedule (3 - 5 - 7 Pipeline)
+
+| Time | Factory Cycle | Core Autonomous Mission |
+|:---|:---|:---|
+| **03:00 AM** | Exploration & Upgrade Cycle | Baseline health check (`pytest -q`), autonomous brainstorming across 5 domains (Performance, Security, UX, Code Quality, Features), pick highest-impact/lowest-risk item, isolate in worktree, implement via TDD, self-review, and merge. |
+| **05:00 AM** | Deep Testing & Boss Arena Benchmark | Check for unmerged worktrees from 3:00 AM, execute 10-match Boss Arena round-robin simulation, analyze AI behavior, brainstorm tactical & security hardening, implement improvements via TDD, and merge. |
+| **07:00 AM** | Daily Summary, Cleanup & Forward Planning | Clean stale worktrees/branches, run full regression test suite, verify documentation consistency (`docs/CONTEXT_RESUME.md` SSOT law), execute QoL upgrade, and generate consolidated daily report in `scratch/maintenance-log-<date>.md`. |
 
 ---
 
@@ -18,22 +32,22 @@ Synthesizes and invokes the entire **Superpowers skill lifecycle** (`using-super
 
 ```mermaid
 flowchart TD
-    Start["Trigger Daily Run"] --> Check["1. Regression Suite (pytest -v)"]
+    Start["Trigger Daily Run (3AM / 5AM / 7AM)"] --> Check["1. Regression Suite (pytest -q)"]
     Check -->|Tests Fail| Debug["Invoke superpowers:systematic-debugging"]
     Debug --> TDD["Invoke superpowers:test-driven-development"]
     TDD --> VerifyFix["Invoke superpowers:verification-before-completion"]
     VerifyFix --> Check
 
-    Check -->|Tests Pass (100% Green)| Benchmark["2. Bot Arena Benchmark (starter_kit/local_arena.py)"]
+    Check -->|Tests Pass (100% Green)| Benchmark["2. Boss Arena Benchmark (independent_boss_arena_simulation.py)"]
     Benchmark --> Decision{"Needs Upgrade / Feature?"}
     
     Decision -->|Routine Maintenance| Schedule["3. Advance Tournament State (config/tournament.yaml)"]
-    Schedule --> Report["4. Daily Health Report (docs/logs/)"]
+    Schedule --> Report["4. Daily Health Report (scratch/maintenance-log-date.md)"]
     Report --> Commit["5. Commit Clean State"]
 
     Decision -->|Enhancement / Upgrade| Brainstorm["Invoke superpowers:brainstorming"]
     Brainstorm --> Plan["Invoke superpowers:writing-plans"]
-    Plan --> SDD["Invoke superpowers:subagent-driven-development"]
+    Plan --> SDD["Invoke superpowers:subagent-driven-development or Inline TDD"]
     SDD --> LoopLaw["Enforce Continuous Feedback Loop Law (Update docs/CONTEXT_RESUME.md)"]
     LoopLaw --> Finish["Invoke superpowers:finishing-a-development-branch"]
     Finish --> Commit
@@ -46,7 +60,7 @@ flowchart TD
 ### Phase 1: Automated Health Audit & Systematic Debugging
 1. **Execute full test suite**:
    ```bash
-   pytest -v
+   pytest -q
    ```
 2. **If ANY test fails or bug is detected**:
    - **MUST INVOKE** `superpowers:systematic-debugging`:
@@ -59,32 +73,29 @@ flowchart TD
      - Implement minimal code fix.
      - Verify test passes.
    - **MUST INVOKE** `superpowers:verification-before-completion`:
-     - Re-run full test suite (`pytest -v`) to confirm zero regressions.
+     - Re-run full test suite (`pytest -q`) to confirm zero regressions.
 
-### Phase 2: Bot Balance & Tactical Benchmarking
-Run 10 head-to-head rounds between standard bots:
+### Phase 2: Boss Arena Benchmark & Tactical Hardening
+Run 10 head-to-head round-robin matches among all 5 benchmark bosses:
 ```bash
-python starter_kit/local_arena.py starter_kit/bot_template.py starter_kit/heuristic_bot.py --rounds 10 --max-turns 150
+python scripts/independent_boss_arena_simulation.py
 ```
-Log victory ratios, average turns, and wipeout vs goal win distributions.
+Verify zero timeouts, zero process crashes, and valid replay JSON logs.
 
 ### Phase 3: Autonomous System Upgrades & Enhancements
-When upgrading features (e.g. runner latency optimizations, new heuristic bot variants, tournament analytics):
+When upgrading features (e.g. queue robustness, AST security, tournament analytics):
 1. **MUST INVOKE** `superpowers:brainstorming`:
-   - Explore requirements and propose architectural approaches.
+   - Explore requirements and identify highest-impact / lowest-risk opportunities.
 2. **MUST INVOKE** `superpowers:writing-plans`:
    - Decompose into bite-sized TDD tasks with file paths and interfaces.
-3. **MUST INVOKE** `superpowers:subagent-driven-development`:
-   - Dispatch implementer and reviewer subagents task-by-task.
+3. **MUST INVOKE** `superpowers:test-driven-development`:
+   - Write failing tests first, verify failure, implement cleanly, verify pass.
 4. **ENFORCE CONTINUOUS FEEDBACK LOOP LAW**:
    - If any API, schema, rule, or interface changed, **IMMEDIATELY UPDATE** `docs/CONTEXT_RESUME.md` and `TASKS.md` in the same commit.
 5. **MUST INVOKE** `superpowers:finishing-a-development-branch`:
-   - Merge back to `main` locally once all tests pass.
+   - Merge back to `main` locally once all tests pass. Clean up worktrees and temporary branches.
 
-### Phase 4: Tournament State Maintenance & Reporting
-1. Update `config/tournament.yaml` (daily Elo multiplier $x \in [1.2, 2.5]$, current day).
-2. Generate health report at `docs/logs/daily_report_<YYYY-MM-DD>.md`.
-3. Commit maintenance ledger:
-   ```bash
-   git add docs/logs/ config/tournament.yaml && git commit -m "chore(daily): autonomous maintenance and upgrade cycle <date>"
-   ```
+### Phase 4: Daily Consolidation & Reporting
+1. Update `config/tournament.yaml` if schedule parameters changed.
+2. Generate consolidated daily report at `scratch/maintenance-log-<YYYY-MM-DD>.md`.
+3. Commit clean state.

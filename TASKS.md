@@ -1,6 +1,6 @@
 # Kế Hoạch Thực Hiện & Theo Dõi Tiến Độ Dự Án (TASKS.md)
 
-> **Trạng thái**: Hoàn thành toàn diện và toàn bộ test pass (252/252 tests pass).
+> **Trạng thái**: Hoàn thành toàn diện và toàn bộ test pass (298/298 tests pass).
 > - Quy tắc: Đã kiểm chứng tự động toàn diện qua Subagent-Driven Development, 6-domain Deep Testing Matrix, Boss Arena Benchmark Simulation, và Unit/Integration/E2E test suite.
 
 ---
@@ -117,3 +117,16 @@
 - *Liên kết chi tiết Spec & Plan*:
   - Spec: [`docs/superpowers/specs/2026-10-09-pro-ui-boss-arena-admin-config-design.md`](docs/superpowers/specs/2026-10-09-pro-ui-boss-arena-admin-config-design.md)
   - Plan: [`docs/superpowers/plans/2026-10-09-pro-ui-boss-arena-admin-config.md`](docs/superpowers/plans/2026-10-09-pro-ui-boss-arena-admin-config.md)
+
+---
+
+## Milestone 9: Autonomous Factory Operating Model & System Queue Hardening (Cả Nhóm)
+- [x] **Task 9.1**: Tích hợp thông báo và quy chuẩn vận hành nhà máy tự động không cần can thiệp (Factory Mode Notice) vào kỹ năng `.gemini/skills/autonomous-daily-maintainer/SKILL.md`.
+  - Thiết lập chuẩn vận hành Zero-Human-Intervention Invariant và lịch trình 3 chu trình (03:00 AM, 05:00 AM, 07:00 AM) thực hiện end-to-end chu trình Superpowers tự động.
+- [x] **Task 9.2**: Xây dựng bộ kiểm thử chuyên sâu cho hàng đợi trận đấu `server/queue.py` (`tests/test_queue.py`).
+  - Bao phủ toàn diện 8 trường hợp biên: trận đấu không tồn tại, người chơi bị xóa, kết quả hòa, người chơi 2 chiến thắng, ngoại lệ tiến trình con runner, bảo toàn Elo trong bracket, và ghi đè cấu hình giải đấu động từ CSDL.
+  - *Verification*: `pytest tests/test_queue.py` -> 8/8 tests PASS.
+- [x] **Task 9.3**: Đồng bộ SSOT `docs/CONTEXT_RESUME.md` (Mục 15: Quy Trình Vận Hành Nhà Máy Tự Động).
+  - Cập nhật quy chuẩn kỹ thuật, lưu trữ báo cáo ngày tại `scratch/maintenance-log-<YYYY-MM-DD>.md`.
+  - *Verification*: `pytest tests/test_documentation_integrity.py` -> 12/12 tests PASS.
+
