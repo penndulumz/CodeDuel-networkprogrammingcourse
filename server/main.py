@@ -7,6 +7,7 @@ tournament administration, and serves static files and Jinja2 web UI templates.
 
 from __future__ import annotations
 
+import os
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any, AsyncGenerator, Dict, List
@@ -46,9 +47,23 @@ app = FastAPI(
 )
 
 # CORS middleware for local web client and remote tunnel access
+def get_allowed_origins() -> List[str]:
+    """Return the configured CORS allowed origins for local or WAN deployment."""
+    allowed_origins_env = os.getenv(
+        "ALLOWED_ORIGINS",
+        "http://localhost:8000,http://127.0.0.1:8000",
+    )
+
+    return [
+        origin.strip()
+        for origin in allowed_origins_env.split(",")
+        if origin.strip()
+    ]
+
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=get_allowed_origins(),
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
