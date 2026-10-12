@@ -354,4 +354,24 @@ Nhằm đánh giá năng lực thích ứng thuật toán thực chiến của c
      ```
    - **Trình Trực Quan Hóa Replay (`web/templates/replay.html`, `web/static/js/visualizer.js`)**: Khi xem lại các trận đấu thuộc biến thể `inverted_rps`, giao diện hiển thị huy hiệu nhận diện nổi bật "Chế độ: Đảo chiều ngũ hành (Kéo > Búa > Bao)" trên thanh điều hướng phát lại.
 
+## 18. WAN Deployment & HTTPS Tunnel Configuration
 
+Hệ thống hỗ trợ triển khai thử nghiệm qua WAN bằng mô hình HTTPS tunnel, phục vụ demo khi người dùng không cùng mạng LAN.
+
+1. Biến môi trường triển khai:
+   - ALLOWED_ORIGINS: Danh sách origin được phép truy cập CORS, phân tách bằng dấu phẩy.
+   - COOKIE_SECURE: Đặt true khi chạy qua HTTPS public tunnel; đặt false khi chạy HTTP local hoặc LAN.
+   - ADMIN_USERNAME và ADMIN_PASSWORD: Cấu hình tài khoản quản trị được seed khi khởi động.
+
+2. Cấu hình mặc định local:
+   - ALLOWED_ORIGINS mặc định gồm http://localhost:8000 và http://127.0.0.1:8000.
+   - COOKIE_SECURE mặc định là false để đăng nhập hoạt động trên HTTP local.
+
+3. Cấu hình WAN demo:
+   - Khi dùng Cloudflare Tunnel hoặc HTTPS public endpoint, đặt ALLOWED_ORIGINS trùng chính xác với URL HTTPS public.
+   - Đặt COOKIE_SECURE=true để session cookie chỉ được gửi qua HTTPS.
+   - Không sử dụng mật khẩu mặc định admin123 khi public hệ thống ra Internet.
+
+4. Quy tắc chạy kiểm thử:
+   - Trước khi chạy pytest, phải xóa các biến môi trường WAN như ADMIN_PASSWORD, ADMIN_USERNAME, COOKIE_SECURE và ALLOWED_ORIGINS.
+   - Nếu ADMIN_PASSWORD còn giữ giá trị demo WAN, test suite có thể fail vì các test mặc định dùng admin/admin123.
