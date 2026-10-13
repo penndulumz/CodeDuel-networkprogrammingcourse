@@ -107,6 +107,9 @@
       <button class="btn btn-danger" onclick="triggerBracketGeneration()" style="width: 100%; padding: 12px;">
         ⚡ Tạo / Khởi tạo lại Nhánh đấu Bracket
       </button>
+      <button class="btn btn-primary" onclick="playNextBracketRound()" style="width: 100%; padding: 12px; margin-top: 12px;">
+        ▶ Chạy vòng đấu tiếp theo
+      </button>
     </div>
 
     <div id="bracketMsg" style="font-size: 13px; display: none;"></div>
@@ -193,6 +196,8 @@
           <td>
             {% if bm.status == 'completed' %}
               <span class="tag" style="background: rgba(16, 185, 129, 0.2); color: #34d399;">Hoàn thành</span>
+            {% elif bm.status == 'running' %}
+              <span class="tag blue">Đang đấu</span>
             {% else %}
               <span class="tag" style="background: rgba(245, 158, 11, 0.2); color: #f59e0b;">Đang chờ</span>
             {% endif %}
@@ -259,7 +264,7 @@
   }
 
   async function triggerBracketGeneration() {
-    if (!confirm('Bạn có chắc muốn tạo mới nhánh đấu? Các trận đấu bracket đang chờ trước đó sẽ bị thay thế.')) {
+    if (!confirm('Bạn có chắc muốn tạo mới nhánh đấu? Toàn bộ nhánh đấu và kết quả bracket trước đó sẽ bị thay thế.')) {
       return;
     }
 
@@ -283,6 +288,33 @@
       msgEl.style.color = '#34d399';
       msgEl.textContent = `Đã tạo nhánh đấu thành công với ${data.length} cặp đấu! Đang tải lại...`;
       setTimeout(() => window.location.reload(), 1000);
+    } catch (err) {
+      msgEl.style.color = '#f87171';
+      msgEl.textContent = `Lỗi mạng: ${err.message}`;
+    }
+  }
+
+  async function playNextBracketRound() {
+    const msgEl = document.getElementById('bracketMsg');
+    msgEl.style.display = 'block';
+    msgEl.style.color = 'var(--muted)';
+    msgEl.textContent = 'Đang đưa các cặp đấu vào hàng chờ...';
+
+    try {
+      const res = await fetch('/api/admin/bracket/play', {
+        method: 'POST'
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        msgEl.style.color = '#f87171';
+        msgEl.textContent = `Lỗi: ${data.detail || 'Không thể chạy vòng đấu'}`;
+        return;
+      }
+
+      msgEl.style.color = '#34d399';
+      msgEl.textContent = `Đang chạy ${data.bracket_match_ids.length} cặp đấu vòng ${data.round_name}. Tải lại trang để xem kết quả.`;
+      setTimeout(() => window.location.reload(), 1500);
     } catch (err) {
       msgEl.style.color = '#f87171';
       msgEl.textContent = `Lỗi mạng: ${err.message}`;

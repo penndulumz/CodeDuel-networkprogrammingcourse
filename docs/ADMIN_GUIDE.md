@@ -122,9 +122,15 @@ On the concluding day of the tournament:
      - Match 2: Seed 4 vs Seed 5
      - Match 3: Seed 2 vs Seed 7
      - Match 4: Seed 3 vs Seed 6
-3. **Public Bracket View**:
+   - Generating again replaces the whole bracket, including results already played.
+3. **Play the Rounds**:
+   - Click **Chạy vòng đấu tiếp theo** (`POST /api/admin/bracket/play`) once per round.
+   - Each pairing is played as a series (`match_format`, default `BO3`) with sides alternating every game. Bracket games never change Elo.
+   - Series winners advance automatically. A player without an active bot forfeits; a level series goes to the better seed.
+4. **Public Bracket View**:
    - Competitors inspect live playoff progress at [http://localhost:8000/bracket](http://localhost:8000/bracket).
-4. **Final Composite Scoring**:
+5. **Final Composite Scoring**:
+   - Shown on the bracket page once the Final is played (also at `GET /api/admin/bracket/standings`).
    $$\text{Final Score} = 0.5 \times \text{Normalized Elo} + 0.5 \times \text{Bracket Points}$$
 
 ---

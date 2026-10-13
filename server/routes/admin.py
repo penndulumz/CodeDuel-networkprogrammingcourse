@@ -3,12 +3,20 @@
 from __future__ import annotations
 
 from typing import Any, Dict, List, Optional, Union
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from engine.game import SUPPORTED_RULE_VARIANTS
 from server.boss_manager import deploy_boss, get_all_bosses_status, retract_boss
+from server.bracket import (
+    STATUS_RUNNING,
+    create_bracket,
+    get_final_results,
+    get_ready_matches,
+    is_bracket_finished,
+    play_bracket_matches,
+)
 from server.database import get_db
 from server.models import Bot, BracketMatch, TournamentSetting, User
 from server.routes.auth import get_current_admin
@@ -231,28 +239,73 @@ def trigger_bracket_generation(
             detail="At least 2 participants are required to generate a tournament bracket.",
         )
 
+    if db.query(BracketMatch).filter(BracketMatch.status == STATUS_RUNNING).first():
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Bracket matches are currently being played. Wait for them to finish.",
+        )
+
     matchups = generate_bracket(eligible_users)
 
-    # Purge any existing pending bracket matches
-    db.query(BracketMatch).filter(BracketMatch.status == "pending").delete()
-
-    saved_bracket_matches: List[BracketMatch] = []
-    for m in matchups:
-        bm = BracketMatch(
-            round_name=m["round_name"],
-            match_index=m["match_index"],
-            player1_id=m["player1_id"],
-            player2_id=m["player2_id"],
-            status="pending",
-        )
-        db.add(bm)
-        saved_bracket_matches.append(bm)
-
-    db.commit()
-    for bm in saved_bracket_matches:
-        db.refresh(bm)
+    # Replace the previous bracket with a fresh tree (first round + empty later rounds)
+    create_bracket(db, matchups)
 
     return matchups
+
+
+@router.post("/bracket/play")
+def play_next_bracket_round(
+    background_tasks: BackgroundTasks,
+    current_admin: User = Depends(get_current_admin),
+    db: Session = Depends(get_db),
+) -> Dict[str, Any]:
+    """Queue every ready pairing of the earliest unfinished bracket round for execution."""
+    all_matches = db.query(BracketMatch).all()
+    if not all_matches:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="No bracket has been generated yet.",
+        )
+    if any(bm.status == STATUS_RUNNING for bm in all_matches):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Bracket matches are currently being played. Wait for them to finish.",
+        )
+    if is_bracket_finished(all_matches):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="The bracket is already finished.",
+        )
+
+    ready = get_ready_matches(db)
+    if not ready:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="No bracket matches are ready to be played.",
+        )
+
+    round_name = ready[0].round_name
+    match_ids = [bm.id for bm in ready]
+    for bm in ready:
+        bm.status = STATUS_RUNNING
+    db.commit()
+
+    background_tasks.add_task(play_bracket_matches, match_ids)
+
+    return {
+        "status": "queued",
+        "round_name": round_name,
+        "bracket_match_ids": match_ids,
+    }
+
+
+@router.get("/bracket/standings")
+def get_bracket_standings(
+    current_admin: User = Depends(get_current_admin),
+    db: Session = Depends(get_db),
+) -> List[Dict[str, Any]]:
+    """Retrieve composite final scores combining normalized Elo and bracket placement."""
+    return get_final_results(db)
 
 
 @router.get("/bracket")
