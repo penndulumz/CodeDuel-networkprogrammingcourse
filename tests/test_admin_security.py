@@ -136,4 +136,51 @@ def test_admin_page_authenticated_admin_allowed():
     home_res = client.get("/")
     assert home_res.status_code == 200
     assert 'href="/admin"' in home_res.text
+def test_login_cookie_has_secure_defaults(monkeypatch):
+    """Verify login cookie keeps safe local defaults without Secure on HTTP."""
+    monkeypatch.setenv("COOKIE_SECURE", "false")
+    init_db()
+    seed_admin_and_starter_bots()
 
+    client = TestClient(app)
+    response = client.post(
+        "/api/auth/login",
+        json={
+            "username": "admin",
+            "password": "admin123",
+        },
+    )
+
+    assert response.status_code == 200
+
+    set_cookie = response.headers.get("set-cookie", "").lower()
+
+    assert "session_token=" in set_cookie
+    assert "httponly" in set_cookie
+    assert "samesite=lax" in set_cookie
+    assert "secure" not in set_cookie
+
+
+def test_login_cookie_uses_secure_flag_for_wan(monkeypatch):
+    """Verify login cookie adds Secure flag when WAN HTTPS mode is enabled."""
+    monkeypatch.setenv("COOKIE_SECURE", "true")
+    init_db()
+    seed_admin_and_starter_bots()
+
+    client = TestClient(app)
+    response = client.post(
+        "/api/auth/login",
+        json={
+            "username": "admin",
+            "password": "admin123",
+        },
+    )
+
+    assert response.status_code == 200
+
+    set_cookie = response.headers.get("set-cookie", "").lower()
+
+    assert "session_token=" in set_cookie
+    assert "httponly" in set_cookie
+    assert "samesite=lax" in set_cookie
+    assert "secure" in set_cookie

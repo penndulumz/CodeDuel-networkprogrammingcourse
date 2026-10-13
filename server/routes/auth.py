@@ -157,8 +157,17 @@ async def login(
 
     token = secrets.token_hex(24)
     ACTIVE_SESSIONS[token] = user.id
-    response.set_cookie(key="session_token", value=token, httponly=True, path="/")
 
+    secure_cookie = os.getenv("COOKIE_SECURE", "false").strip().lower() == "true"
+
+    response.set_cookie(
+        key="session_token",
+        value=token,
+        httponly=True,
+        secure=secure_cookie,
+        samesite="lax",
+        path="/",
+    )
     return {
         "token": token,
         "user": {
@@ -180,7 +189,15 @@ def logout(
     if token and token in ACTIVE_SESSIONS:
         del ACTIVE_SESSIONS[token]
 
-    response.delete_cookie(key="session_token", path="/")
+    secure_cookie = os.getenv("COOKIE_SECURE", "false").strip().lower() == "true"
+
+    response.delete_cookie(
+        key="session_token",
+        path="/",
+        secure=secure_cookie,
+        httponly=True,
+        samesite="lax",
+    )
     return {"message": "Logged out successfully"}
 
 

@@ -135,3 +135,24 @@ On the concluding day of the tournament:
 - **Replay Files**: Preserved as JSON files in `replays/match_<id>.json`.
 - **Competitor Bots**: Stored securely in `bots/<user_id>_<filename>.py`.
 - **Season Reset**: To wipe all state for a new tournament season, stop the server, remove `app.db`, `bots/`, and `replays/`, then restart via `python main.py`.
+
+## WAN Demo Mode
+
+Để demo hệ thống qua Internet, có thể dùng HTTPS tunnel trỏ về server local đang chạy tại http://localhost:8000.
+
+Ví dụ PowerShell:
+
+ALLOWED_ORIGINS=https://<your-tunnel>.trycloudflare.com
+COOKIE_SECURE=true
+ADMIN_USERNAME=admin
+ADMIN_PASSWORD=<strong-demo-password>
+
+Sau đó chạy:
+
+python main.py
+
+Lưu ý:
+- Không commit mật khẩu thật vào repository.
+- Quick Tunnel URL là tạm thời và có thể thay đổi sau mỗi lần khởi động lại cloudflared.
+- Nếu URL tunnel thay đổi, phải cập nhật lại ALLOWED_ORIGINS.
+- Trước khi chạy pytest, cần xóa các biến môi trường WAN để test suite dùng cấu hình local mặc định.
