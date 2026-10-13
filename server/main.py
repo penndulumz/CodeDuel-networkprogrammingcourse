@@ -20,6 +20,7 @@ from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
 from server.database import get_db, init_db
+from server.bracket import ROUND_ORDER, get_final_results, is_bracket_finished
 from server.models import Bot, BracketMatch, Match, User
 from server.routes import admin, auth, bots, leaderboard, matches
 from server.routes.admin import _get_all_settings_dict
@@ -283,11 +284,19 @@ def bracket_page(
         .all()
     )
 
+    present_rounds = {bm.round_name for bm in bracket_matches}
+    bracket_rounds = [name for name in ROUND_ORDER if name in present_rounds]
+    final_results = (
+        get_final_results(db) if is_bracket_finished(bracket_matches) else []
+    )
+
     return templates.TemplateResponse(
         request=request,
         name="bracket.html",
         context={
             "bracket_matches": bracket_matches,
+            "bracket_rounds": bracket_rounds,
+            "final_results": final_results,
             "current_user": current_user,
         },
     )

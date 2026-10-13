@@ -6,7 +6,7 @@
 <div class="page-header">
   <div>
     <h1 class="page-title">Nhánh đấu Chung kết (Tournament Bracket)</h1>
-    <div class="page-subtitle">Vòng chung kết nhánh đấu loại trực tiếp (Single-elimination) cho Top kỳ thủ</div>
+    <div class="page-subtitle">Vòng chung kết nhánh đấu loại trực tiếp (Single-elimination) cho Top kỳ thủ — đội thua bị loại, đội thắng được bốc thăm ngẫu nhiên vào vòng sau</div>
   </div>
 
   <div style="display: flex; gap: 10px;">
@@ -21,20 +21,18 @@
   </div>
 
   <div class="bracket-tree">
-    {% set rounds = ['Quarterfinals', 'Semifinals', 'Finals'] %}
-    {% for r_name in rounds %}
+    {% for r_name in bracket_rounds %}
       <div class="bracket-round">
         <h4>{{ r_name }}</h4>
-        {% set round_matches = [] %}
         {% for m in bracket_matches %}
-          {% if m.round_name.lower() == r_name.lower() %}
+          {% if m.round_name == r_name %}
             <div class="bracket-match">
               <div style="font-size: 11px; color: var(--muted); margin-bottom: 4px;">Trận {{ m.match_index }}</div>
-              <div class="team-row {% if m.winner_id and m.winner_id == m.player1_id %}winner{% endif %}">
+              <div class="team-row {% if m.winner_id and m.winner_id == m.player1_id %}winner{% endif %}" {% if m.status == 'completed' and m.winner_id and m.winner_id != m.player1_id %}style="color: var(--muted); text-decoration: line-through;"{% endif %}>
                 <span>{{ m.player1.username if m.player1 else 'TBD' }}</span>
                 <span>{{ m.score_p1 }}</span>
               </div>
-              <div class="team-row {% if m.winner_id and m.winner_id == m.player2_id %}winner{% endif %}">
+              <div class="team-row {% if m.winner_id and m.winner_id == m.player2_id %}winner{% endif %}" {% if m.status == 'completed' and m.winner_id and m.winner_id != m.player2_id %}style="color: var(--muted); text-decoration: line-through;"{% endif %}>
                 <span>{{ m.player2.username if m.player2 else 'TBD' }}</span>
                 <span>{{ m.score_p2 }}</span>
               </div>
@@ -45,9 +43,50 @@
           {% endif %}
         {% endfor %}
       </div>
+    {% else %}
+      <div style="color: var(--muted); padding: 12px;">Chưa có nhánh đấu nào được khởi tạo.</div>
     {% endfor %}
   </div>
 </div>
+
+{% if final_results %}
+<div class="card" style="margin-bottom: 24px;">
+  <div class="card-header">
+    <h2 class="card-title">Kết quả chung cuộc</h2>
+  </div>
+
+  <div class="table-wrap">
+    <table class="table-dark">
+      <thead>
+        <tr>
+          <th style="width: 70px; text-align: center;">Hạng</th>
+          <th>Người chơi</th>
+          <th>Elo</th>
+          <th>Điểm Elo (chuẩn hóa)</th>
+          <th>Hạng Bracket</th>
+          <th>Điểm Bracket</th>
+          <th>Điểm tổng kết</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for r in final_results %}
+        <tr>
+          <td style="text-align: center;">
+            <span class="rank-pill {% if r.rank == 1 %}rank-1{% elif r.rank == 2 %}rank-2{% elif r.rank == 3 %}rank-3{% endif %}">{{ r.rank }}</span>
+          </td>
+          <td><strong style="color: var(--text);">{{ r.username }}</strong></td>
+          <td><span class="elo-badge">{{ r.elo }}</span></td>
+          <td>{{ '%.1f'|format(r.normalized_elo) }}</td>
+          <td>{{ r.bracket_rank if r.bracket_rank else '—' }}</td>
+          <td>{{ '%.0f'|format(r.bracket_score) }}</td>
+          <td><strong style="color: var(--accent);">{{ '%.1f'|format(r.final_score) }}</strong></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endif %}
 
 <div class="card">
   <div class="card-header">
@@ -83,6 +122,8 @@
           <td>
             {% if bm.status == 'completed' %}
               <span class="tag" style="background: rgba(16, 185, 129, 0.2); color: #34d399;">Hoàn thành</span>
+            {% elif bm.status == 'running' %}
+              <span class="tag blue">Đang đấu</span>
             {% else %}
               <span class="tag" style="background: rgba(245, 158, 11, 0.2); color: #f59e0b;">Chưa diễn ra</span>
             {% endif %}
