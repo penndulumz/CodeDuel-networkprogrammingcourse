@@ -126,7 +126,8 @@ On the concluding day of the tournament:
 3. **Play the Rounds**:
    - Click **Chạy vòng đấu tiếp theo** (`POST /api/admin/bracket/play`) once per round.
    - Each pairing is played as a series (`match_format`, default `BO3`) with sides alternating every game. Bracket games never change Elo.
-   - Series winners advance automatically. A player without an active bot forfeits; a level series goes to the better seed.
+   - Losers are eliminated. Once every pairing of a round is finished, the winners are drawn at random into the next round's pairings.
+   - A player without an active bot forfeits; a level series goes to the better seed.
 4. **Public Bracket View**:
    - Competitors inspect live playoff progress at [http://localhost:8000/bracket](http://localhost:8000/bracket).
 5. **Final Composite Scoring**:

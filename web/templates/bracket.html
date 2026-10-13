@@ -6,7 +6,7 @@
 <div class="page-header">
   <div>
     <h1 class="page-title">Nhánh đấu Chung kết (Tournament Bracket)</h1>
-    <div class="page-subtitle">Vòng chung kết nhánh đấu loại trực tiếp (Single-elimination) cho Top kỳ thủ</div>
+    <div class="page-subtitle">Vòng chung kết nhánh đấu loại trực tiếp (Single-elimination) cho Top kỳ thủ — đội thua bị loại, đội thắng được bốc thăm ngẫu nhiên vào vòng sau</div>
   </div>
 
   <div style="display: flex; gap: 10px;">
@@ -28,11 +28,11 @@
           {% if m.round_name == r_name %}
             <div class="bracket-match">
               <div style="font-size: 11px; color: var(--muted); margin-bottom: 4px;">Trận {{ m.match_index }}</div>
-              <div class="team-row {% if m.winner_id and m.winner_id == m.player1_id %}winner{% endif %}">
+              <div class="team-row {% if m.winner_id and m.winner_id == m.player1_id %}winner{% endif %}" {% if m.status == 'completed' and m.winner_id and m.winner_id != m.player1_id %}style="color: var(--muted); text-decoration: line-through;"{% endif %}>
                 <span>{{ m.player1.username if m.player1 else 'TBD' }}</span>
                 <span>{{ m.score_p1 }}</span>
               </div>
-              <div class="team-row {% if m.winner_id and m.winner_id == m.player2_id %}winner{% endif %}">
+              <div class="team-row {% if m.winner_id and m.winner_id == m.player2_id %}winner{% endif %}" {% if m.status == 'completed' and m.winner_id and m.winner_id != m.player2_id %}style="color: var(--muted); text-decoration: line-through;"{% endif %}>
                 <span>{{ m.player2.username if m.player2 else 'TBD' }}</span>
                 <span>{{ m.score_p2 }}</span>
               </div>

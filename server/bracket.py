@@ -3,13 +3,15 @@
 This module drives the single-elimination bracket after seeding:
 1. Persists the full bracket tree (seeded first round plus empty later rounds).
 2. Plays each pairing as a best-of-N series of bracket games with alternating sides.
-3. Advances series winners into the next round until a champion is decided.
+3. Eliminates series losers and randomly draws the winners into the next round
+   once every pairing of a round is finished, until a champion is decided.
 4. Derives placement ranks and composite final tournament scores.
 """
 
 from __future__ import annotations
 
 import logging
+import random
 from typing import Any, Callable
 
 from sqlalchemy.orm import Session
@@ -76,8 +78,8 @@ def parse_best_of(match_format: Any) -> int:
 def create_bracket(db: Session, matchups: list[dict[str, Any]]) -> list[BracketMatch]:
     """Replace the stored bracket with a fresh tree built from first-round matchups.
 
-    Later rounds are created as empty pending pairings that get filled as series
-    winners advance.
+    Later rounds are created as empty pending pairings that get filled by a
+    random draw of the winners once the previous round is finished.
 
     Args:
         db: Active database session.
@@ -133,27 +135,42 @@ def get_ready_matches(db: Session) -> list[BracketMatch]:
     return []
 
 
-def _advance_winner(db: Session, bm: BracketMatch) -> None:
-    """Place a completed pairing's winner into its slot in the next round."""
-    size = get_round_size(bm.round_name)
-    if size <= 2 or bm.winner_id is None:
+def _draw_next_round(db: Session, round_name: str) -> None:
+    """Randomly pair a finished round's winners into the next round.
+
+    Does nothing until every pairing of the round is completed, so losers are
+    all eliminated before the draw. The draw happens only once per round.
+    """
+    size = get_round_size(round_name)
+    if size <= 2:
         return
 
-    next_match = (
+    current = (
         db.query(BracketMatch)
-        .filter(
-            BracketMatch.round_name == get_round_name(size // 2),
-            BracketMatch.match_index == bm.match_index // 2,
-        )
-        .first()
+        .filter(BracketMatch.round_name == round_name)
+        .order_by(BracketMatch.match_index.asc())
+        .all()
     )
-    if next_match is None:
+    if any(bm.status != STATUS_COMPLETED or bm.winner_id is None for bm in current):
         return
 
-    if bm.match_index % 2 == 0:
-        next_match.player1_id = bm.winner_id
-    else:
-        next_match.player2_id = bm.winner_id
+    next_round = (
+        db.query(BracketMatch)
+        .filter(BracketMatch.round_name == get_round_name(size // 2))
+        .order_by(BracketMatch.match_index.asc())
+        .all()
+    )
+    if any(bm.player1_id or bm.player2_id for bm in next_round):
+        return
+
+    winners = [bm.winner_id for bm in current]
+    if len(winners) != len(next_round) * 2:
+        return
+
+    random.shuffle(winners)
+    for idx, bm in enumerate(next_round):
+        bm.player1_id = winners[idx * 2]
+        bm.player2_id = winners[idx * 2 + 1]
 
 
 def _active_bot(db: Session, user_id: int) -> Bot | None:
@@ -175,11 +192,12 @@ def play_bracket_series(
     bracket_match_id: int,
     db_factory: Callable[[], Any] | None = None,
 ) -> int | None:
-    """Play one bracket pairing as a best-of-N series and advance the winner.
+    """Play one bracket pairing as a best-of-N series and eliminate the loser.
 
     Sides alternate every game. Games are stored as Match rows flagged
     is_bracket so they never affect Elo. A player without an active bot
-    forfeits the series; a level series goes to the better seed.
+    forfeits the series; a level series goes to the better seed. When the last
+    pairing of a round finishes, the winners are randomly drawn into the next round.
 
     Args:
         bracket_match_id: Primary key of the BracketMatch to play.
@@ -277,7 +295,8 @@ def play_bracket_series(
             bm.winner_id = _break_tie(player1, player2)
 
         bm.status = STATUS_COMPLETED
-        _advance_winner(db, bm)
+        db.flush()
+        _draw_next_round(db, bm.round_name)
         db.commit()
         return bm.winner_id
 

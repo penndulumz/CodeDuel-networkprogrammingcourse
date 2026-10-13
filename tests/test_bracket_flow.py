@@ -1,4 +1,4 @@
-"""Tests for the playoff bracket lifecycle: tree creation, series play, advancement, standings."""
+"""Tests for the playoff bracket lifecycle: tree creation, series play, random draw, standings."""
 
 from pathlib import Path
 
@@ -101,8 +101,8 @@ def test_create_bracket_builds_full_tree(session_factory, tmp_path):
         db.close()
 
 
-def test_series_winner_advances_and_skips_elo(session_factory, tmp_path):
-    """A BO3 series is decided 2-0, the winner advances, and Elo is untouched."""
+def test_series_result_and_skips_elo(session_factory, tmp_path):
+    """A BO3 series is decided 2-0, Elo is untouched, and no draw happens mid-round."""
     users = _seed_players(session_factory, tmp_path, 4, strong_ids=(4,))
     db = session_factory()
     try:
@@ -123,9 +123,9 @@ def test_series_winner_advances_and_skips_elo(session_factory, tmp_path):
         assert semi.winner_id == users[3]["id"]
         assert (semi.score_p1, semi.score_p2) == (0, 2)
 
-        # First semi-final (match_index 0) feeds player 1 of the final
+        # The other semi-final is still pending, so the final is not drawn yet
         final = db.query(BracketMatch).filter(BracketMatch.id == final_id).one()
-        assert final.player1_id == users[3]["id"]
+        assert final.player1_id is None
         assert final.player2_id is None
 
         games = db.query(Match).order_by(Match.id.asc()).all()
@@ -155,6 +155,55 @@ def test_missing_bot_forfeits_series(session_factory, tmp_path):
     db = session_factory()
     try:
         assert db.query(Match).count() == 0
+    finally:
+        db.close()
+
+
+def test_next_round_is_random_draw_of_winners(session_factory, tmp_path, monkeypatch):
+    """After a round finishes, losers are out and winners are shuffled into the next round."""
+    users = _seed_players(session_factory, tmp_path, 8)
+    shuffle_calls = []
+
+    def fake_shuffle(items):
+        shuffle_calls.append(list(items))
+        items.reverse()
+
+    monkeypatch.setattr("server.bracket.random.shuffle", fake_shuffle)
+
+    db = session_factory()
+    try:
+        # Nobody has an active bot, so every series goes to the better seed without games
+        db.query(Bot).update({"is_active": False})
+        create_bracket(db, generate_bracket(users))
+        ready_ids = [bm.id for bm in get_ready_matches(db)]
+    finally:
+        db.close()
+
+    # Quarter-finals are (1v8), (4v5), (2v7), (3v6): seeds 1, 4, 2, 3 go through
+    play_bracket_matches(ready_ids[:3], db_factory=session_factory)
+    assert shuffle_calls == []
+
+    play_bracket_matches(ready_ids[3:], db_factory=session_factory)
+    winners = [users[0]["id"], users[3]["id"], users[1]["id"], users[2]["id"]]
+    assert shuffle_calls == [winners]
+
+    db = session_factory()
+    try:
+        semis = (
+            db.query(BracketMatch)
+            .filter(BracketMatch.round_name == "Semi-Final")
+            .order_by(BracketMatch.match_index.asc())
+            .all()
+        )
+        drawn = [pid for bm in semis for pid in (bm.player1_id, bm.player2_id)]
+        assert drawn == list(reversed(winners))
+
+        eliminated = {users[i]["id"] for i in (4, 5, 6, 7)}
+        assert eliminated.isdisjoint(drawn)
+        assert len(get_ready_matches(db)) == 2
+
+        final = db.query(BracketMatch).filter(BracketMatch.round_name == "Final").one()
+        assert final.player1_id is None and final.player2_id is None
     finally:
         db.close()
 
