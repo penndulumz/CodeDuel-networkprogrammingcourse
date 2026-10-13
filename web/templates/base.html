@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="vi">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -8,9 +8,19 @@
   {% block extra_head %}{% endblock %}
 </head>
 <body>
+  <div class="page-grid" aria-hidden="true"></div>
+
   <nav class="navbar">
     <a href="/" class="nav-brand">
-      <span>⚔️ Battlecode 9x9</span>
+      <svg class="brand-mark" viewBox="0 0 26 26" aria-hidden="true">
+        <rect x="0.5" y="0.5" width="25" height="25" rx="5" fill="#161b22" stroke="#30363d"/>
+        <rect x="4" y="16" width="6" height="6" rx="1.5" fill="#f85149"/>
+        <rect x="10" y="10" width="6" height="6" rx="1.5" fill="#3d444d"/>
+        <rect x="16" y="4" width="6" height="6" rx="1.5" fill="#58a6ff"/>
+        <rect x="4" y="4" width="6" height="6" rx="1.5" fill="#21262d"/>
+        <rect x="16" y="16" width="6" height="6" rx="1.5" fill="#f2b33d"/>
+      </svg>
+      <span>Battlecode 9x9</span>
       <span class="brand-badge">RPS Chess</span>
     </a>
 
@@ -25,10 +35,10 @@
 
     <div class="nav-user">
       {% if current_user %}
-        <div class="user-badge">
-          <span>👤 {{ current_user.username }}</span>
-          <span class="elo-tag">⭐ {{ current_user.elo }}</span>
-        </div>
+        <a href="/profile" class="user-badge">
+          <span>{{ current_user.username }}</span>
+          <span class="elo-tag">{{ current_user.elo }}</span>
+        </a>
         <button class="btn btn-sm" onclick="logout()">Logout</button>
       {% else %}
         <a href="/login" class="btn btn-sm">Login</a>
@@ -40,6 +50,11 @@
   <main class="container">
     {% block content %}{% endblock %}
   </main>
+
+  <footer class="site-footer">
+    <span>Battlecode 9x9 — Rock-Paper-Scissors Chess Arena</span>
+    <span class="mono">✊ &gt; ✌ &gt; ✋ &gt; ✊</span>
+  </footer>
 
   <script>
     async function logout() {

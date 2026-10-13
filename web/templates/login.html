@@ -3,11 +3,24 @@
 {% block title %}Đăng nhập (Login) - Battlecode 9x9{% endblock %}
 
 {% block content %}
-<div style="max-width: 440px; margin: 40px auto;">
-  <div class="card">
-    <div class="card-header">
-      <h2 class="card-title">Đăng nhập tài khoản</h2>
+<div class="auth-wrap">
+  <div class="auth-side">
+    <div>
+      <div class="page-eyebrow">Battlecode 9x9</div>
+      <h2>Viết bot. Thách đấu. Leo hạng.</h2>
+      <p>Đấu trường thuật toán Rock-Paper-Scissors Chess trên bàn cờ 9x9: nộp một file Python, hệ thống lo phần còn lại.</p>
     </div>
+    <div class="rps-cycle">
+      <span class="rps-piece">✊</span>
+      <span>vs</span>
+      <span class="rps-piece p2">✌</span>
+      <span>→</span>
+      <span class="rps-piece goal">★</span>
+    </div>
+  </div>
+  <div class="auth-form">
+    <h1>Đăng nhập tài khoản</h1>
+    <div class="auth-sub">Chào mừng trở lại đấu trường.</div>
 
     <form id="loginForm" onsubmit="handleLogin(event)">
       <div class="form-group">
@@ -20,12 +33,12 @@
         <input type="password" id="password" name="password" class="form-control" required autocomplete="current-password" placeholder="Nhập mật khẩu...">
       </div>
 
-      <div id="loginError" style="color: #f87171; font-size: 13px; margin-bottom: 12px; display: none;"></div>
+      <div id="loginError" class="form-error"></div>
 
-      <button type="submit" class="btn btn-primary" style="width: 100%;">Đăng nhập</button>
+      <button type="submit" class="btn btn-primary btn-lg btn-block">Đăng nhập</button>
     </form>
 
-    <div style="margin-top: 16px; text-align: center; font-size: 13px; color: var(--muted);">
+    <div class="auth-foot">
       Chưa có tài khoản? <a href="/register">Đăng ký ngay</a>
     </div>
   </div>

@@ -5,16 +5,22 @@
 {% block content %}
 <div class="page-header">
   <div>
-    <h1 class="page-title">Quản trị Giải đấu (Admin Tournament Management)</h1>
+    <div class="page-eyebrow">Admin</div>
+    <h1 class="page-title">Quản trị Giải đấu</h1>
     <div class="page-subtitle">Điều khiển cổng thách đấu FFA, hệ số điểm ngày (multiplier x), và tạo nhánh đấu Bracket</div>
   </div>
 
-  <div style="display: flex; gap: 10px;">
-    <a href="/bracket" class="btn btn-sm">🏆 Xem Cây Nhánh đấu</a>
+  <div class="page-actions">
+    {% if settings.is_portal_open %}
+      <div class="portal-badge open"><span class="dot"></span><span>Cổng FFA: Mở</span></div>
+    {% else %}
+      <div class="portal-badge closed"><span class="dot"></span><span>Cổng FFA: Đóng</span></div>
+    {% endif %}
+    <a href="/bracket" class="btn btn-sm">Xem Cây Nhánh đấu</a>
   </div>
 </div>
 
-<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-bottom: 24px;">
+<div class="grid-main section">
   <!-- Settings Form -->
   <div class="card">
     <div class="card-header">
@@ -22,9 +28,10 @@
     </div>
 
     <form id="adminSettingsForm" onsubmit="handleUpdateSettings(event)">
+      <div class="form-section-title">Cổng thách đấu</div>
       <div class="form-group">
-        <label class="form-label" for="portal_mode"><b>Chế độ Cổng Thách đấu FFA (Portal Mode)</b></label>
-        <select id="portal_mode" name="portal_mode" class="form-control" style="background: var(--bg-card); color: var(--text);">
+        <label class="form-label" for="portal_mode">Chế độ Cổng Thách đấu FFA (Portal Mode)</label>
+        <select id="portal_mode" name="portal_mode" class="form-control">
           <option value="auto" {% if settings.portal_mode == 'auto' or not settings.portal_mode %}selected{% endif %}>Auto (Theo Khung Giờ)</option>
           <option value="true" {% if settings.portal_mode == 'true' %}selected{% endif %}>Force Open (Mở Khẩn Cấp)</option>
           <option value="false" {% if settings.portal_mode == 'false' %}selected{% endif %}>Force Closed (Đóng Khẩn Cấp)</option>
@@ -32,14 +39,14 @@
       </div>
 
       <div class="form-group">
-        <label class="form-label" for="rule_variant"><b>Quy tắc Chiến đấu (Rule Variant)</b></label>
-        <select id="rule_variant" name="rule_variant" class="form-control" style="background: var(--bg-card); color: var(--text);">
+        <label class="form-label" for="rule_variant">Quy tắc Chiến đấu (Rule Variant)</label>
+        <select id="rule_variant" name="rule_variant" class="form-control">
           <option value="standard" {% if settings.rule_variant == 'standard' or not settings.rule_variant %}selected{% endif %}>Tiêu chuẩn (Standard: Búa > Kéo > Bao)</option>
           <option value="inverted_rps" {% if settings.rule_variant == 'inverted_rps' %}selected{% endif %}>Đảo chiều ngũ hành (Inverted Combat: Kéo > Búa > Bao)</option>
         </select>
       </div>
 
-      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+      <div class="form-row">
         <div class="form-group">
           <label class="form-label" for="start_time">Giờ mở cổng (Start Time)</label>
           <input type="time" id="start_time" name="start_time" class="form-control" value="{{ settings.start_time or '19:00' }}" required>
@@ -51,13 +58,14 @@
         </div>
       </div>
 
+      <div class="form-section-title">Lịch giải & Elo</div>
       <div class="form-group">
         <label class="form-label" for="daily_multiplier_x">Hệ số nhân Elo hàng ngày (Daily Multiplier x)</label>
         <input type="number" step="0.1" min="0.1" max="10.0" id="daily_multiplier_x" name="daily_multiplier_x"
                class="form-control" value="{{ settings.daily_multiplier_x }}" required>
       </div>
 
-      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+      <div class="form-row">
         <div class="form-group">
           <label class="form-label" for="current_day">Ngày thi đấu hiện tại</label>
           <input type="number" min="1" id="current_day" name="current_day"
@@ -71,7 +79,8 @@
         </div>
       </div>
 
-      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+      <div class="form-section-title">Luật trận đấu</div>
+      <div class="form-row">
         <div class="form-group">
           <label class="form-label" for="max_turns">Giới hạn số lượt tối đa (Max Turns)</label>
           <input type="number" min="10" max="1000" id="max_turns" name="max_turns"
@@ -85,10 +94,10 @@
         </div>
       </div>
 
-      <div id="settingsMsg" style="margin-bottom: 12px; font-size: 13px; display: none;"></div>
+      <div id="settingsMsg" class="form-msg"></div>
 
-      <button type="submit" class="btn btn-primary" style="width: 100%;">
-        💾 Lưu Cấu hình
+      <button type="submit" class="btn btn-primary btn-lg btn-block">
+        Lưu Cấu hình
       </button>
     </form>
   </div>
@@ -99,16 +108,18 @@
       <h2 class="card-title">Khởi tạo Nhánh đấu (Bracket)</h2>
     </div>
 
-    <p style="color: var(--muted); font-size: 14px; line-height: 1.5;">
-      Nhánh đấu loại trực tiếp (Single-elimination) sẽ tự động lấy danh sách Top {{ settings.top_players_count }} người chơi có điểm Elo cao nhất và đã nộp bot hoạt động để ghép cặp (Seed 1 vs 8, 2 vs 7, v.v.).
-    </p>
+    <ol class="steps">
+      <li><span><b>Tạo nhánh đấu.</b> Lấy Top {{ settings.top_players_count }} người chơi có Elo cao nhất đã nộp bot hoạt động và ghép cặp vòng đầu theo hạt giống (Seed 1 vs 8, 2 vs 7, v.v.).</span></li>
+      <li><span><b>Chạy từng vòng.</b> Mỗi cặp đấu theo series, đội thua bị loại.</span></li>
+      <li><span><b>Bốc thăm vòng sau.</b> Khi cả vòng đấu xong, các đội thắng được ghép cặp ngẫu nhiên.</span></li>
+    </ol>
 
-    <div style="margin: 24px 0;">
-      <button class="btn btn-danger" onclick="triggerBracketGeneration()" style="width: 100%; padding: 12px;">
-        ⚡ Tạo / Khởi tạo lại Nhánh đấu Bracket
-      </button>
-      <button class="btn btn-primary" onclick="playNextBracketRound()" style="width: 100%; padding: 12px; margin-top: 12px;">
+    <div class="stack" style="gap: 10px; margin-bottom: 14px;">
+      <button class="btn btn-primary btn-lg btn-block" onclick="playNextBracketRound()">
         ▶ Chạy vòng đấu tiếp theo
+      </button>
+      <button class="btn btn-danger btn-lg btn-block" onclick="triggerBracketGeneration()">
+        Tạo / Khởi tạo lại Nhánh đấu Bracket
       </button>
     </div>
 
@@ -117,35 +128,35 @@
 </div>
 
 <!-- Benchmark Boss Arena Section -->
-<div class="card" style="margin-bottom: 24px;">
+<div class="card section">
   <div class="card-header">
     <div>
       <h2 class="card-title">Benchmark Boss Arena</h2>
-      <div style="font-size: 13px; color: var(--muted); margin-top: 4px;">Graduated AI benchmark bots for tournament calibration, testing, and student challenges</div>
+      <div class="card-desc">Graduated AI benchmark bots for tournament calibration, testing, and student challenges</div>
     </div>
     <div id="bossGlobalMsg" style="font-size: 13px; display: none;"></div>
   </div>
 
-  <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px;">
+  <div class="boss-grid">
     {% for boss in settings.bosses %}
-    <div class="card" style="background: var(--panel-2); border: 1px solid var(--border-subtle); display: flex; flex-direction: column; justify-content: space-between;" id="boss-card-{{ boss.boss_slug }}">
-      <div>
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-          <span style="font-size: 11px; font-weight: 700; text-transform: uppercase; color: var(--accent); letter-spacing: 0.5px;">Level {{ boss.level }}</span>
+    <div class="boss-card" id="boss-card-{{ boss.boss_slug }}">
+      <div class="stack" style="gap: 10px; flex: 1;">
+        <div class="boss-top">
+          <span class="boss-level">Level {{ boss.level }}</span>
           {% if boss.is_deployed %}
             <span class="tag" style="background: rgba(46, 160, 67, 0.15); color: #3fb950; border: 1px solid rgba(46, 160, 67, 0.4);" id="badge-{{ boss.boss_slug }}">Deployed</span>
           {% else %}
             <span class="tag" style="background: rgba(110, 118, 129, 0.15); color: var(--muted); border: 1px solid var(--border-subtle);" id="badge-{{ boss.boss_slug }}">Inactive</span>
           {% endif %}
         </div>
-        <h3 style="margin: 0 0 6px 0; font-size: 15px; color: var(--text-primary);">{{ boss.name }}</h3>
-        <div style="font-size: 12px; color: var(--muted); font-family: var(--font-mono); margin-bottom: 10px;">Elo: {{ boss.elo }}</div>
-        <p style="font-size: 12px; color: var(--muted); line-height: 1.4; margin: 0 0 16px 0;">
-          {{ boss.description }}
-        </p>
+        <div>
+          <h3>{{ boss.name }}</h3>
+          <div class="boss-elo">Elo: {{ boss.elo }}</div>
+        </div>
+        <p>{{ boss.description }}</p>
       </div>
 
-      <div style="margin-top: auto;">
+      <div>
         {% if boss.is_deployed %}
           <button class="btn btn-sm btn-danger" style="width: 100%;" id="btn-{{ boss.boss_slug }}" onclick="toggleBoss('{{ boss.boss_slug }}', 'retract')">
             Retract Boss
@@ -162,8 +173,8 @@
 </div>
 
 <!-- Bracket Matches Table -->
-<div class="card">
-  <div class="card-header">
+<div class="card card-flush">
+  <div class="card-header" style="padding-bottom: 16px;">
     <h2 class="card-title">Danh sách Trận đấu Bracket Hiện tại</h2>
   </div>
 
@@ -185,7 +196,7 @@
         <tr>
           <td>#{{ bm.id }}</td>
           <td><b>{{ bm.round_name }}</b></td>
-          <td>Trận {{ bm.match_index }}</td>
+          <td>Trận {{ bm.match_index + 1 }}</td>
           <td>
             <strong style="color: var(--p1);">{{ bm.player1.username if bm.player1 else 'Chưa xác định' }}</strong>
           </td>
@@ -195,17 +206,17 @@
           <td>{{ bm.score_p1 }} - {{ bm.score_p2 }}</td>
           <td>
             {% if bm.status == 'completed' %}
-              <span class="tag" style="background: rgba(16, 185, 129, 0.2); color: #34d399;">Hoàn thành</span>
+              <span class="tag green">Hoàn thành</span>
             {% elif bm.status == 'running' %}
               <span class="tag blue">Đang đấu</span>
             {% else %}
-              <span class="tag" style="background: rgba(245, 158, 11, 0.2); color: #f59e0b;">Đang chờ</span>
+              <span class="tag amber">Đang chờ</span>
             {% endif %}
           </td>
         </tr>
         {% else %}
         <tr>
-          <td colspan="7" style="text-align: center; color: var(--muted); padding: 24px;">
+          <td colspan="7" class="empty-cell">
             Chưa có nhánh đấu nào được tạo. Nhấn "Tạo Nhánh đấu Bracket" để bắt đầu!
           </td>
         </tr>

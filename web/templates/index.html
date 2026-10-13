@@ -5,11 +5,12 @@
 {% block content %}
 <div class="page-header">
   <div>
-    <h1 class="page-title">Bảng xếp hạng & Đấu trường FFA (Leaderboard)</h1>
-    <div class="page-subtitle">Xếp hạng thuật toán 9x9 Rock-Paper-Scissors Chess theo Elo</div>
+    <div class="page-eyebrow">FFA Arena</div>
+    <h1 class="page-title">Bảng xếp hạng (Leaderboard)</h1>
+    <div class="page-subtitle">Xếp hạng thuật toán 9x9 Rock-Paper-Scissors Chess theo Elo. Thách đấu bất kỳ ai có bot đang hoạt động khi cổng FFA mở.</div>
   </div>
 
-  <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+  <div class="page-actions">
     {% if is_portal_open %}
       <div class="portal-badge open">
         <span class="dot"></span>
@@ -23,77 +24,140 @@
     {% endif %}
 
     <div class="multiplier-tag">
-      <span>⚡ Hệ số ngày: x{{ daily_multiplier_x }}</span>
+      <span>Hệ số ngày: x{{ daily_multiplier_x }}</span>
     </div>
   </div>
 </div>
 
-<div id="rating-chart-card" class="chart-card" style="margin-bottom: 24px;">
-  <div class="chart-header">
-    <h2 class="chart-title">Biến động xếp hạng Elo (Top 5)</h2>
+{% set ready_count = leaderboard | selectattr('has_active_bot') | list | length %}
+{% set total_games = ((leaderboard | sum(attribute='wins')) + (leaderboard | sum(attribute='losses')) + (leaderboard | sum(attribute='draws'))) // 2 %}
+<div class="stat-grid">
+  <div class="stat">
+    <div class="stat-label">Người chơi</div>
+    <div class="stat-value">{{ leaderboard | length }}</div>
+    <div class="stat-note">{{ ready_count }} bot sẵn sàng</div>
   </div>
-  <div id="rating-chart-container"></div>
+  <div class="stat">
+    <div class="stat-label">Elo cao nhất</div>
+    <div class="stat-value accent">{{ leaderboard[0].elo if leaderboard else '—' }}</div>
+    <div class="stat-note">{{ leaderboard[0].username if leaderboard else 'Chưa có người chơi' }}</div>
+  </div>
+  <div class="stat">
+    <div class="stat-label">Trận đã đấu</div>
+    <div class="stat-value">{{ total_games }}</div>
+    <div class="stat-note">Tính trên toàn bảng</div>
+  </div>
+  <div class="stat">
+    <div class="stat-label">Elo của bạn</div>
+    {% if current_user %}
+      <div class="stat-value accent">{{ current_user.elo }}</div>
+      <div class="stat-note">{{ current_user.wins }} thắng · {{ current_user.losses }} thua</div>
+    {% else %}
+      <div class="stat-value">—</div>
+      <div class="stat-note"><a href="/login">Đăng nhập</a> để thi đấu</div>
+    {% endif %}
+  </div>
+</div>
+
+<div class="grid-main section">
+  <div id="rating-chart-card" class="chart-card">
+    <div class="chart-header">
+      <h2 class="chart-title">Biến động xếp hạng Elo (Top 5)</h2>
+    </div>
+    <div id="rating-chart-container"></div>
+  </div>
+
+  <div class="card">
+    <div class="card-header">
+      <h2 class="card-title">Dẫn đầu</h2>
+    </div>
+    <div class="podium">
+      {% for player in leaderboard[:3] %}
+      <div class="podium-item place-{{ player.rank }}">
+        <div class="podium-place">{{ player.rank }}</div>
+        <div class="podium-body">
+          <div class="podium-name">{{ player.username }}</div>
+          <div class="podium-meta">{{ player.wins }}W · {{ player.losses }}L · {{ player.draws }}D</div>
+        </div>
+        <span class="elo-badge">{{ player.elo }}</span>
+      </div>
+      {% else %}
+      <div class="chart-empty-state">Chưa có người chơi nào.</div>
+      {% endfor %}
+    </div>
+  </div>
 </div>
 
 <div class="table-wrap">
   <table class="table-dark">
     <thead>
       <tr>
-        <th style="width: 70px; text-align: center;">Hạng</th>
+        <th class="center" style="width: 70px;">Hạng</th>
         <th>Người chơi</th>
         <th>Elo Rating</th>
         <th>Thắng / Thua / Hòa</th>
         <th>Bot hoạt động</th>
-        <th style="text-align: right;">Hành động</th>
+        <th class="right">Hành động</th>
       </tr>
     </thead>
     <tbody>
       {% for player in leaderboard %}
-      <tr>
-        <td style="text-align: center;">
+      {% set is_me = current_user and current_user.id == player.id %}
+      {% set games = player.wins + player.losses + player.draws %}
+      <tr class="{% if is_me %}is-me{% endif %}">
+        <td class="center">
           <span class="rank-pill {% if player.rank == 1 %}rank-1{% elif player.rank == 2 %}rank-2{% elif player.rank == 3 %}rank-3{% endif %}">
             {{ player.rank }}
           </span>
         </td>
         <td>
-          <strong style="color: var(--text);">{{ player.username }}</strong>
-          {% if current_user and current_user.id == player.id %}
-            <span class="tag blue" style="margin-left: 6px;">Bạn</span>
+          <strong>{{ player.username }}</strong>
+          {% if is_me %}
+            <span class="tag amber" style="margin-left: 6px;">Bạn</span>
           {% endif %}
         </td>
         <td>
           <span class="elo-badge">{{ player.elo }}</span>
         </td>
         <td>
-          <span style="color: #34d399; font-weight: 700;">{{ player.wins }}W</span>
-          <span style="color: var(--muted);">/</span>
-          <span style="color: #f87171; font-weight: 700;">{{ player.losses }}L</span>
-          <span style="color: var(--muted);">/</span>
-          <span style="color: var(--muted);">{{ player.draws }}D</span>
+          <div class="record">
+            <div class="record-text">
+              <span class="w">{{ player.wins }}W</span>
+              <span class="l">{{ player.losses }}L</span>
+              <span class="d">{{ player.draws }}D</span>
+            </div>
+            <div class="record-bar">
+              {% if games %}
+              <span class="w" style="width: {{ (player.wins * 100 / games) | round(1) }}%;"></span>
+              <span class="d" style="width: {{ (player.draws * 100 / games) | round(1) }}%;"></span>
+              <span class="l" style="width: {{ (player.losses * 100 / games) | round(1) }}%;"></span>
+              {% endif %}
+            </div>
+          </div>
         </td>
         <td>
           {% if player.has_active_bot %}
-            <span style="color: #34d399; font-size: 13px; font-weight: 600;">● Sẵn sàng</span>
+            <span class="status-dot on">Sẵn sàng</span>
           {% else %}
-            <span style="color: var(--muted); font-size: 13px;">○ Chưa nộp bot</span>
+            <span class="status-dot">Chưa nộp bot</span>
           {% endif %}
         </td>
-        <td style="text-align: right;">
-          {% if current_user and current_user.id == player.id %}
+        <td class="right">
+          {% if is_me %}
             <a href="/profile" class="btn btn-sm">Quản lý Bot</a>
           {% else %}
             <button class="btn btn-primary btn-sm btn-challenge"
                     onclick="challengePlayer({{ player.id }}, '{{ player.username }}')"
                     {% if not is_portal_open or not player.has_active_bot %}disabled{% endif %}
                     title="{% if not is_portal_open %}Cổng FFA đang đóng{% elif not player.has_active_bot %}Đối thủ chưa có bot hoạt động{% else %}Thách đấu đối thủ{% endif %}">
-              ⚔️ Thách đấu
+              Thách đấu
             </button>
           {% endif %}
         </td>
       </tr>
       {% else %}
       <tr>
-        <td colspan="6" style="text-align: center; color: var(--muted); padding: 32px;">
+        <td colspan="6" class="empty-cell">
           Chưa có người chơi nào trên bảng xếp hạng. Hãy đăng ký và tải lên bot đầu tiên!
         </td>
       </tr>
