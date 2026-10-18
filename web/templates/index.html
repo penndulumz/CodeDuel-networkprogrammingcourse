@@ -1,90 +1,32 @@
 {% extends "base.html" %}
 
-{% block title %}Leaderboard & FFA Arena - Battlecode 9x9{% endblock %}
+{% block title %}Bảng xếp hạng — CodeDuel{% endblock %}
 
 {% block content %}
 <div class="page-header">
   <div>
-    <div class="page-eyebrow">FFA Arena</div>
-    <h1 class="page-title">Bảng xếp hạng (Leaderboard)</h1>
-    <div class="page-subtitle">Xếp hạng thuật toán 9x9 Rock-Paper-Scissors Chess theo Elo. Thách đấu bất kỳ ai có bot đang hoạt động khi cổng FFA mở.</div>
+    <div class="page-eyebrow">Thi đấu</div>
+    <h1 class="page-title">Bảng xếp hạng</h1>
+    <div class="page-subtitle"><a href="/games/{{ active_game.slug }}"><strong>{{ active_game.name_vi }}</strong></a> · Chọn người chơi có bot sẵn sàng để thách đấu. Kết quả mỗi trận được tính vào Elo.</div>
   </div>
 
   <div class="page-actions">
     {% if is_portal_open %}
       <div class="portal-badge open">
         <span class="dot"></span>
-        <span>Cổng FFA: Mở</span>
+        <span>Đang nhận thách đấu</span>
       </div>
     {% else %}
       <div class="portal-badge closed">
         <span class="dot"></span>
-        <span>Cổng FFA: Đóng</span>
+        <span>Tạm đóng thách đấu</span>
       </div>
     {% endif %}
 
     <div class="multiplier-tag">
       <span>Hệ số ngày: x{{ daily_multiplier_x }}</span>
     </div>
-  </div>
-</div>
-
-{% set ready_count = leaderboard | selectattr('has_active_bot') | list | length %}
-{% set total_games = ((leaderboard | sum(attribute='wins')) + (leaderboard | sum(attribute='losses')) + (leaderboard | sum(attribute='draws'))) // 2 %}
-<div class="stat-grid">
-  <div class="stat">
-    <div class="stat-label">Người chơi</div>
-    <div class="stat-value">{{ leaderboard | length }}</div>
-    <div class="stat-note">{{ ready_count }} bot sẵn sàng</div>
-  </div>
-  <div class="stat">
-    <div class="stat-label">Elo cao nhất</div>
-    <div class="stat-value accent">{{ leaderboard[0].elo if leaderboard else '—' }}</div>
-    <div class="stat-note">{{ leaderboard[0].username if leaderboard else 'Chưa có người chơi' }}</div>
-  </div>
-  <div class="stat">
-    <div class="stat-label">Trận đã đấu</div>
-    <div class="stat-value">{{ total_games }}</div>
-    <div class="stat-note">Tính trên toàn bảng</div>
-  </div>
-  <div class="stat">
-    <div class="stat-label">Elo của bạn</div>
-    {% if current_user %}
-      <div class="stat-value accent">{{ current_user.elo }}</div>
-      <div class="stat-note">{{ current_user.wins }} thắng · {{ current_user.losses }} thua</div>
-    {% else %}
-      <div class="stat-value">—</div>
-      <div class="stat-note"><a href="/login">Đăng nhập</a> để thi đấu</div>
-    {% endif %}
-  </div>
-</div>
-
-<div class="grid-main section">
-  <div id="rating-chart-card" class="chart-card">
-    <div class="chart-header">
-      <h2 class="chart-title">Biến động xếp hạng Elo (Top 5)</h2>
-    </div>
-    <div id="rating-chart-container"></div>
-  </div>
-
-  <div class="card">
-    <div class="card-header">
-      <h2 class="card-title">Dẫn đầu</h2>
-    </div>
-    <div class="podium">
-      {% for player in leaderboard[:3] %}
-      <div class="podium-item place-{{ player.rank }}">
-        <div class="podium-place">{{ player.rank }}</div>
-        <div class="podium-body">
-          <div class="podium-name">{{ player.username }}</div>
-          <div class="podium-meta">{{ player.wins }}W · {{ player.losses }}L · {{ player.draws }}D</div>
-        </div>
-        <span class="elo-badge">{{ player.elo }}</span>
-      </div>
-      {% else %}
-      <div class="chart-empty-state">Chưa có người chơi nào.</div>
-      {% endfor %}
-    </div>
+    <a class="btn btn-sm" href="/api/leaderboard/export.csv" title="Tải bảng xếp hạng để chấm điểm">Xuất CSV</a>
   </div>
 </div>
 
@@ -94,9 +36,9 @@
       <tr>
         <th class="center" style="width: 70px;">Hạng</th>
         <th>Người chơi</th>
-        <th>Elo Rating</th>
+        <th>Elo</th>
         <th>Thắng / Thua / Hòa</th>
-        <th>Bot hoạt động</th>
+        <th>Bot thi đấu</th>
         <th class="right">Hành động</th>
       </tr>
     </thead>
@@ -149,7 +91,7 @@
             <button class="btn btn-primary btn-sm btn-challenge"
                     onclick="challengePlayer({{ player.id }}, '{{ player.username }}')"
                     {% if not is_portal_open or not player.has_active_bot %}disabled{% endif %}
-                    title="{% if not is_portal_open %}Cổng FFA đang đóng{% elif not player.has_active_bot %}Đối thủ chưa có bot hoạt động{% else %}Thách đấu đối thủ{% endif %}">
+                    title="{% if not is_portal_open %}Cổng FFA đang đóng{% elif not player.has_active_bot %}Đối thủ chưa có bot cho {{ active_game.name }}{% else %}Thách đấu đối thủ{% endif %}">
               Thách đấu
             </button>
           {% endif %}
@@ -165,6 +107,49 @@
     </tbody>
   </table>
 </div>
+
+{% set ready_count = leaderboard | selectattr('has_active_bot') | list | length %}
+{% set total_games = ((leaderboard | sum(attribute='wins')) + (leaderboard | sum(attribute='losses')) + (leaderboard | sum(attribute='draws'))) // 2 %}
+<div class="stat-grid">
+  <div class="stat">
+    <div class="stat-label">Người chơi</div>
+    <div class="stat-value">{{ leaderboard | length }}</div>
+    <div class="stat-note">{{ ready_count }} bot sẵn sàng</div>
+  </div>
+  <div class="stat">
+    <div class="stat-label">Elo cao nhất</div>
+    <div class="stat-value accent">{{ leaderboard[0].elo if leaderboard else '—' }}</div>
+    <div class="stat-note">{{ leaderboard[0].username if leaderboard else 'Chưa có người chơi' }}</div>
+  </div>
+  <div class="stat">
+    <div class="stat-label">Trận đã đấu</div>
+    <div class="stat-value">{{ total_games }}</div>
+    <div class="stat-note">Tính trên toàn bảng</div>
+  </div>
+  <div class="stat">
+    <div class="stat-label">Elo của bạn</div>
+    {% if current_user %}
+      <div class="stat-value accent">{{ current_user.elo }}</div>
+      <div class="stat-note">{{ current_user.wins }} thắng · {{ current_user.losses }} thua</div>
+    {% else %}
+      <div class="stat-value">—</div>
+      <div class="stat-note"><a href="/login">Đăng nhập</a> để thi đấu</div>
+    {% endif %}
+  </div>
+</div>
+
+<div class="section ranking-history">
+  <div id="rating-chart-card" class="chart-card">
+    <div class="chart-header">
+      <h2 class="chart-title">Điểm Elo qua các trận</h2>
+    </div>
+    <div id="rating-chart-container"></div>
+  </div>
+
+
+</div>
+
+
 {% endblock %}
 
 {% block scripts %}

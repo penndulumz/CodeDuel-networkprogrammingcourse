@@ -1,0 +1,32 @@
+{# Game cards shared by the landing page and /games. Needs games_list (global) and active_game. #}
+<div class="grid-3">
+  {% for g in games_list %}
+  <article class="tile game-card">
+    <div class="game-art" aria-hidden="true">
+      {% if g.slug == 'connect4' %}
+        <div class="mini-board c4">{% for ch in "......." ~ "...y..." ~ "..ry..." ~ ".rryy.." %}<span class="{{ 'r' if ch == 'r' else ('y' if ch == 'y' else '') }}"></span>{% endfor %}</div>
+      {% elif g.slug == 'caro' %}
+        <div class="mini-board caro">{% for ch in "........." ~ "...o....." ~ "..xxxx..." ~ "..oo.o..." ~ "....x...." ~ "........." %}<span class="{{ 'x' if ch == 'x' else ('o' if ch == 'o' else '') }}">{{ 'X' if ch == 'x' else ('O' if ch == 'o' else '') }}</span>{% endfor %}</div>
+      {% else %}
+        <div class="mini-board rps">{% for ch in "RPS.." ~ ".R..." ~ "..S.P" ~ "....S" %}<span>{% if ch in 'RPS' %}<img class="rps-symbol" src="/static/img/rps-{{ {'R': 'rock', 'P': 'paper', 'S': 'scissors'}[ch] }}.svg" alt="">{% endif %}</span>{% endfor %}</div>
+      {% endif %}
+    </div>
+    <div class="game-body">
+      <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+        <span class="chip level-{{ g.level }}">{{ g.level_label }}</span>
+        {% if active_game and active_game.slug == g.slug %}<span class="chip live">Đang thi đấu</span>{% endif %}
+      </div>
+      <h3>{{ g.name_vi }}</h3>
+      <p>{{ g.tagline }}</p>
+      <dl>
+        <dt>Bàn cờ</dt><dd>{{ g.board }}</dd>
+        <dt>Nước đi</dt><dd><code>{{ g.move_format }}</code></dd>
+      </dl>
+      <div class="tile-foot">
+        <a class="btn btn-primary btn-sm" href="/games/{{ g.slug }}">Luật & code mẫu</a>
+        <a class="btn btn-sm" href="/play/{{ g.slug }}">Chơi thử</a>
+      </div>
+    </div>
+  </article>
+  {% endfor %}
+</div>

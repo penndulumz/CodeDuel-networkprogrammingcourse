@@ -1,0 +1,138 @@
+{% extends "base.html" %}
+
+{% block title %}{{ game.name_vi }} — Luật chơi & code mẫu — CodeDuel{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <div class="page-eyebrow"><a href="/games">Trò chơi</a> / {{ game.name }}</div>
+    <h1 class="page-title">{{ game.name_vi }}</h1>
+    <p class="lead">{{ game.tagline }}</p>
+    <div style="display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px;">
+      <span class="chip level-{{ game.level }}">{{ game.level_label }}</span>
+      <span class="chip">Bàn cờ {{ game.board }}</span>
+      {% if active_game.slug == game.slug %}<span class="chip live">Đang là game thi đấu</span>{% endif %}
+    </div>
+  </div>
+  <div class="page-actions">
+    <a href="/play/{{ game.slug }}" class="btn btn-primary">Chơi thử với máy</a>
+    <a href="/grade" class="btn">Tự chấm bot</a>
+  </div>
+</div>
+
+<div class="doc-layout">
+  <nav class="doc-toc" aria-label="Mục lục">
+    <span class="toc-title">Trên trang này</span>
+    <a href="#rules">Luật chơi</a>
+    <a href="#board">Bàn cờ trong code</a>
+    <a href="#starter">Code mẫu</a>
+    <a href="#test">Chạy thử & chấm điểm</a>
+    <a href="#ideas">Ý tưởng chiến thuật</a>
+  </nav>
+
+  <div class="prose">
+    <section id="rules">
+      <h2>Luật chơi</h2>
+      {% if game.slug == 'connect4' %}
+      <ul>
+        <li>Bàn cờ dựng đứng gồm <strong>6 hàng × 7 cột</strong>. Người chơi 1 (đỏ) đi trước, hai bên luân phiên.</li>
+        <li>Mỗi lượt bạn chọn <strong>một cột</strong> còn chỗ trống, quân sẽ rơi xuống ô thấp nhất của cột đó.</li>
+        <li>Ai tạo được <strong>4 quân liền nhau</strong> theo hàng ngang, dọc hoặc chéo trước thì thắng.</li>
+        <li>Bàn cờ đầy mà không ai có 4 quân liền nhau: <strong>hòa</strong>.</li>
+      </ul>
+      {% elif game.slug == 'caro' %}
+      <ul>
+        <li>Bàn cờ <strong>15 × 15</strong>. Người chơi 1 (X) đi trước, hai bên luân phiên đặt quân.</li>
+        <li>Mỗi lượt đặt <strong>một quân vào một ô trống bất kỳ</strong>.</li>
+        <li>Ai có <strong>5 quân trở lên thẳng hàng</strong> (ngang, dọc, chéo) trước thì thắng. Không áp dụng luật chặn hai đầu.</li>
+        <li>Bàn cờ đầy mà chưa ai thắng: <strong>hòa</strong>.</li>
+      </ul>
+      {% else %}
+      <ul>
+        <li>Bàn cờ <strong>9 × 9</strong>, mỗi bên 9 quân: 3 Búa (R <img class="rps-symbol inline-symbol" src="/static/img/rps-rock.svg" alt="Búa">), 3 Bao (P <img class="rps-symbol inline-symbol" src="/static/img/rps-paper.svg?v=hand-2" alt="Bao">), 3 Kéo (S <img class="rps-symbol inline-symbol" src="/static/img/rps-scissors.svg" alt="Kéo">).</li>
+        <li>Mỗi lượt di chuyển <strong>một quân đi 1 ô</strong> theo 8 hướng (giống quân Vua trong cờ vua).</li>
+        <li>Được ăn quân đối thủ nếu thắng theo luật oẳn tù tì: <strong>Búa thắng Kéo, Kéo thắng Bao, Bao thắng Búa</strong>. Quân cùng loại chặn nhau.</li>
+        <li>Thắng khi <strong>chạm ô đích</strong> của đối thủ (người chơi 1 đến i9, người chơi 2 đến a1) hoặc <strong>diệt sạch cả 3 quân của một loại</strong>.</li>
+        <li>Sau 200 nước, bên còn nhiều quân hơn thắng; bằng nhau thì hòa.</li>
+      </ul>
+      {% endif %}
+      <div class="callout"><span class="callout-icon">i</span><p>Cách nhanh nhất để hiểu luật là <a href="/play/{{ game.slug }}">chơi thử vài ván với máy</a> ngay trên trình duyệt.</p></div>
+    </section>
+
+    <section id="board">
+      <h2>Bàn cờ trong code</h2>
+      {% if game.slug == 'connect4' %}
+      <p><code>board</code> là list 6 hàng, mỗi hàng 7 số. <code>board[0]</code> là <strong>hàng trên cùng</strong>, <code>board[5]</code> là hàng dưới cùng. Giá trị: <code>0</code> trống, <code>1</code> hoặc <code>2</code> là quân của người chơi tương ứng.</p>
+      <p>Một cột còn chơi được khi ô trên cùng còn trống: <code>board[0][cot] == 0</code>. Bạn trả về <strong>một số nguyên 0..6</strong>.</p>
+      <pre class="code">history = [{<span class="k">'turn'</span>: 1, <span class="k">'player'</span>: 1, <span class="k">'move'</span>: 3, <span class="k">'cell'</span>: [5, 3]}, ...]</pre>
+      {% elif game.slug == 'caro' %}
+      <p><code>board</code> là list 15 hàng, mỗi hàng 15 số: <code>0</code> trống, <code>1</code> hoặc <code>2</code> là quân của người chơi. Bạn trả về <strong>tuple (hàng, cột)</strong> của một ô đang trống, ví dụ <code>(7, 7)</code> là ô chính giữa.</p>
+      <pre class="code">history = [{<span class="k">'turn'</span>: 1, <span class="k">'player'</span>: 1, <span class="k">'move'</span>: [7, 7], <span class="k">'cell'</span>: [7, 7]}, ...]</pre>
+      {% else %}
+      <p><code>board[row][col]</code> là <code>None</code> hoặc dict <code>{'type': 'R'|'P'|'S', 'player': 1|2}</code>. <code>row</code> 0..8 tương ứng hàng 1..9, <code>col</code> 0..8 tương ứng cột a..i.</p>
+      <p>Bạn trả về <code>((from_row, from_col), (to_row, to_col))</code>. Xem thêm tài liệu đầy đủ trong <code>docs/BOT_GUIDE.md</code> của bộ công cụ.</p>
+      {% endif %}
+    </section>
+
+    <section id="starter">
+      <h2>Code mẫu</h2>
+      <p>File này có sẵn trong bộ công cụ tại <code>starter_kit/{{ template_file }}</code>. Sao chép, đổi tên, rồi cải tiến dần.</p>
+      <div class="code-head"><span>starter_kit/{{ template_file }}</span><button type="button" onclick="copyCode(this)">Sao chép</button></div>
+      <pre class="code" id="starterCode">{{ template_code }}</pre>
+    </section>
+
+    <section id="test">
+      <h2>Chạy thử & chấm điểm trên máy</h2>
+      <p>Giải nén <a href="/download/starter-kit.zip">bộ công cụ offline</a>, mở terminal trong thư mục vừa giải nén rồi chạy:</p>
+      <h3>Cho bot của bạn đấu với bot mẫu</h3>
+      <pre class="code">python starter_kit/local_arena.py my_bot.py starter_kit/{{ {'connect4': 'connect4_bot.py', 'caro': 'caro_bot.py'}.get(game.slug, 'heuristic_bot.py') }} --game {{ game.slug }} --rounds 4 --swap-sides</pre>
+      <h3>Tự chấm điểm trên thang 10</h3>
+      <pre class="code">python starter_kit/grade.py my_bot.py --game {{ game.slug }}</pre>
+      <div class="callout ok"><span class="callout-icon">✓</span><p>Điểm chấm offline và điểm trên trang <a href="/grade">Tự chấm điểm</a> dùng cùng một bộ đối thủ chuẩn, nên kết quả tương đương.</p></div>
+    </section>
+
+    <section id="ideas">
+      <h2>Ý tưởng chiến thuật</h2>
+      {% if game.slug == 'connect4' %}
+      <ol>
+        <li>Nếu có cột giúp bạn thắng ngay → đi cột đó.</li>
+        <li>Nếu đối thủ sắp thắng ở một cột → chặn cột đó.</li>
+        <li>Đừng đặt quân ngay dưới ô mà đối thủ đang cần để thắng.</li>
+        <li>Ưu tiên cột giữa: cột 3 nằm trong nhiều đường 4 quân nhất.</li>
+        <li>Nâng cao: tìm kiếm Minimax 4–6 tầng với cắt tỉa Alpha-Beta.</li>
+      </ol>
+      {% elif game.slug == 'caro' %}
+      <ol>
+        <li>Chỉ xét các ô gần quân đã có (trong bán kính 2) để chạy nhanh.</li>
+        <li>Chấm điểm mỗi ô: tấn công (độ dài chuỗi của mình) + phòng thủ (chuỗi của đối thủ bị chặn).</li>
+        <li>Chuỗi 4 hở hai đầu gần như chắc thắng; chuỗi 3 hở hai đầu cần chặn ngay.</li>
+        <li>Nâng cao: Minimax 2–3 tầng trên các ô ứng viên tốt nhất.</li>
+      </ol>
+      {% else %}
+      <ol>
+        <li>Luôn kiểm tra nước chạm đích hoặc nước diệt quân cuối cùng của một loại.</li>
+        <li>Tránh đứng cạnh quân đối thủ có thể ăn mình.</li>
+        <li>Đưa quân tiến về đích theo khoảng cách Chebyshev.</li>
+        <li>Nâng cao: Minimax 2–3 tầng, xem 5 boss bot trên server để học hỏi.</li>
+      </ol>
+      {% endif %}
+    </section>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  function copyCode(btn) {
+    const text = document.getElementById('starterCode').textContent;
+    const done = () => { btn.textContent = 'Đã chép'; setTimeout(() => (btn.textContent = 'Sao chép'), 1500); };
+    if (navigator.clipboard && window.isSecureContext) {
+      navigator.clipboard.writeText(text).then(done);
+    } else {
+      const area = document.createElement('textarea');
+      area.value = text; document.body.appendChild(area); area.select();
+      try { document.execCommand('copy'); done(); } finally { area.remove(); }
+    }
+  }
+</script>
+{% endblock %}

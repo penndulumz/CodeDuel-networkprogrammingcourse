@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}Nhánh đấu Chung kết (Tournament Bracket) - Battlecode 9x9{% endblock %}
+{% block title %}Vòng loại trực tiếp — CodeDuel{% endblock %}
 
 {% block content %}
 {% set ns = namespace(champion=none, done=0) %}
@@ -15,25 +15,25 @@
 
 <div class="page-header">
   <div>
-    <div class="page-eyebrow">Playoffs</div>
-    <h1 class="page-title">Nhánh đấu Chung kết (Tournament Bracket)</h1>
-    <div class="page-subtitle">Loại trực tiếp (Single-elimination) cho Top kỳ thủ — đội thua bị loại, đội thắng được bốc thăm ngẫu nhiên vào vòng sau.</div>
+    <div class="page-eyebrow">Giải đấu</div>
+    <h1 class="page-title">Vòng loại trực tiếp</h1>
+    <div class="page-subtitle">Theo dõi các cặp đấu và kết quả từng vòng. Người thắng đi tiếp, người thua dừng tại vòng đó.</div>
   </div>
 
   <div class="page-actions">
     {% if bracket_matches %}
       <span class="tag {% if ns.champion %}green{% else %}amber{% endif %}">{{ ns.done }} / {{ bracket_matches | length }} cặp đã đấu</span>
     {% endif %}
-    <a href="/" class="btn btn-sm">← Bảng xếp hạng</a>
+    <a href="/leaderboard" class="btn btn-sm">← Bảng xếp hạng</a>
     {% if current_user and current_user.is_admin %}
-      <a href="/admin" class="btn btn-sm">Quản trị Admin</a>
+      <a href="/admin" class="btn btn-sm">Quản trị</a>
     {% endif %}
   </div>
 </div>
 
 <div class="card section">
   <div class="card-header">
-    <h2 class="card-title">Cây Nhánh đấu (Bracket Matches)</h2>
+    <h2 class="card-title">Các cặp đấu</h2>
   </div>
 
   {% if bracket_rounds %}

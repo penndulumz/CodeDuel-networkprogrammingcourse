@@ -1,35 +1,33 @@
 {% extends "base.html" %}
 
-{% block title %}Đăng ký (Register) - Battlecode 9x9{% endblock %}
+{% block title %}Đăng ký — CodeDuel{% endblock %}
 
 {% block content %}
 <div class="auth-wrap">
   <div class="auth-side">
     <div>
-      <div class="page-eyebrow">Battlecode 9x9</div>
-      <h2>Viết bot. Thách đấu. Leo hạng.</h2>
-      <p>Đấu trường thuật toán Rock-Paper-Scissors Chess trên bàn cờ 9x9: nộp một file Python, hệ thống lo phần còn lại.</p>
+      <div class="page-eyebrow">CodeDuel Arena</div>
+      <h2>Tham gia buổi chơi.</h2>
+      <p>Tạo tài khoản để nộp bot và thi đấu. Nếu chơi theo nhóm, hãy dùng tên nhóm để mọi người dễ nhận ra.</p>
     </div>
-    <div class="rps-cycle">
-      <span class="rps-piece">✊</span>
-      <span>vs</span>
-      <span class="rps-piece p2">✌</span>
-      <span>→</span>
-      <span class="rps-piece goal">★</span>
+    <div class="rps-cycle" aria-label="Búa, Bao, Kéo">
+      <span class="rps-piece"><img class="rps-symbol" src="/static/img/rps-rock.svg" alt="Búa"></span>
+      <span class="rps-piece paper"><img class="rps-symbol" src="/static/img/rps-paper.svg?v=hand-2" alt="Bao"></span>
+      <span class="rps-piece p2"><img class="rps-symbol" src="/static/img/rps-scissors.svg" alt="Kéo"></span>
     </div>
   </div>
   <div class="auth-form">
-    <h1>Tạo tài khoản mới</h1>
-    <div class="auth-sub">Mất chưa tới một phút để vào bảng xếp hạng.</div>
+    <h1>Đăng ký</h1>
+    <div class="auth-sub">Chọn tên đăng nhập và mật khẩu cho tài khoản của bạn.</div>
 
     <form id="registerForm" onsubmit="handleRegister(event)">
       <div class="form-group">
-        <label class="form-label" for="username">Tên người dùng (Username)</label>
+        <label class="form-label" for="username">Tên đăng nhập</label>
         <input type="text" id="username" name="username" class="form-control" required minlength="3" autocomplete="username" placeholder="Ít nhất 3 ký tự...">
       </div>
 
       <div class="form-group">
-        <label class="form-label" for="password">Mật khẩu (Password)</label>
+        <label class="form-label" for="password">Mật khẩu</label>
         <input type="password" id="password" name="password" class="form-control" required minlength="6" autocomplete="new-password" placeholder="Ít nhất 6 ký tự...">
       </div>
 

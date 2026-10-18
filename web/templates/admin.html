@@ -1,13 +1,13 @@
 {% extends "base.html" %}
 
-{% block title %}Quản trị Giải đấu (Admin) - Battlecode 9x9{% endblock %}
+{% block title %}Quản trị giải đấu (Admin) — CodeDuel{% endblock %}
 
 {% block content %}
 <div class="page-header">
   <div>
     <div class="page-eyebrow">Admin</div>
-    <h1 class="page-title">Quản trị Giải đấu</h1>
-    <div class="page-subtitle">Điều khiển cổng thách đấu FFA, hệ số điểm ngày (multiplier x), và tạo nhánh đấu Bracket</div>
+    <h1 class="page-title">Quản trị giải đấu</h1>
+    <div class="page-subtitle">Mở hoặc đóng thi đấu, chọn game và điều hành vòng loại trực tiếp.</div>
   </div>
 
   <div class="page-actions">
@@ -24,22 +24,43 @@
   <!-- Settings Form -->
   <div class="card">
     <div class="card-header">
-      <h2 class="card-title">Cài đặt Giải đấu & Cổng FFA</h2>
+      <h2 class="card-title">Thiết lập buổi thi</h2>
     </div>
 
     <form id="adminSettingsForm" onsubmit="handleUpdateSettings(event)">
       <div class="form-section-title">Cổng thách đấu</div>
       <div class="form-group">
-        <label class="form-label" for="portal_mode">Chế độ Cổng Thách đấu FFA (Portal Mode)</label>
+        <label class="form-label" for="portal_mode">Nhận thách đấu</label>
         <select id="portal_mode" name="portal_mode" class="form-control">
-          <option value="auto" {% if settings.portal_mode == 'auto' or not settings.portal_mode %}selected{% endif %}>Auto (Theo Khung Giờ)</option>
-          <option value="true" {% if settings.portal_mode == 'true' %}selected{% endif %}>Force Open (Mở Khẩn Cấp)</option>
-          <option value="false" {% if settings.portal_mode == 'false' %}selected{% endif %}>Force Closed (Đóng Khẩn Cấp)</option>
+          <option value="auto" {% if settings.portal_mode == 'auto' or not settings.portal_mode %}selected{% endif %}>Theo khung giờ</option>
+          <option value="true" {% if settings.portal_mode == 'true' %}selected{% endif %}>Luôn mở</option>
+          <option value="false" {% if settings.portal_mode == 'false' %}selected{% endif %}>Tạm đóng</option>
         </select>
       </div>
 
+      <fieldset class="form-group">
+        <legend class="form-label">Trò chơi hiển thị trên website</legend>
+        <p class="form-hint">Mặc định chỉ có Oẳn Tù Tì 9×9. Chọn thêm trò chơi đã có sẵn rồi lưu để đưa vào danh sách công khai.</p>
+        {% for g in settings.games %}
+        <label style="display:block; margin:10px 0">
+          <input type="checkbox" name="catalog_games" value="{{ g.slug }}" {% if g.slug in settings.catalog_games %}checked{% endif %} {% if g.slug == 'rps9x9' %}disabled{% endif %}>
+          {{ g.name_vi }}{% if g.slug == 'rps9x9' %} — luôn hiển thị{% endif %}
+        </label>
+        {% endfor %}
+      </fieldset>
+
       <div class="form-group">
-        <label class="form-label" for="rule_variant">Quy tắc Chiến đấu (Rule Variant)</label>
+        <label class="form-label" for="game_type">Game đang thi đấu</label>
+        <select id="game_type" name="game_type" class="form-control">
+          {% for g in settings.games %}
+          <option value="{{ g.slug }}" {% if settings.game_type == g.slug %}selected{% endif %}>{{ g.name_vi }} ({{ g.board }}) — {{ g.level_label }}</option>
+          {% endfor %}
+        </select>
+        <p class="form-hint">Thách đấu FFA và Bracket dùng bot đang kích hoạt của mỗi người cho game này. Đổi game giữa chừng không làm mất bot cũ.</p>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label" for="rule_variant">Luật ăn quân — RPS 9×9</label>
         <select id="rule_variant" name="rule_variant" class="form-control">
           <option value="standard" {% if settings.rule_variant == 'standard' or not settings.rule_variant %}selected{% endif %}>Tiêu chuẩn (Standard: Búa > Kéo > Bao)</option>
           <option value="inverted_rps" {% if settings.rule_variant == 'inverted_rps' %}selected{% endif %}>Đảo chiều ngũ hành (Inverted Combat: Kéo > Búa > Bao)</option>
@@ -48,12 +69,12 @@
 
       <div class="form-row">
         <div class="form-group">
-          <label class="form-label" for="start_time">Giờ mở cổng (Start Time)</label>
+          <label class="form-label" for="start_time">Giờ bắt đầu</label>
           <input type="time" id="start_time" name="start_time" class="form-control" value="{{ settings.start_time or '19:00' }}" required>
         </div>
 
         <div class="form-group">
-          <label class="form-label" for="end_time">Giờ đóng cổng (End Time)</label>
+          <label class="form-label" for="end_time">Giờ kết thúc</label>
           <input type="time" id="end_time" name="end_time" class="form-control" value="{{ settings.end_time or '21:00' }}" required>
         </div>
       </div>
@@ -239,6 +260,8 @@
     const payload = {
       portal_mode: portalMode,
       rule_variant: ruleVariant,
+      game_type: document.getElementById('game_type').value,
+      catalog_games: Array.from(document.querySelectorAll('input[name="catalog_games"]:checked'), el => el.value),
       start_time: document.getElementById('start_time').value,
       end_time: document.getElementById('end_time').value,
       daily_multiplier_x: parseFloat(document.getElementById('daily_multiplier_x').value),

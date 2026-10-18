@@ -1,0 +1,142 @@
+{% extends "base.html" %}
+
+{% set game = games_map[match.game_type] %}
+{% block title %}Replay trận #{{ match_id }} ({{ game.name }}) — CodeDuel{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <div class="page-eyebrow">Xem lại trận · {{ game.name_vi }}</div>
+    <h1 class="page-title">Trận đấu #{{ match_id }}</h1>
+    <p class="lead">
+      <strong style="color: var(--red);">{{ match.player1.username if match.player1 else 'Người chơi 1' }}</strong>
+      ({{ 'X' if game.slug == 'caro' else 'Đỏ' }}, đi trước) đấu
+      <strong style="color: {{ 'var(--amber)' if game.slug == 'connect4' else 'var(--blue)' }};">{{ match.player2.username if match.player2 else 'Người chơi 2' }}</strong>
+      ({{ 'O' if game.slug == 'caro' else 'Vàng' }})
+    </p>
+  </div>
+  <div class="page-actions">
+    <a href="/leaderboard" class="btn btn-sm">← Bảng xếp hạng</a>
+    <a href="/profile" class="btn btn-sm">Hồ sơ của tôi</a>
+  </div>
+</div>
+
+<div class="play-layout">
+  <div class="board-stage">
+    <div id="replayBoard"></div>
+  </div>
+
+  <aside class="side-panel">
+    <div class="panel">
+      <div class="turn-pill" id="statusPill"><span id="statusText">Đang tải dữ liệu trận đấu...</span></div>
+    </div>
+
+    <div class="panel">
+      <h3>Điều khiển</h3>
+      <div class="controls-row" style="display: flex; gap: 6px; flex-wrap: wrap;">
+        <button class="btn btn-sm" id="btnFirst" title="Về đầu">⏮</button>
+        <button class="btn btn-sm" id="btnPrev" title="Lùi (←)">◀</button>
+        <button class="btn btn-primary btn-sm" id="btnPlay" style="min-width: 86px;" title="Phát / Dừng (Space)">▶ Phát</button>
+        <button class="btn btn-sm" id="btnNext" title="Tiến (→)">▶</button>
+        <button class="btn btn-sm" id="btnLast" title="Về cuối">⏭</button>
+      </div>
+      <input type="range" id="slider" min="0" max="0" value="0" style="width: 100%; margin-top: 14px;" aria-label="Chọn nước đi">
+      <div class="text-muted" style="font-size: 13px; margin-top: 4px;">Nước <b id="counter">0 / 0</b> · phím <kbd>←</kbd> <kbd>→</kbd> <kbd>Space</kbd></div>
+    </div>
+
+    <div class="panel">
+      <h3>Thông tin trận</h3>
+      <div class="info-list">
+        <div class="row"><span>Kết quả</span><b>{% if match.winner_id %}{{ match.winner.username }} thắng{% elif match.win_reason %}Hòa{% else %}Đang chạy...{% endif %}</b></div>
+        <div class="row"><span>Lý do</span><b>{{ match.win_reason or '—' }}</b></div>
+        <div class="row"><span>Số nước</span><b>{{ match.total_turns }}</b></div>
+      </div>
+      <p class="text-muted" id="errorLine" style="font-size: 13px; margin: 10px 0 0; display: none;"></p>
+    </div>
+  </aside>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="/static/js/board_view.js?v=club-pieces-3"></script>
+<script>
+(function () {
+  const matchId = {{ match_id }};
+  const REASONS = { line: 'đủ hàng', board_full: 'bàn cờ đầy', timeout: 'quá thời gian', error: 'bot bị lỗi', invalid_move: 'nước đi không hợp lệ' };
+  let data = null, idx = 0, timer = null, view = null;
+
+  const $ = (id) => document.getElementById(id);
+
+  function boardAt(n) {
+    const board = data.initial_board.map(row => row.slice());
+    for (let i = 0; i < n; i++) {
+      const m = data.moves[i];
+      board[m.cell[0]][m.cell[1]] = m.player;
+    }
+    return board;
+  }
+
+  function show(n) {
+    idx = Math.max(0, Math.min(n, data.moves.length));
+    const marks = {};
+    if (idx > 0) marks.last = data.moves[idx - 1].cell;
+    if (idx === data.moves.length) marks.line = data.winning_line || [];
+    view.render(boardAt(idx), marks);
+    $('slider').value = idx;
+    $('counter').textContent = `${idx} / ${data.moves.length}`;
+    const pill = $('statusPill');
+    pill.classList.remove('win');
+    if (idx === data.moves.length) {
+      const name = data.winner === 1 ? data.player1.username : data.winner === 2 ? data.player2.username : null;
+      $('statusText').textContent = name ? `${name} thắng (${REASONS[data.win_reason] || data.win_reason})` : 'Hòa';
+      if (name) pill.classList.add('win');
+    } else {
+      $('statusText').textContent = idx === 0 ? 'Bắt đầu trận đấu' : `Nước ${idx}`;
+    }
+  }
+
+  function toggle(play) {
+    const playing = play ?? !timer;
+    clearInterval(timer); timer = null;
+    $('btnPlay').textContent = playing ? '❚❚ Dừng' : '▶ Phát';
+    if (!playing) return;
+    if (idx >= data.moves.length) show(0);
+    timer = setInterval(() => {
+      if (idx >= data.moves.length) return toggle(false);
+      show(idx + 1);
+    }, data.game_type === 'caro' ? 280 : 450);
+  }
+
+  async function load() {
+    const res = await fetch(`/api/matches/${matchId}/replay`);
+    if (!res.ok) {
+      // The match may still be running in the background queue: retry shortly.
+      $('statusText').textContent = 'Trận đấu đang chạy, đang chờ kết quả...';
+      setTimeout(load, 2000);
+      return;
+    }
+    data = await res.json();
+    view = new BoardView($('replayBoard'), data.game_type, data.rows, data.cols);
+    $('slider').max = data.moves.length;
+    const err = data.bot1_error || data.bot2_error;
+    if (err) { $('errorLine').textContent = 'Lỗi bot: ' + err; $('errorLine').style.display = 'block'; }
+    show(data.moves.length);
+  }
+
+  $('btnFirst').onclick = () => { toggle(false); show(0); };
+  $('btnPrev').onclick = () => { toggle(false); show(idx - 1); };
+  $('btnNext').onclick = () => { toggle(false); show(idx + 1); };
+  $('btnLast').onclick = () => { toggle(false); show(data.moves.length); };
+  $('btnPlay').onclick = () => toggle();
+  $('slider').oninput = (e) => { toggle(false); show(Number(e.target.value)); };
+  document.addEventListener('keydown', (e) => {
+    if (!data || e.target.tagName === 'INPUT') return;
+    if (e.key === 'ArrowLeft') { toggle(false); show(idx - 1); }
+    if (e.key === 'ArrowRight') { toggle(false); show(idx + 1); }
+    if (e.key === ' ') { e.preventDefault(); toggle(); }
+  });
+
+  load();
+})();
+</script>
+{% endblock %}

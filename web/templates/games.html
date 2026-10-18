@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+
+{% block title %}Trò chơi — CodeDuel Arena{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <div class="page-eyebrow">Trò chơi</div>
+    <h1 class="page-title">Trò chơi</h1>
+    <p class="lead">Các trò chơi đang được ban tổ chức mở. Chọn một game để xem luật hoặc chơi thử.</p>
+  </div>
+</div>
+
+{% include "_game_cards.html" %}
+
+<section class="section-block prose" aria-labelledby="same-api">
+  <section>
+    <h2 id="same-api">Hàm bot cần viết</h2>
+    <p>Server gọi hàm của bạn mỗi khi đến lượt, với 3 tham số giống nhau ở mọi game:</p>
+    <pre class="code"><span class="k">def</span> get_move(board, my_player, history):
+    <span class="c"># board     : bàn cờ hiện tại (list các list)</span>
+    <span class="c"># my_player : 1 hoặc 2 — bạn là người chơi nào</span>
+    <span class="c"># history   : danh sách các nước đã đi</span>
+    <span class="k">return</span> nuoc_di</pre>
+    <table>
+      <thead><tr><th>Trò chơi</th><th>Ô trên bàn cờ</th><th>Giá trị trả về</th></tr></thead>
+      <tbody>
+        {% if games_list | selectattr("slug", "equalto", "connect4") | list %}<tr><td>Connect Four</td><td><code>0</code> trống, <code>1</code>/<code>2</code> quân của người chơi</td><td><code>3</code> — chỉ số cột (0..6)</td></tr>{% endif %}
+        {% if games_list | selectattr("slug", "equalto", "caro") | list %}<tr><td>Caro 15×15</td><td><code>0</code> trống, <code>1</code>/<code>2</code> quân của người chơi</td><td><code>(7, 7)</code> — (hàng, cột) của ô trống</td></tr>{% endif %}
+        <tr><td>RPS Chess 9×9</td><td><code>None</code> hoặc <code>{'type': 'R', 'player': 1}</code></td><td><code>((0, 3), (1, 3))</code> — từ ô nào đến ô nào</td></tr>
+      </tbody>
+    </table>
+    <div class="callout warn"><span class="callout-icon">!</span><p>Mỗi nước đi có tối đa <strong>1 giây</strong>. Bot quá giờ, bị lỗi (exception) hoặc trả về nước không hợp lệ sẽ <strong>bị xử thua ngay</strong>.</p></div>
+  </section>
+</section>
+{% endblock %}

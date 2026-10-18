@@ -6,8 +6,8 @@
 ---
 
 ## 1. Tóm Tắt Dự Án (System Overview)
-- **Tên dự án**: Battlecode RPS Chess 9x9 Platform.
-- **Mô tả**: Nền tảng thi đấu cờ Oẳn Tù Tì (Rock-Paper-Scissors) kích thước 9x9 cho sinh viên. Sinh viên viết bot bằng Python để điều khiển các quân cờ đấu 1v1.
+- **Tên dự án**: CodeDuel Arena (tiền thân: Battlecode RPS Chess 9x9 Platform).
+- **Mô tả**: Nền tảng thi đấu bot cho sinh viên năm nhất, hỗ trợ nhiều trò chơi (Connect Four, Caro 15x15, Cờ Oẳn Tù Tì 9x9 - xem Mục 19). Sinh viên viết bot bằng Python (cùng một hàm `get_move`) để đấu 1v1.
 - **Mô hình máy chủ**: Centralized Runner. Người chơi upload file bot Python lên web. Server lưu mã nguồn kín đáo (chống lộ code), chạy ngầm trận đấu trong tiến trình con cô lập, xuất file replay JSON và cập nhật điểm Elo.
 - **Thể thức giải đấu**:
   - **Ngày 1 đến Ngày n**: Mở cổng theo khung giờ động được cấu hình qua cơ sở dữ liệu (mặc định 19h - 21h). Đấu tự do FFA không giới hạn. Mỗi ngày có một hệ số nhân Elo ngẫu nhiên x trong [1.0, 3.0].
@@ -16,7 +16,7 @@
 - **Tech Stack**:
   - **Backend & Engine**: Python 3.10+, FastAPI, SQLite (qua SQLAlchemy WAL), PyYAML.
   - **Frontend**: HTML5, Vanilla JavaScript, CSS3 Design Tokens (bảng màu tối Charcoal/Slate chuyên nghiệp), không dùng Node.js/npm.
-  - **Deployment**: Local-First & Multi-Machine LAN (`python main.py` lắng nghe trên `0.0.0.0:8000` với cơ chế tự động dò IP mạng LAN `http://<LAN_IP>:8000`), không phụ thuộc dịch vụ đám mây ngoài.
+  - **Deployment**: Local-First & Multi-Machine LAN (`python main.py` lắng nghe trên `0.0.0.0:8000` với cơ chế tự động dò IP mạng LAN `http://<LAN_IP>:8000`), không phụ thuộc dịch vụ đám mây ngoài. Mở ra Internet (WAN) bằng `python main.py --tunnel` hoặc `--public-url` (Mục 18, Mục 22).
 
 ---
 
@@ -360,18 +360,78 @@ Hệ thống hỗ trợ triển khai thử nghiệm qua WAN bằng mô hình HTT
 
 1. Biến môi trường triển khai:
    - ALLOWED_ORIGINS: Danh sách origin được phép truy cập CORS, phân tách bằng dấu phẩy.
-   - COOKIE_SECURE: Đặt true khi chạy qua HTTPS public tunnel; đặt false khi chạy HTTP local hoặc LAN.
+   - COOKIE_SECURE: Mặc định để trống (auto) - cookie phiên tự bật cờ Secure khi request đến qua HTTPS (kể cả qua tunnel), tắt khi chạy HTTP LAN. Đặt true/false để ép buộc.
    - ADMIN_USERNAME và ADMIN_PASSWORD: Cấu hình tài khoản quản trị được seed khi khởi động.
 
 2. Cấu hình mặc định local:
    - ALLOWED_ORIGINS mặc định gồm http://localhost:8000 và http://127.0.0.1:8000.
-   - COOKIE_SECURE mặc định là false để đăng nhập hoạt động trên HTTP local.
+   - COOKIE_SECURE mặc định là auto (theo scheme của request) để đăng nhập hoạt động cả trên HTTP local lẫn HTTPS tunnel.
 
 3. Cấu hình WAN demo:
    - Khi dùng Cloudflare Tunnel hoặc HTTPS public endpoint, đặt ALLOWED_ORIGINS trùng chính xác với URL HTTPS public.
-   - Đặt COOKIE_SECURE=true để session cookie chỉ được gửi qua HTTPS.
+   - Không cần đặt COOKIE_SECURE: chế độ auto tự nhận HTTPS nhờ uvicorn proxy headers (tin cậy proxy trong FORWARDED_ALLOW_IPS, mặc định 127.0.0.1).
    - Không sử dụng mật khẩu mặc định admin123 khi public hệ thống ra Internet.
 
 4. Quy tắc chạy kiểm thử:
    - Trước khi chạy pytest, phải xóa các biến môi trường WAN như ADMIN_PASSWORD, ADMIN_USERNAME, COOKIE_SECURE và ALLOWED_ORIGINS.
    - Nếu ADMIN_PASSWORD còn giữ giá trị demo WAN, test suite có thể fail vì các test mặc định dùng admin/admin123.
+
+## 19. Kiến Trúc Đa Trò Chơi (Multi-Game Registry)
+
+1. **Danh mục game (`engine/games/__init__.py`)**:
+   - `GAMES`: metadata hiển thị cho mọi game, khóa bằng slug ổn định: `connect4` (Connect Four 6x7, độ khó 1), `caro` (Caro/Gomoku 15x15, độ khó 2), `rps9x9` (Cờ Oẳn Tù Tì 9x9, độ khó 3, game mặc định `DEFAULT_GAME`).
+   - Hàm tiện ích: `SUPPORTED_GAMES`, `list_games()` (sắp từ dễ đến khó), `normalize_game_type()`, `is_grid_game()`, `create_grid_game()`.
+   - Engine RPS gốc `engine/game.py` giữ nguyên, chỉ được đăng ký vào danh mục.
+2. **Engine game lưới (`engine/games/grid.py`)**:
+   - Lớp `GridGame` dùng chung: bàn cờ ma trận số nguyên (0 trống, 1/2 quân người chơi), Player 1 đi trước, thắng khi có `win_length` quân thẳng hàng (ngang/dọc/chéo), bàn đầy thì hòa (`win_reason`: `line` hoặc `board_full`).
+   - `Connect4Game`: 6 hàng x 7 cột, `gravity = True`, nước đi là `int` (chỉ số cột), hàng 0 là hàng trên cùng.
+   - `CaroGame`: 15 x 15, nước đi là `(row, col)`, 5 quân trở lên thẳng hàng là thắng.
+3. **Bot interface thống nhất**: mọi game dùng chung `get_move(board, my_player, history)`. Với game lưới, `history` là danh sách `{'turn', 'player', 'move', 'cell'}`.
+4. **Runner (`engine/runner.py`)**: `run_match(..., game_type="rps9x9")`. Game lưới chạy qua `_run_grid_match` với cùng `BotProcess` cô lập, timeout và luật xử thua (`timeout`, `error`, `invalid_move`). Replay JSON có thêm `game_type`, `rows`, `cols`, `winning_line`; replay RPS cũng có `game_type: "rps9x9"`.
+5. **CSDL**: cột `game_type` (String(32), mặc định `"rps9x9"`) trên bảng `Bot` và `Match`. `init_db()` tự `ALTER TABLE` thêm cột cho các file `app.db` cũ (`ADDED_COLUMNS` trong `server/database.py`).
+6. **Game đang thi đấu**: khóa `game_type` trong `TournamentSetting`, admin chọn trên `/admin` (API `POST /api/admin/settings` với `game_type`). `server/games.py` cung cấp `get_active_game()` và `get_active_bot(db, user_id, game_type)`.
+   - Mỗi người dùng có tối đa 1 bot kích hoạt cho TỪNG game; upload (`POST /api/bots/upload`, form field `game_type`, mặc định game đang thi đấu) và activate chỉ tắt bot cùng game.
+   - Thách đấu FFA và Bracket dùng bot kích hoạt của game đang thi đấu; `Match.game_type` lưu game của trận.
+   - Lưu ý: Elo vẫn là một chỉ số chung trên `User`. Khi đổi game giữa các buổi, ban tổ chức nên coi mỗi buổi là một mùa giải riêng.
+7. **Starter kit**: `connect4_template.py`, `connect4_bot.py`, `caro_template.py`, `caro_bot.py`, đối thủ chuẩn `starter_kit/opponents/`. `local_arena.py` có cờ `--game {rps9x9,connect4,caro}`.
+8. **Boss Arena**: 5 boss server-side vẫn chỉ dành cho RPS 9x9.
+
+## 20. Website Công Khai & Các Trang Web (Public Website)
+
+| Route | Template | Mục đích |
+| :--- | :--- | :--- |
+| `/` | `home.html` | Trang chủ: giới thiệu, 4 bước cho người mới, thẻ 3 game, trạng thái cổng, địa chỉ chia sẻ (LAN/WAN), top 5 |
+| `/leaderboard` | `index.html` | Bảng xếp hạng Elo + thách đấu FFA (trước đây nằm ở `/`) |
+| `/games`, `/games/{slug}` | `games.html`, `game_detail.html` | Danh sách game; luật, cấu trúc bàn cờ, code mẫu đọc trực tiếp từ `starter_kit/`, lệnh test/chấm |
+| `/play/{slug}` | `play.html` | Chơi với máy ngay trong trình duyệt (`web/static/js/games.js` + `board_view.js`, chạy hoàn toàn phía client) |
+| `/guide` | `guide.html` | Hướng dẫn 6 bước cho sinh viên năm nhất, lỗi thường gặp, FAQ |
+| `/guide/organizer` | `organizer.html` | Cẩm nang ban tổ chức: LAN offline, WAN, điều hành, chấm điểm, kịch bản 120 phút |
+| `/grade` | `grade.html` | Tự chấm điểm bot trên web |
+| `/replay/{id}` | `replay.html` hoặc `replay_grid.html` | Replay RPS 9x9 hoặc replay game lưới (tự chọn theo `Match.game_type`) |
+| `/download/starter-kit.zip` | - | Bộ công cụ offline (starter_kit, engine, grader, server/bosses, BOT_GUIDE) |
+
+- Giao diện: `web/static/css/site.css` (lớp site, nạp sau `style.css` và `arena-light.css`), navbar có menu thu gọn cho mobile, không phụ thuộc CDN hay font ngoài (chạy được trong LAN khép kín).
+- Biến Jinja toàn cục: `games_list`, `games_map`.
+
+## 21. Chấm Điểm Tự Động (Auto-Grader)
+
+1. **Lõi (`engine/grader.py`)**: `grade_bot(bot_path, game_type, games_per_opponent=4)` kiểm tra AST sandbox (không qua = 0 điểm), cho bot đấu với thang đối thủ chuẩn `GRADING_LADDERS` (đổi lượt đi trước mỗi ván; thắng 1, hòa 0.5), điểm = `10 * sum(trọng số * tỉ lệ điểm) / sum(trọng số)`, xếp loại theo `GRADE_BANDS` (Xuất sắc >= 9, Giỏi >= 7, Khá >= 5, Trung bình >= 3).
+   - `connect4` / `caro`: Random (Lv1, trọng số 4), Heuristic (Lv2, trọng số 6).
+   - `rps9x9`: Novice (3), Heuristic (3), Rusher (4).
+2. **CLI offline (`starter_kit/grade.py`)**: `python starter_kit/grade.py <bot.py | thư_mục> --game connect4 [--games N] [--csv diem.csv]` - chấm một bot hoặc cả lớp, xuất CSV.
+3. **API web (`server/routes/grade.py`)**: `POST /api/grade` (đăng nhập; form `game_type`, `file` tùy chọn - nếu không có file thì chấm bot đang kích hoạt; file upload chỉ dùng để chấm, không thay bot thi đấu) trả về `job_id` (HTTP 202); `GET /api/grade/{job_id}` trả tiến trình và báo cáo (chỉ chủ job xem được). Tối đa 2 job chấm chạy đồng thời (`MAX_CONCURRENT_GRADINGS`).
+4. **Xuất bảng xếp hạng**: `GET /api/leaderboard/export.csv` (UTF-8 BOM cho Excel, loại tài khoản admin và boss).
+
+## 22. Tối Ưu Truy Cập WAN
+
+1. `python main.py --tunnel`: khởi động Cloudflare quick tunnel (`cloudflared tunnel --url http://localhost:<port>`), đọc URL `https://*.trycloudflare.com` (`parse_tunnel_url`), đặt biến `PUBLIC_URL` và in dòng `Public WAN URL` trên banner. Thiếu `cloudflared` thì cảnh báo và tiếp tục chạy LAN.
+2. `python main.py --public-url https://...` (hoặc biến `PUBLIC_URL`): dùng cho VPS/reverse proxy riêng.
+3. `server/network.py`: `get_lan_ip()` (chuyển từ `main.py`, `main` vẫn import lại), `get_public_url(request)` (ưu tiên `PUBLIC_URL`, nếu truy cập bằng localhost thì thay bằng IP LAN), `should_use_secure_cookie(request)` (COOKIE_SECURE auto/true/false).
+4. `GZipMiddleware` (minimum_size 1024) nén HTML/JSON/replay; trận đấu chạy hoàn toàn phía server nên độ trễ mạng không ảnh hưởng giới hạn 1 giây/nước; trang replay game lưới tự thử lại khi trận còn đang chạy.
+
+## 23. An Toàn Dữ Liệu Khi Chạy Test
+
+- Một số test xóa `app.db`, `bots/`, `replays/` trong thư mục làm việc. `tests/conftest.py` (fixture `preserve_dev_data`, scope session) di chuyển các dữ liệu này sang thư mục tạm trước khi chạy và khôi phục sau khi xong, nên chạy `pytest` không còn làm mất dữ liệu dev. Hãy tắt server dev (đang mở `app.db`) trước khi chạy test trên Windows.
+- Với Starlette 1.x, `fastapi.testclient` cần gói `httpx2` (`pip install httpx2`) để chạy test suite.
+
+- 2026-10-18: Applied the approved clubhouse UI from `.worktrees/midterm-review` to the original checkout at the user request. Includes local SVG pieces, club-room home, compact interior pages and admin-managed public catalog (RPS only by default). Previous affected source files backed up under `local_backups/`. Local databases and uploaded bots were not copied. No GitHub push.

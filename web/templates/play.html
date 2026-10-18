@@ -1,0 +1,178 @@
+{% extends "base.html" %}
+
+{% block title %}Chơi thử {{ game.name_vi }} — CodeDuel{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <div class="page-eyebrow"><a href="/games">Trò chơi</a> / Chơi thử</div>
+    <h1 class="page-title">{{ game.name_vi }}</h1>
+    <p class="lead">Chọn quân của bạn và chơi với máy. Không cần đăng nhập; ván chơi này không tính Elo.</p>
+  </div>
+  <div class="page-actions">
+    {% for g in games_list %}
+      <a href="/play/{{ g.slug }}" class="btn btn-sm {{ 'btn-primary' if g.slug == game.slug else '' }}">{{ g.name }}</a>
+    {% endfor %}
+  </div>
+</div>
+
+<div class="play-layout">
+  <div class="board-stage">
+    <div id="playBoard"></div>
+  </div>
+
+  <aside class="side-panel">
+    <div class="panel">
+      <div class="turn-pill" id="statusPill"><span class="swatch p1" id="statusSwatch"></span><span id="statusText">Lượt của bạn</span></div>
+    </div>
+
+    <div class="panel">
+      <h3>Bạn cầm quân</h3>
+      <div class="seg" id="sideSeg">
+        <button type="button" data-side="1" class="on">{{ 'X — đi trước' if game.slug == 'caro' else 'Đỏ — đi trước' }}</button>
+        <button type="button" data-side="2">{{ 'O — đi sau' if game.slug == 'caro' else ('Vàng — đi sau' if game.slug == 'connect4' else 'Xanh — đi sau') }}</button>
+      </div>
+      <h3 style="margin-top: 14px;">Độ khó của máy</h3>
+      <div class="seg" id="levelSeg">
+        <button type="button" data-level="easy">Dễ</button>
+        <button type="button" data-level="normal" class="on">Thường</button>
+      </div>
+      <button type="button" class="btn btn-primary btn-block" style="margin-top: 14px;" id="newGameBtn">Ván mới</button>
+    </div>
+
+    <div class="panel">
+      <h3>Luật nhanh</h3>
+      <p class="text-muted" style="margin: 0; line-height: 1.6;">
+        {% if game.slug == 'connect4' %}Bấm vào một cột để thả quân. Nối <strong>4 quân</strong> liền nhau (ngang, dọc, chéo) để thắng.
+        {% elif game.slug == 'caro' %}Bấm vào ô trống để đặt quân. <strong>5 quân</strong> thẳng hàng là thắng.
+        {% else %}Bấm vào quân của bạn rồi bấm ô đích (chấm xanh). Búa <img class="rps-symbol inline-symbol" src="/static/img/rps-rock.svg" alt="Búa"> ăn Kéo <img class="rps-symbol inline-symbol" src="/static/img/rps-scissors.svg" alt="Kéo">, Kéo ăn Bao <img class="rps-symbol inline-symbol" src="/static/img/rps-paper.svg?v=hand-2" alt="Bao">, Bao ăn Búa. Chạm góc đích hoặc diệt sạch một loại quân để thắng.{% endif %}
+      </p>
+      <p style="margin: 10px 0 0;"><a href="/games/{{ game.slug }}">Luật đầy đủ & code mẫu →</a></p>
+    </div>
+
+    <div class="panel">
+      <h3>Các nước đã đi</h3>
+      <ol class="move-log" id="moveLog"></ol>
+    </div>
+  </aside>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="/static/js/games.js"></script>
+<script src="/static/js/board_view.js?v=club-pieces-3"></script>
+<script>
+(function () {
+  const SLUG = {{ game.slug | tojson }};
+  const NAMES = SLUG === 'caro' ? { 1: 'X', 2: 'O' } : SLUG === 'connect4' ? { 1: 'Đỏ', 2: 'Vàng' } : { 1: 'Đỏ', 2: 'Xanh' };
+  const REASONS = { line: 'đủ hàng', board_full: 'bàn cờ đầy', goal: 'chạm ô đích', wipeout: 'diệt sạch một loại quân', max_turns: 'hết 200 nước', stalemate: 'hết nước đi' };
+
+  let game = GameKit.create(SLUG);
+  let human = 1;
+  let level = 'normal';
+  let selected = null;     // RPS: square of the piece being moved
+  let thinking = false;
+
+  const view = new BoardView(document.getElementById('playBoard'), SLUG, game.rows, game.cols, onCell);
+  const statusText = document.getElementById('statusText');
+  const statusPill = document.getElementById('statusPill');
+  const swatch = document.getElementById('statusSwatch');
+  const log = document.getElementById('moveLog');
+
+  function lastMarks() {
+    const last = game.history[game.history.length - 1];
+    if (!last) return {};
+    if (SLUG === 'rps9x9') return { last: last.to, from: last.from };
+    return { last: last.cell, line: game.winningLine };
+  }
+
+  function draw() {
+    const marks = lastMarks();
+    if (selected) {
+      marks.selected = selected;
+      marks.targets = game.destinations(selected[0], selected[1]);
+    }
+    view.render(game.board, marks);
+    view.setInteractive(!game.over && game.turn === human && !thinking);
+
+    statusPill.classList.remove('win', 'lose');
+    swatch.className = 'swatch p' + game.turn + (SLUG === 'connect4' && game.turn === 2 ? ' yellow' : '');
+    if (game.over) {
+      const why = REASONS[game.winReason] || game.winReason;
+      if (game.winner === null) statusText.textContent = `Hòa (${why})`;
+      else if (game.winner === human) { statusText.textContent = `Bạn thắng! (${why})`; statusPill.classList.add('win'); }
+      else { statusText.textContent = `Máy thắng (${why}). Thử lại nhé!`; statusPill.classList.add('lose'); }
+    } else {
+      statusText.textContent = game.turn === human ? `Lượt của bạn (${NAMES[human]})` : 'Máy đang nghĩ...';
+    }
+  }
+
+  function addLog(rec) {
+    const li = document.createElement('li');
+    if (SLUG === 'rps9x9') li.textContent = `${NAMES[rec.player]}: ${rec.san}`;
+    else if (SLUG === 'connect4') li.textContent = `${NAMES[rec.player]}: cột ${rec.move}`;
+    else li.textContent = `${NAMES[rec.player]}: (${rec.cell[0]}, ${rec.cell[1]})`;
+    log.appendChild(li);
+    log.scrollTop = log.scrollHeight;
+  }
+
+  function playMove(move) {
+    const rec = game.play(move);
+    if (rec) addLog(rec);
+    return rec;
+  }
+
+  function computerTurn() {
+    if (game.over || game.turn === human) return;
+    thinking = true;
+    draw();
+    setTimeout(() => {
+      playMove(GameKit.aiMove(game, level));
+      thinking = false;
+      draw();
+    }, 350);
+  }
+
+  function onCell(r, c) {
+    if (game.over || thinking || game.turn !== human) return;
+    if (SLUG === 'connect4') {
+      if (playMove(c)) { draw(); computerTurn(); }
+      return;
+    }
+    if (SLUG === 'caro') {
+      if (playMove([r, c])) { draw(); computerTurn(); }
+      return;
+    }
+    // RPS: first click selects one of your pieces, second click moves it.
+    const piece = game.board[r][c];
+    if (piece && piece.player === human) { selected = [r, c]; draw(); return; }
+    if (selected && playMove([selected, [r, c]])) { selected = null; draw(); computerTurn(); return; }
+    selected = null;
+    draw();
+  }
+
+  function newGame() {
+    game = GameKit.create(SLUG);
+    selected = null;
+    thinking = false;
+    log.innerHTML = '';
+    draw();
+    computerTurn();
+  }
+
+  function bindSeg(id, attr, apply) {
+    document.getElementById(id).addEventListener('click', (e) => {
+      const btn = e.target.closest('button');
+      if (!btn) return;
+      document.querySelectorAll(`#${id} button`).forEach(b => b.classList.toggle('on', b === btn));
+      apply(btn.dataset[attr]);
+    });
+  }
+  bindSeg('sideSeg', 'side', (v) => { human = Number(v); newGame(); });
+  bindSeg('levelSeg', 'level', (v) => { level = v; });
+  document.getElementById('newGameBtn').addEventListener('click', newGame);
+
+  newGame();
+})();
+</script>
+{% endblock %}

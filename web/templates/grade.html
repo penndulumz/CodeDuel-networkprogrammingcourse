@@ -1,0 +1,172 @@
+{% extends "base.html" %}
+
+{% block title %}Tự chấm điểm bot — CodeDuel{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <div class="page-eyebrow">Tự chấm điểm</div>
+    <h1 class="page-title">Chấm thử bot</h1>
+    <p class="lead">Chọn bot để đấu với các đối thủ mẫu. Mỗi đối thủ chơi 4 ván, chia đều lượt đi trước và đi sau. Kết quả được quy ra <strong>thang điểm 10</strong>.</p>
+  </div>
+</div>
+
+<div class="play-layout">
+  <div class="stack">
+    <div class="panel">
+      {% if not current_user %}
+      <h3>Chấm trên web hoặc trên máy của bạn</h3>
+      <p class="text-muted">Đăng nhập để chấm trên web. Nếu đã tải bộ công cụ, bạn có thể chạy lệnh này trên máy:</p>
+      <pre class="code">python starter_kit/grade.py my_bot.py --game {{ active_game.slug }}</pre>
+      <div class="page-actions"><a class="btn btn-primary" href="/login?next=/grade">Đăng nhập</a><a class="btn" href="/download/starter-kit.zip">Tải bộ công cụ offline</a></div>
+      {% else %}
+      <form id="gradeForm">
+        <div class="form-group">
+          <label class="form-label" for="gameSelect">Trò chơi</label>
+          <select id="gameSelect" class="form-control">
+            {% for g in games_list %}
+            <option value="{{ g.slug }}" {% if g.slug == active_game.slug %}selected{% endif %}>{{ g.name_vi }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="form-group">
+          <span class="form-label">Bot cần chấm</span>
+          <div class="seg" id="sourceSeg">
+            <button type="button" data-src="file" class="on">Chọn file .py</button>
+            <button type="button" data-src="active">Bot đang kích hoạt</button>
+          </div>
+          <input type="file" id="gradeFile" accept=".py" class="form-control" style="margin-top: 10px;">
+          <p class="form-hint" id="sourceHint">File chỉ dùng để chấm, không thay thế bot đang thi đấu của bạn.</p>
+        </div>
+        <button type="submit" class="btn btn-primary btn-lg btn-block" id="gradeBtn">Bắt đầu chấm</button>
+        <p class="form-error" id="gradeError"></p>
+      </form>
+      {% endif %}
+    </div>
+
+    <div class="panel" id="resultPanel" hidden>
+      <div class="result-head">
+        <div class="score-ring" id="scoreRing"><div><div><b id="scoreValue">–</b><span>/ 10 điểm</span></div></div></div>
+        <div>
+          <h3 id="scoreLabel" style="font-size: 22px; margin-bottom: 4px;">Đang chấm...</h3>
+          <p class="text-muted" id="scoreBot" style="margin: 0;"></p>
+        </div>
+      </div>
+      <div class="table-wrap" style="margin-top: 18px; box-shadow: none;">
+        <table class="table-dark">
+          <thead><tr><th>Đối thủ</th><th class="right">Thắng</th><th class="right">Hòa</th><th class="right">Thua</th><th class="right">Trọng số</th></tr></thead>
+          <tbody id="resultRows"><tr><td colspan="5" class="empty-cell">Chưa có kết quả</td></tr></tbody>
+        </table>
+      </div>
+      <p class="text-muted" id="resultErrors" style="font-size: 13px;"></p>
+    </div>
+  </div>
+
+  <aside class="side-panel">
+    <div class="panel">
+      <h3>Tiến trình</h3>
+      <ul class="progress-log" id="progressLog"><li>Chọn bot rồi bấm "Bắt đầu chấm".</li></ul>
+    </div>
+    <div class="panel">
+      <h3>Cách đọc điểm</h3>
+      <table class="table-dark" style="font-size: 13.5px;">
+        <tbody>
+          <tr><td>9.0 – 10</td><td>Xuất sắc</td></tr>
+          <tr><td>7.0 – 8.9</td><td>Giỏi</td></tr>
+          <tr><td>5.0 – 6.9</td><td>Khá</td></tr>
+          <tr><td>3.0 – 4.9</td><td>Trung bình</td></tr>
+          <tr><td>0 – 2.9</td><td>Cần cố gắng</td></tr>
+        </tbody>
+      </table>
+      <p class="form-hint">Bot không qua kiểm tra bảo mật (import <code>os</code>, <code>open()</code>…) được 0 điểm.</p>
+    </div>
+  </aside>
+</div>
+{% endblock %}
+
+{% block scripts %}
+{% if current_user %}
+<script>
+(function () {
+  const $ = (id) => document.getElementById(id);
+  let source = 'file';
+
+  $('sourceSeg').addEventListener('click', (e) => {
+    const btn = e.target.closest('button');
+    if (!btn) return;
+    source = btn.dataset.src;
+    document.querySelectorAll('#sourceSeg button').forEach(b => b.classList.toggle('on', b === btn));
+    $('gradeFile').hidden = source !== 'file';
+    $('sourceHint').textContent = source === 'file'
+      ? 'File chỉ dùng để chấm, không thay thế bot đang thi đấu của bạn.'
+      : 'Chấm bot đang kích hoạt của bạn cho trò chơi đã chọn (xem ở trang Hồ sơ).';
+  });
+
+  function setProgress(lines) {
+    $('progressLog').innerHTML = lines.map(l => `<li>${l.replace(/</g, '&lt;')}</li>`).join('');
+    $('progressLog').scrollTop = $('progressLog').scrollHeight;
+  }
+
+  function showReport(job) {
+    const r = job.report;
+    $('resultPanel').hidden = false;
+    $('scoreBot').textContent = `${job.bot} · ${r.game_name}`;
+    if (!r.valid) {
+      $('scoreValue').textContent = '0';
+      $('scoreLabel').textContent = 'Bot không hợp lệ';
+      $('resultErrors').textContent = r.error;
+      $('scoreRing').style.setProperty('--p', 0);
+      $('resultRows').innerHTML = '<tr><td colspan="5" class="empty-cell">Không chấm được</td></tr>';
+      return;
+    }
+    $('scoreValue').textContent = r.score.toFixed(1);
+    $('scoreLabel').textContent = r.label;
+    $('scoreRing').style.setProperty('--p', r.score * 10);
+    $('resultRows').innerHTML = r.opponents.map(o =>
+      `<tr><td><strong>${o.name}</strong></td><td class="right num">${o.wins}</td><td class="right num">${o.draws}</td><td class="right num">${o.losses}</td><td class="right num">${o.weight}</td></tr>`
+    ).join('');
+    const errs = r.opponents.flatMap(o => o.errors);
+    $('resultErrors').textContent = errs.length ? 'Lỗi gặp phải: ' + errs.slice(0, 3).join(' | ') : '';
+  }
+
+  async function poll(jobId) {
+    const res = await fetch(`/api/grade/${jobId}`);
+    const job = await res.json();
+    setProgress(job.status === 'queued' ? ['Đang chờ đến lượt chấm (server đang chấm cho người khác)...'] : job.progress);
+    if (job.status === 'done') { showReport(job); $('gradeBtn').disabled = false; return; }
+    if (job.status === 'error') { $('gradeError').textContent = job.error; $('gradeError').style.display = 'block'; $('gradeBtn').disabled = false; return; }
+    setTimeout(() => poll(jobId), 800);
+  }
+
+  $('gradeForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    $('gradeError').style.display = 'none';
+    const form = new FormData();
+    form.append('game_type', $('gameSelect').value);
+    if (source === 'file') {
+      const file = $('gradeFile').files[0];
+      if (!file) { $('gradeError').textContent = 'Hãy chọn một file .py'; $('gradeError').style.display = 'block'; return; }
+      form.append('file', file);
+    }
+    $('gradeBtn').disabled = true;
+    $('resultPanel').hidden = false;
+    $('scoreValue').textContent = '…';
+    $('scoreLabel').textContent = 'Đang chấm...';
+    $('scoreRing').style.setProperty('--p', 0);
+    setProgress(['Đang gửi bot lên server...']);
+    try {
+      const res = await fetch('/api/grade', { method: 'POST', body: form });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail || 'Không thể chấm bot');
+      poll(data.job_id);
+    } catch (err) {
+      $('gradeError').textContent = err.message;
+      $('gradeError').style.display = 'block';
+      $('gradeBtn').disabled = false;
+      $('resultPanel').hidden = true;
+    }
+  });
+})();
+</script>
+{% endif %}
+{% endblock %}

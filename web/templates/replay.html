@@ -1,17 +1,17 @@
 {% extends "base.html" %}
 
-{% block title %}Đấu trường Trực quan 9x9 (Replay Match #{{ match_id }}) - Battlecode 9x9{% endblock %}
+{% block title %}Xem lại trận #{{ match_id }} — CodeDuel{% endblock %}
 
 {% block content %}
 <div class="page-header">
   <div>
-    <div class="page-eyebrow">Match Replay</div>
+    <div class="page-eyebrow">Xem lại trận</div>
     <h1 class="page-title">Trận đấu #{{ match_id }}</h1>
-    <div class="page-subtitle">Xem lại từng nước đi trên bàn cờ 9×9 Rock-Paper-Scissors Chess</div>
+    <div class="page-subtitle">Dùng nút phát hoặc phím mũi tên để xem từng nước đi.</div>
   </div>
 
   <div class="page-actions">
-    <a href="/" class="btn btn-sm">← Bảng xếp hạng</a>
+    <a href="/leaderboard" class="btn btn-sm">← Bảng xếp hạng</a>
     <a href="/profile" class="btn btn-sm">Hồ sơ của tôi</a>
   </div>
 </div>
@@ -29,7 +29,7 @@
     </div>
 
     <div class="log-panel">
-      <h3>Thông tin Trận đấu</h3>
+      <h3>Thông tin trận</h3>
       <div class="info-list">
         <div class="row"><span>Mã trận</span><b>#{{ match_id }}</b></div>
         <div class="row"><span>Lùi / Tiến</span><span><kbd>←</kbd> <kbd>→</kbd></span></div>
@@ -111,7 +111,7 @@
 {% endblock %}
 
 {% block scripts %}
-<script src="/static/js/visualizer.js"></script>
+<script src="/static/js/visualizer.js?v=club-pieces-3"></script>
 <script>
   document.addEventListener('DOMContentLoaded', async () => {
     const matchId = {{ match_id }};

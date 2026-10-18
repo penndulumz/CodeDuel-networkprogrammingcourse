@@ -7,7 +7,7 @@
 
 const FILES = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i'];
 const RANKS = ['1', '2', '3', '4', '5', '6', '7', '8', '9'];
-const TYPE_ICONS = { R: '✊', P: '✋', S: '✌' };
+const TYPE_ICONS = { R: '<img class="rps-symbol" src="/static/img/rps-rock.svg" alt="Búa" draggable="false">', P: '<img class="rps-symbol" src="/static/img/rps-paper.svg?v=hand-2" alt="Bao" draggable="false">', S: '<img class="rps-symbol" src="/static/img/rps-scissors.svg" alt="Kéo" draggable="false">' };
 const TYPE_NAMES = { R: 'Rock', P: 'Paper', S: 'Scissors' };
 
 /** Helper to format internal row/col to coordinate string (e.g. 0, 0 -> a1) */

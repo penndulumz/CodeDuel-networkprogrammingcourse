@@ -1,0 +1,94 @@
+{% extends "base.html" %}
+{% block title %}CodeDuel — Câu lạc bộ bot{% endblock %}
+{% block body_class %}home-page{% endblock %}
+{% block content %}
+<div class="home-topline"><span>CODEDUEL / PHÒNG CHƠI</span><span><i class="dot {{ 'on' if is_portal_open else 'off' }}"></i> Thi đấu {{ 'đang mở' if is_portal_open else 'đang đóng' }}</span></div>
+<section class="home-desk" aria-labelledby="home-title">
+  <div class="desk-intro">
+    <p class="desk-label">Hôm nay chơi gì?</p>
+    <h1 id="home-title">Oẳn tù tì.<br>Nhưng trên bàn cờ.</h1>
+    <p class="desk-description">Vẫn là búa, bao, kéo quen thuộc. Lần này, bạn điều khiển cả đội quân trên bàn 9×9 — hoặc viết một bot Python để chơi thay mình.</p>
+    <div class="page-actions"><a class="btn btn-amber btn-lg" href="/play/rps9x9">Vào chơi thử <span aria-hidden="true">↗</span></a><a class="desk-text-link" href="/games/rps9x9">Đọc luật chơi</a></div>
+    <p class="desk-caption">Chơi với máy · Không cần tài khoản</p>
+    <div class="desk-beginner"><span class="desk-pencil" aria-hidden="true">✎</span><div><strong>Muốn tự viết bot?</strong><p>Tải <a href="/download/starter-kit.zip">bộ công cụ</a>, mở <code>bot_template.py</code> và thử sửa hàm <code>get_move()</code>.</p><a href="/guide">Làm theo hướng dẫn người mới →</a></div></div>
+  </div>
+  <div class="desk-game" aria-label="Minh họa bàn cờ Oẳn Tù Tì 9×9">
+    <div class="desk-game-title"><span>OẲN TÙ TÌ / 9 × 9</span><a href="/games">Danh sách trò chơi ↗</a></div>
+    <div class="desk-board" aria-hidden="true">
+      {% for r in range(9) %}{% for c in range(9) %}
+      <span class="desk-cell {{ 'shade' if (r+c)%2 else '' }}">
+        {% if r == 0 or r == 8 %}
+          {% set type = (['scissors','paper','rock'] if r == 0 else ['rock','paper','scissors'])[c//3] %}
+          <span class="desk-token {{ 'blue' if r == 0 else 'coral' }}"><img src="/static/img/rps-{{ type }}.svg?v=hand-2" alt=""></span>
+        {% endif %}
+      </span>
+      {% endfor %}{% endfor %}
+    </div>
+    <div class="desk-game-note"><span>Ăn quân theo luật búa · bao · kéo.</span><span>Đưa một quân đến góc đích để thắng.</span></div>
+    <div class="desk-bit" aria-hidden="true">    <svg class="club-mascot" viewBox="0 0 320 290" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M62 144L27 116M258 144L290 111" stroke="#29352d" stroke-width="15" stroke-linecap="round"/>
+      <path d="M124 232L112 269M198 232L210 269" stroke="#29352d" stroke-width="20" stroke-linecap="round"/>
+      <rect x="103" y="164" width="116" height="79" rx="25" fill="#8dcbb0" stroke="#29352d" stroke-width="5"/>
+      <path d="M158 49V25" stroke="#29352d" stroke-width="5"/><circle cx="158" cy="20" r="11" fill="#ed805d" stroke="#29352d" stroke-width="5"/>
+      <rect x="59" y="49" width="202" height="137" rx="42" fill="#ffcf56" stroke="#29352d" stroke-width="5"/>
+      <rect x="81" y="72" width="158" height="83" rx="27" fill="#fffdf3" stroke="#29352d" stroke-width="4"/>
+      <path d="M109 110Q120 91 131 110M187 110Q198 91 209 110M144 123Q160 141 177 123" stroke="#29352d" stroke-width="6" stroke-linecap="round"/>
+      <ellipse cx="107" cy="125" rx="12" ry="6" fill="#f6a38a"/><ellipse cx="213" cy="125" rx="12" ry="6" fill="#f6a38a"/>
+      <path d="M142 201L130 211L142 221M178 201L190 211L178 221M164 198L155 224" stroke="#29352d" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+      <path d="M17 62L22 48L27 62L42 67L27 72L22 87L17 72L2 67Z" fill="#ed805d"/>
+      <path d="M283 187L288 172L293 187L308 192L293 197L288 212L283 197L268 192Z" fill="#6c94c5"/>
+    </svg>
+<span>Bit ngồi đây chờ bạn.</span></div>
+  </div>
+</section>
+<section class="home-bottom" aria-label="Hoạt động câu lạc bộ">
+  <div class="home-ranking">
+    <div class="home-section-heading"><h2>Bảng xếp hạng</h2><a href="/leaderboard">Xem đầy đủ ↗</a></div>
+    {% if top_players %}
+    <div class="table-wrap" style="box-shadow: none;">
+      <table class="table-dark">
+        <thead><tr><th>#</th><th>Người chơi</th><th class="right">Elo</th><th class="right">T/H/B</th></tr></thead>
+        <tbody>
+          {% for p in top_players %}
+          <tr>
+            <td class="num">{{ loop.index }}</td>
+            <td><strong>{{ p.username }}</strong></td>
+            <td class="right"><span class="elo-badge">{{ p.elo }}</span></td>
+            <td class="right num">{{ p.wins }}/{{ p.draws }}/{{ p.losses }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <p>Chưa có người chơi nào. Hãy là người đầu tiên đăng ký và nộp bot!</p>
+    {% endif %}
+
+  </div>
+  <aside class="home-notice">
+    <span class="notice-pin" aria-hidden="true"></span>
+    <h2>Ghi chú trước khi vào thi</h2>
+    <p>Đã có bot? <a href="{{ '/profile' if current_user else '/login' }}">Nộp bot tại hồ sơ</a>, rồi chọn đối thủ trên bảng xếp hạng.</p>
+    <p>Chưa chắc bot chạy đúng? <a href="/grade">Tự chấm thử</a> trước. Bạn cũng có thể chấm ngay trên máy khi không có Internet.</p>
+    <a href="/guide/organizer">Hướng dẫn tổ chức buổi chơi →</a>
+  </aside>
+</section>
+<div class="home-connection"><span>{{ stats.players }} người chơi · {{ stats.matches }} trận đã đấu</span><span class="copy-field"><span id="shareUrl">{{ public_url }}</span><button type="button" onclick="copyShare(this)">Sao chép địa chỉ</button></span></div>
+{% endblock %}
+{% block scripts %}
+<script>
+  function copyShare(btn) {
+    const text = document.getElementById('shareUrl').textContent.trim();
+    const done = () => { btn.textContent = 'Đã chép'; setTimeout(() => (btn.textContent = 'Sao chép'), 1500); };
+    if (navigator.clipboard && window.isSecureContext) {
+      navigator.clipboard.writeText(text).then(done);
+    } else {
+      // Clipboard API needs HTTPS; fall back to selecting the text on plain-HTTP LAN.
+      const range = document.createRange();
+      range.selectNodeContents(document.getElementById('shareUrl'));
+      const sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(range);
+      try { document.execCommand('copy'); done(); } catch (e) { /* user can copy manually */ }
+    }
+  }
+</script>
+{% endblock %}
