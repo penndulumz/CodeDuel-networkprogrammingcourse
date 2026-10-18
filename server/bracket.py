@@ -11,7 +11,10 @@ This module drives the single-elimination bracket after seeding:
 from __future__ import annotations
 
 import logging
+import json
 import random
+import threading
+from concurrent.futures import ThreadPoolExecutor
 from typing import Any, Callable
 
 from sqlalchemy.orm import Session
@@ -34,6 +37,7 @@ ROUND_ORDER: list[str] = [
 ]
 
 _ROUND_SIZES: dict[str, int] = {name: size for size, name in ROUND_NAMES.items()}
+_ROUND_ADVANCE_LOCK = threading.Lock()
 
 
 def get_round_size(round_name: str) -> int:
@@ -255,6 +259,7 @@ def play_bracket_series(
                     p1_elo_before=first.elo,
                     p2_elo_before=second.elo,
                     is_bracket=True,
+                    bracket_match_id=bm.id,
                     rule_variant=rule_variant,
                 )
                 db.add(game)
@@ -269,12 +274,24 @@ def play_bracket_series(
                 )
 
                 winner_code = result.get("winner") if result else None
+                game_winner = None
                 if winner_code in (1, 2):
                     game_winner = first if winner_code == 1 else second
                     if game_winner.id == player1.id:
                         bm.score_p1 += 1
                     else:
                         bm.score_p2 += 1
+                if result is not None:
+                    game_results = json.loads(bm.game_results or "[]")
+                    game_results.append(
+                        {
+                            "game_number": game_no + 1,
+                            "match_id": game.id,
+                            "winner_id": game_winner.id if game_winner else None,
+                            "winner_username": game_winner.username if game_winner else None,
+                        }
+                    )
+                    bm.game_results = json.dumps(game_results, ensure_ascii=False)
                 db.commit()
 
                 if bm.score_p1 >= wins_needed or bm.score_p2 >= wins_needed:
@@ -295,9 +312,10 @@ def play_bracket_series(
             bm.winner_id = _break_tie(player1, player2)
 
         bm.status = STATUS_COMPLETED
-        db.flush()
-        _draw_next_round(db, bm.round_name)
-        db.commit()
+        with _ROUND_ADVANCE_LOCK:
+            db.flush()
+            _draw_next_round(db, bm.round_name)
+            db.commit()
         return bm.winner_id
 
     except Exception as exc:
@@ -318,10 +336,17 @@ def play_bracket_series(
 def play_bracket_matches(
     bracket_match_ids: list[int],
     db_factory: Callable[[], Any] | None = None,
+    max_workers: int = 1,
 ) -> None:
-    """Play a batch of bracket pairings sequentially (background job entry point)."""
-    for bracket_match_id in bracket_match_ids:
-        play_bracket_series(bracket_match_id, db_factory=db_factory)
+    """Play independent bracket pairings concurrently up to the configured board count."""
+    worker_count = max(1, min(int(max_workers), len(bracket_match_ids) or 1))
+    with ThreadPoolExecutor(max_workers=worker_count) as executor:
+        futures = [
+            executor.submit(play_bracket_series, match_id, db_factory)
+            for match_id in bracket_match_ids
+        ]
+        for future in futures:
+            future.result()
 
 
 def compute_bracket_standings(matches: list[BracketMatch]) -> dict[int, int]:

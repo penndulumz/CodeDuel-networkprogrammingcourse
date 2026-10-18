@@ -174,5 +174,14 @@
   - Spec: [`docs/specs/2026-10-10-inverted-combat-rule-variant-design.md`](docs/specs/2026-10-10-inverted-combat-rule-variant-design.md)
   - Plan: [`docs/plans/2026-10-10-inverted-combat-rule-variant.md`](docs/plans/2026-10-10-inverted-combat-rule-variant.md)
 
+## Milestone 12: Multi-board Live Tournament Projections
+- [x] Add bracket-time `concurrent_boards` configuration and bounded parallel execution for pairings in a round.
+- [x] Persist live move progress and every BO3 game winner; link games to their bracket pairing.
+- [x] Add public multi-board scoreboard at `/bracket` and live replay updates on individual match pages.
+- [x] Pace bracket moves for visibility; add next-round and optional auto-advance controls to the public bracket projection.
+- [x] Add an Admin end-tournament action that closes FFA and clears old match/bracket/replay data while preserving users and ratings.
+- [ ] Add and run unit/integration coverage for concurrency bounds, SQLite migration, live progress, and game/series winner reporting.
+- [ ] Review the implementation and update verification results after tests are run.
+
 
 

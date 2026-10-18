@@ -10,6 +10,7 @@ from pydantic import BaseModel
 from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
+from engine.game import create_initial_board
 from server.database import get_db
 from server.models import Bot, Match, TournamentSetting, User
 from server.queue import execute_match_job
@@ -190,10 +191,27 @@ def get_match_replay(
         )
 
     if not match.replay_path:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Replay is not yet available or match is still running.",
-        )
+        if not match.is_bracket:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Replay is not yet available or match is still running.",
+            )
+        try:
+            moves = json.loads(match.live_moves or "[]")
+        except (TypeError, json.JSONDecodeError):
+            moves = []
+        return {
+            "match_id": match.id,
+            "player1": {"id": match.player1.id, "username": match.player1.username},
+            "player2": {"id": match.player2.id, "username": match.player2.username},
+            "winner": None,
+            "win_reason": match.win_reason,
+            "rule_variant": match.rule_variant,
+            "total_turns": len(moves),
+            "moves": moves,
+            "initial_board": create_initial_board(),
+            "live": match.win_reason is None,
+        }
 
     replay_path = Path(match.replay_path)
     if not replay_path.is_file():

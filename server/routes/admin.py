@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Any, Dict, List, Optional, Union
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
 from pydantic import BaseModel, Field
@@ -18,7 +19,7 @@ from server.bracket import (
     play_bracket_matches,
 )
 from server.database import get_db
-from server.models import Bot, BracketMatch, TournamentSetting, User
+from server.models import Bot, BracketMatch, Match, TournamentSetting, User
 from server.routes.auth import get_current_admin
 from server.tournament import generate_bracket, is_ffa_portal_open
 from server.tournament_config import load_tournament_config
@@ -30,6 +31,11 @@ class BossDeployRequest(BaseModel):
     """Pydantic payload for deploying or retracting a benchmark boss bot."""
     boss_slug: str
     action: str = "deploy"
+
+
+class BracketGenerationRequest(BaseModel):
+    """Options selected when the organizer creates a bracket tournament."""
+    concurrent_boards: int = Field(1, ge=1, le=8)
 
 
 class UpdateSettingsRequest(BaseModel):
@@ -73,6 +79,11 @@ def _get_all_settings_dict(db: Session) -> Dict[str, Any]:
     settings_map: Dict[str, str] = {
         s.key: s.value for s in db.query(TournamentSetting).all()
     }
+    try:
+        concurrent_boards = int(settings_map.get("concurrent_boards", "1"))
+    except (TypeError, ValueError):
+        concurrent_boards = 1
+    concurrent_boards = max(1, min(8, concurrent_boards))
 
     start_time = settings_map.get("start_time", daily_cfg.get("start_time", "19:00"))
     end_time = settings_map.get("end_time", daily_cfg.get("end_time", "21:00"))
@@ -130,6 +141,7 @@ def _get_all_settings_dict(db: Session) -> Dict[str, Any]:
         "max_turns": max_turns,
         "turn_timeout_seconds": timeout_seconds,
         "top_players_count": int(bracket_cfg.get("top_players_count", 8)),
+        "concurrent_boards": concurrent_boards,
         "bosses": get_all_bosses_status(db),
     }
 
@@ -195,6 +207,7 @@ def update_settings(
 
 @router.post("/bracket/generate")
 def trigger_bracket_generation(
+    payload: BracketGenerationRequest = BracketGenerationRequest(),
     current_admin: User = Depends(get_current_admin),
     db: Session = Depends(get_db),
 ) -> List[Dict[str, Any]]:
@@ -249,6 +262,8 @@ def trigger_bracket_generation(
 
     # Replace the previous bracket with a fresh tree (first round + empty later rounds)
     create_bracket(db, matchups)
+    _upsert_setting(db, "concurrent_boards", str(payload.concurrent_boards))
+    db.commit()
 
     return matchups
 
@@ -290,12 +305,74 @@ def play_next_bracket_round(
         bm.status = STATUS_RUNNING
     db.commit()
 
-    background_tasks.add_task(play_bracket_matches, match_ids)
+    setting = db.query(TournamentSetting).filter(
+        TournamentSetting.key == "concurrent_boards"
+    ).first()
+    try:
+        concurrent_boards = max(1, min(8, int(setting.value))) if setting else 1
+    except (TypeError, ValueError):
+        concurrent_boards = 1
+    background_tasks.add_task(play_bracket_matches, match_ids, None, concurrent_boards)
 
     return {
         "status": "queued",
         "round_name": round_name,
         "bracket_match_ids": match_ids,
+        "concurrent_boards": concurrent_boards,
+    }
+
+
+@router.post("/tournament/end")
+def end_tournament(
+    current_admin: User = Depends(get_current_admin),
+    db: Session = Depends(get_db),
+) -> Dict[str, Any]:
+    """Close match submissions and remove stored match and bracket history."""
+    if db.query(BracketMatch).filter(BracketMatch.status == STATUS_RUNNING).first():
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Wait for the running bracket round to finish before ending the tournament.",
+        )
+    if db.query(Match).filter(
+        Match.replay_path.is_(None), Match.win_reason.is_(None)
+    ).first():
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Wait for queued or running matches to finish before ending the tournament.",
+        )
+
+    replays_dir = Path(__file__).resolve().parents[2] / "replays"
+    replay_files = list(replays_dir.glob("match_*.json")) if replays_dir.is_dir() else []
+    match_count = db.query(Match).count()
+    bracket_count = db.query(BracketMatch).count()
+
+    db.query(Match).delete(synchronize_session=False)
+    db.query(BracketMatch).delete(synchronize_session=False)
+    _upsert_setting(db, "portal_mode", "false")
+    _upsert_setting(db, "is_portal_open", "false")
+    db.commit()
+
+    deleted_replays = 0
+    resolved_replays_dir = replays_dir.resolve()
+    for replay_file in replay_files:
+        try:
+            resolved_file = replay_file.resolve()
+            if (
+                not replay_file.is_symlink()
+                and resolved_file.parent == resolved_replays_dir
+                and replay_file.name.startswith("match_")
+            ):
+                resolved_file.unlink()
+                deleted_replays += 1
+        except OSError:
+            continue
+
+    return {
+        "status": "ended",
+        "deleted_matches": match_count,
+        "deleted_bracket_pairings": bracket_count,
+        "deleted_replays": deleted_replays,
+        "portal_mode": "false",
     }
 
 

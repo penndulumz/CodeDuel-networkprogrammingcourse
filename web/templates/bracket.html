@@ -20,6 +20,25 @@
     <h2 class="card-title">Cây Nhánh đấu (Bracket Matches)</h2>
   </div>
 
+  <section class="live-projections" aria-live="polite">
+    <div class="projection-heading">
+      <h3 class="card-title">Màn chiếu trực tiếp</h3>
+      <button id="projectionFullscreen" class="btn btn-sm" type="button">Toàn màn hình</button>
+    </div>
+    <p class="projection-note">Các bàn đang chạy cập nhật tự động. Chọn một bàn để mở replay riêng.</p>
+    {% if current_user and current_user.is_admin %}
+    <div class="projection-controls">
+      <button id="startNextBracketRound" class="btn btn-primary btn-sm" type="button">Chạy vòng tiếp theo</button>
+      <label class="projection-auto-control">
+        <input id="autoAdvanceRounds" type="checkbox">
+        Tự chạy vòng kế tiếp khi vòng hiện tại hoàn tất
+      </label>
+      <span id="projectionControlMessage" class="projection-note" role="status"></span>
+    </div>
+    {% endif %}
+    <div id="liveProjections" class="projection-grid"><p class="projection-note">Đang tải trạng thái giải đấu...</p></div>
+  </section>
+
   <div class="bracket-tree">
     {% for r_name in bracket_rounds %}
       <div class="bracket-round">
@@ -140,4 +159,8 @@
     </table>
   </div>
 </div>
+{% endblock %}
+
+{% block scripts %}
+<script src="/static/js/bracket_live.js"></script>
 {% endblock %}

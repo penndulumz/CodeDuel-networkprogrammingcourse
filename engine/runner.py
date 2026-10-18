@@ -17,16 +17,19 @@ import copy
 from datetime import datetime, timezone
 import importlib.util
 import json
+import logging
 import os
 from pathlib import Path
 import queue
 import subprocess
 import sys
 import threading
-from typing import Any
+from typing import Any, Callable
 import uuid
 
 from engine.game import GameState, create_initial_board
+
+logger = logging.getLogger(__name__)
 
 
 def _normalize_move(raw_move: Any) -> tuple[tuple[int, int], tuple[int, int]] | None:
@@ -381,6 +384,7 @@ def run_match(
     player1_info: dict[str, Any] | None = None,
     player2_info: dict[str, Any] | None = None,
     variant: str = "standard",
+    progress_callback: Callable[[list[dict[str, Any]]], None] | None = None,
 ) -> dict[str, Any]:
     """Execute a complete 9x9 Rock-Paper-Scissors Chess match between two bot scripts.
 
@@ -535,6 +539,26 @@ def run_match(
 
             # Apply move to board state
             game.apply_move(norm_move[0], norm_move[1])
+
+            if progress_callback is not None:
+                try:
+                    progress_callback(
+                        [
+                            {
+                                "turn": move["turn"],
+                                "player": move["player"],
+                                "from": list(move["from"]),
+                                "to": list(move["to"]),
+                                "piece": move["piece"],
+                                "captured": move["captured"],
+                                "san": move["san"],
+                            }
+                            for move in game.history
+                        ]
+                    )
+                except Exception:
+                    # A temporary scoreboard persistence issue must not forfeit a game.
+                    logger.exception("Failed to persist live match progress")
 
             if game.is_game_over:
                 winner = game.winner

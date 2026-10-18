@@ -103,6 +103,12 @@
       Nhánh đấu loại trực tiếp (Single-elimination) sẽ tự động lấy danh sách Top {{ settings.top_players_count }} người chơi có điểm Elo cao nhất và đã nộp bot hoạt động để ghép cặp (Seed 1 vs 8, 2 vs 7, v.v.).
     </p>
 
+    <div class="form-group" style="max-width: 280px;">
+      <label class="form-label" for="concurrentBoards"><b>Số bàn chiếu chạy đồng thời</b></label>
+      <input id="concurrentBoards" type="number" min="1" max="8" value="{{ settings.concurrent_boards }}" class="form-control">
+      <small style="color: var(--muted);">Mỗi bàn là một cặp đấu; tối đa 8 bàn.</small>
+    </div>
+
     <div style="margin: 24px 0;">
       <button class="btn btn-danger" onclick="triggerBracketGeneration()" style="width: 100%; padding: 12px;">
         ⚡ Tạo / Khởi tạo lại Nhánh đấu Bracket
@@ -110,6 +116,12 @@
       <button class="btn btn-primary" onclick="playNextBracketRound()" style="width: 100%; padding: 12px; margin-top: 12px;">
         ▶ Chạy vòng đấu tiếp theo
       </button>
+      <button class="btn btn-danger" onclick="endTournament()" style="width: 100%; padding: 12px; margin-top: 12px;">
+        Kết thúc giải đấu và xóa trận cũ
+      </button>
+      <small style="display: block; margin-top: 8px; color: var(--muted);">
+        Đóng cổng FFA và xóa lịch sử trận, cây bracket cùng replay. Tài khoản, Elo và thống kê người chơi được giữ lại.
+      </small>
     </div>
 
     <div id="bracketMsg" style="font-size: 13px; display: none;"></div>
@@ -275,7 +287,9 @@
 
     try {
       const res = await fetch('/api/admin/bracket/generate', {
-        method: 'POST'
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ concurrent_boards: Number(document.getElementById('concurrentBoards').value) })
       });
 
       const data = await res.json();
@@ -286,7 +300,7 @@
       }
 
       msgEl.style.color = '#34d399';
-      msgEl.textContent = `Đã tạo nhánh đấu thành công với ${data.length} cặp đấu! Đang tải lại...`;
+      msgEl.textContent = `Đã tạo ${data.length} cặp đấu, chạy đồng thời tối đa ${document.getElementById('concurrentBoards').value} bàn. Đang tải lại...`;
       setTimeout(() => window.location.reload(), 1000);
     } catch (err) {
       msgEl.style.color = '#f87171';
@@ -313,11 +327,33 @@
       }
 
       msgEl.style.color = '#34d399';
-      msgEl.textContent = `Đang chạy ${data.bracket_match_ids.length} cặp đấu vòng ${data.round_name}. Tải lại trang để xem kết quả.`;
-      setTimeout(() => window.location.reload(), 1500);
+      msgEl.textContent = `Đang chạy ${data.bracket_match_ids.length} cặp vòng ${data.round_name} trên ${data.concurrent_boards} bàn chiếu. Theo dõi trực tiếp tại trang Bracket.`;
     } catch (err) {
       msgEl.style.color = '#f87171';
       msgEl.textContent = `Lỗi mạng: ${err.message}`;
+    }
+  }
+
+  async function endTournament() {
+    const confirmed = confirm(
+      'Kết thúc giải đấu? Thao tác này đóng cổng FFA và xóa toàn bộ trận FFA/bracket, cây bracket và các file replay. Tài khoản, Elo và thống kê người chơi sẽ được giữ lại.'
+    );
+    if (!confirmed) return;
+
+    const msgEl = document.getElementById('bracketMsg');
+    msgEl.style.display = 'block';
+    msgEl.style.color = 'var(--muted)';
+    msgEl.textContent = 'Đang kết thúc giải đấu...';
+    try {
+      const response = await fetch('/api/admin/tournament/end', { method: 'POST' });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.detail || 'Không thể kết thúc giải đấu');
+      msgEl.style.color = '#34d399';
+      msgEl.textContent = `Đã xóa ${data.deleted_matches} trận, ${data.deleted_bracket_pairings} cặp bracket và ${data.deleted_replays} replay. Cổng FFA đã đóng.`;
+      setTimeout(() => window.location.reload(), 1500);
+    } catch (error) {
+      msgEl.style.color = '#f87171';
+      msgEl.textContent = error.message;
     }
   }
 

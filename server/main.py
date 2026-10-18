@@ -7,6 +7,7 @@ tournament administration, and serves static files and Jinja2 web UI templates.
 
 from __future__ import annotations
 
+import json
 import os
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -26,6 +27,7 @@ from server.routes import admin, auth, bots, leaderboard, matches
 from server.routes.admin import _get_all_settings_dict
 from server.routes.auth import ACTIVE_SESSIONS, get_token_from_request
 from server.routes.matches import _is_portal_open_now
+from engine.game import create_initial_board
 
 
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -307,6 +309,68 @@ def bracket_page(
 def health_check() -> dict[str, str]:
     """Health check endpoint to verify server responsiveness."""
     return {"status": "ok"}
+
+
+@app.get("/api/bracket/live", tags=["tournament"])
+def get_live_bracket(db: Session = Depends(get_db)) -> Dict[str, Any]:
+    """Return bracket pairings and their current boards for public scoreboards."""
+    pairings = db.query(BracketMatch).order_by(BracketMatch.id.asc()).all()
+    payload: list[dict[str, Any]] = []
+    for pairing in pairings:
+        game = (
+            db.query(Match)
+            .filter(Match.bracket_match_id == pairing.id)
+            .order_by(Match.id.desc())
+            .first()
+        )
+        moves: list[dict[str, Any]] = []
+        if game is not None:
+            try:
+                moves = json.loads(game.live_moves or "[]")
+            except (TypeError, json.JSONDecodeError):
+                moves = []
+
+        try:
+            game_results = json.loads(pairing.game_results or "[]")
+        except (TypeError, json.JSONDecodeError):
+            game_results = []
+
+        game_winner = None
+        if game is not None and game.winner_id is not None:
+            game_winner = (
+                game.player1.username
+                if game.winner_id == game.player1_id
+                else game.player2.username
+            )
+        payload.append(
+            {
+                "id": pairing.id,
+                "round_name": pairing.round_name,
+                "match_index": pairing.match_index + 1,
+                "player1": pairing.player1.username if pairing.player1 else "TBD",
+                "player2": pairing.player2.username if pairing.player2 else "TBD",
+                "score_p1": pairing.score_p1,
+                "score_p2": pairing.score_p2,
+                "status": pairing.status,
+                "winner": pairing.winner.username if pairing.winner else None,
+                "game_results": game_results,
+                "current_game": {
+                    "match_id": game.id,
+                    "player1": game.player1.username,
+                    "player2": game.player2.username,
+                    "moves": moves,
+                    "winner": game_winner,
+                    "live": pairing.status == "running" and game.replay_path is None and game.win_reason is None,
+                    "win_reason": game.win_reason,
+                    "turns": len(moves),
+                }
+                if game is not None
+                else None,
+                "initial_board": create_initial_board() if game is not None else None,
+            }
+        )
+
+    return {"pairings": payload}
 
 
 if __name__ == "__main__":

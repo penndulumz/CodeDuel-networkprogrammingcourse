@@ -7,8 +7,10 @@ and match statistics, and committing outcomes to the database.
 
 from __future__ import annotations
 
+import json
 import logging
 from pathlib import Path
+import time
 from typing import Any, Callable
 
 from engine.runner import run_match, save_replay
@@ -18,6 +20,7 @@ from server.tournament import apply_elo_change, calculate_elo_delta
 from server.tournament_config import load_tournament_config
 
 logger = logging.getLogger(__name__)
+BRACKET_MOVE_DISPLAY_DELAY_SECONDS = 0.45
 
 
 def _get_setting_value(db, key: str, default: Any, caster: Callable[[str], Any]) -> Any:
@@ -107,6 +110,21 @@ def execute_match_job(
             "match_id": match_id,
         }
 
+        # Persist each accepted move so bracket projections can follow an active game.
+        def save_live_progress(moves: list[dict[str, Any]]) -> None:
+            progress_db = session_factory()
+            try:
+                live_match = progress_db.query(Match).filter(Match.id == match_id).first()
+                if live_match is not None:
+                    live_match.live_moves = json.dumps(moves, ensure_ascii=False)
+                    live_match.total_turns = len(moves)
+                    progress_db.commit()
+            except Exception:
+                logger.exception("Failed to persist live progress for bracket match %d", match_id)
+            finally:
+                progress_db.close()
+            time.sleep(BRACKET_MOVE_DISPLAY_DELAY_SECONDS)
+
         # Run match in isolated worker processes
         match_result = run_match(
             bot1_path=bot1_path,
@@ -116,6 +134,7 @@ def execute_match_job(
             player1_info=p1_meta,
             player2_info=p2_meta,
             variant=rule_variant,
+            progress_callback=save_live_progress if match.is_bracket else None,
         )
 
         # Save replay JSON
@@ -132,6 +151,7 @@ def execute_match_job(
         match.replay_path = replay_filepath
         match.win_reason = win_reason
         match.total_turns = total_turns
+        match.live_moves = json.dumps(match_result.get("moves", []), ensure_ascii=False)
         match.rule_variant = rule_variant
 
         if winner_code == 1:

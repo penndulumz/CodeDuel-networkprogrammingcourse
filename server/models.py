@@ -6,7 +6,7 @@ import hmac
 import secrets
 from typing import List, Optional
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String
+from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from server.database import Base
@@ -115,6 +115,10 @@ class Match(Base):
     p2_elo_after: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     replay_path: Mapped[Optional[str]] = mapped_column(String(512), nullable=True)
     is_bracket: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    bracket_match_id: Mapped[Optional[int]] = mapped_column(
+        Integer, ForeignKey("bracket_matches.id"), nullable=True, index=True
+    )
+    live_moves: Mapped[str] = mapped_column(Text, default="[]", nullable=False)
     rule_variant: Mapped[str] = mapped_column(String(32), default="standard", nullable=False)
     created_at: Mapped[datetime] = mapped_column(
         DateTime,
@@ -158,6 +162,7 @@ class BracketMatch(Base):
     winner_id: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("users.id"), nullable=True)
     score_p1: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     score_p2: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    game_results: Mapped[str] = mapped_column(Text, default="[]", nullable=False)
     status: Mapped[str] = mapped_column(String(32), default="pending", nullable=False)
     created_at: Mapped[datetime] = mapped_column(
         DateTime,

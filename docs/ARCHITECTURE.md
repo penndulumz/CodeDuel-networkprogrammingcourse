@@ -128,6 +128,7 @@ erDiagram
     User ||--o{ Bot : owns
     User ||--o{ Match : "plays as P1/P2"
     User ||--o{ BracketMatch : "participates in"
+    BracketMatch ||--o{ Match : "contains bracket games"
     
     User {
         int id PK
@@ -163,6 +164,8 @@ erDiagram
         int p2_elo_after
         string replay_path
         boolean is_bracket
+        int bracket_match_id FK
+        text live_moves
         datetime created_at
     }
 
@@ -182,10 +185,15 @@ erDiagram
         int winner_id
         int score_p1
         int score_p2
+        text game_results
         string status
         datetime created_at
     }
 ```
+
+### Live Tournament Projections
+
+At bracket generation, the organizer selects `concurrent_boards` (1–8). The round runner uses a bounded thread pool to execute that many pairings at once. Each accepted move is persisted in `Match.live_moves`; `Match.bracket_match_id` links the game to its bracket pairing. `GET /api/bracket/live` feeds the public multi-board scoreboard, while the replay endpoint returns partial move history until the replay file is complete. `BracketMatch.game_results` preserves the winner of every BO3 game and the series winner remains `BracketMatch.winner_id`.
 
 ### Dynamic Schedule Persistence (`TournamentSetting`)
 Rather than relying on static configuration file edits, the system stores operational scheduling keys in `TournamentSetting`:

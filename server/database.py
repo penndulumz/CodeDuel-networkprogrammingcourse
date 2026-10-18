@@ -2,7 +2,7 @@
 
 import os
 from typing import Generator
-from sqlalchemy import create_engine, event
+from sqlalchemy import create_engine, event, inspect, text
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import declarative_base, sessionmaker, Session
 
@@ -51,7 +51,42 @@ def get_db() -> Generator[Session, None, None]:
 
 
 def init_db(target_engine=None) -> None:
-    """Create all database tables registered on Base metadata."""
+    """Create registered tables and add live tournament columns to older SQLite files."""
     from server import models  # noqa: F401
     eng = target_engine or engine
     Base.metadata.create_all(bind=eng)
+
+    # SQLite create_all does not add newly declared columns to an existing database.
+    if eng.dialect.name == "sqlite":
+        with eng.begin() as connection:
+            tables = inspect(connection).get_table_names()
+            if "matches" in tables:
+                match_columns = {
+                    column["name"] for column in inspect(connection).get_columns("matches")
+                }
+                if "bracket_match_id" not in match_columns:
+                    connection.execute(
+                        text("ALTER TABLE matches ADD COLUMN bracket_match_id INTEGER")
+                    )
+                if "live_moves" not in match_columns:
+                    connection.execute(
+                        text("ALTER TABLE matches ADD COLUMN live_moves TEXT NOT NULL DEFAULT '[]'")
+                    )
+                connection.execute(
+                    text(
+                        "CREATE INDEX IF NOT EXISTS ix_matches_bracket_match_id "
+                        "ON matches (bracket_match_id)"
+                    )
+                )
+            if "bracket_matches" in tables:
+                bracket_columns = {
+                    column["name"]
+                    for column in inspect(connection).get_columns("bracket_matches")
+                }
+                if "game_results" not in bracket_columns:
+                    connection.execute(
+                        text(
+                            "ALTER TABLE bracket_matches ADD COLUMN "
+                            "game_results TEXT NOT NULL DEFAULT '[]'"
+                        )
+                    )

@@ -38,6 +38,8 @@ class ReplayVisualizer {
     this.isPlaying = false;
     this.speed = 1; // 1x, 2x, 4x
     this.timer = null;
+    this.livePollTimer = null;
+    this.livePlaybackTimer = null;
 
     this.historyStates = []; // Array of board snapshots at each turn index [0..totalTurns]
     this.moves = [];
@@ -191,6 +193,22 @@ class ReplayVisualizer {
       }
       const data = await res.json();
       this.loadReplay(data);
+      if (data.live && !this.livePollTimer) {
+        this.livePollTimer = window.setInterval(() => this.fetchReplay(this.matchId), 1000);
+      } else if (!data.live && this.livePollTimer) {
+        window.clearInterval(this.livePollTimer);
+        this.livePollTimer = null;
+      }
+      if (!this.livePlaybackTimer && (data.live || this.currentTurn < this.totalTurns)) {
+        this.livePlaybackTimer = window.setInterval(() => {
+          if (this.currentTurn < this.totalTurns) {
+            this.goToTurn(this.currentTurn + 1);
+          } else if (!this.replayData.live) {
+            window.clearInterval(this.livePlaybackTimer);
+            this.livePlaybackTimer = null;
+          }
+        }, 300);
+      }
     } catch (err) {
       console.error('Error fetching replay:', err);
       if (this.dom.turnBanner) {
@@ -201,6 +219,7 @@ class ReplayVisualizer {
 
   /** Precompute board snapshots across all turns for fast scrubbing */
   loadReplay(data) {
+    const isFirstLoad = !this.replayData;
     this.replayData = data;
     this.moves = data.moves || [];
     this.totalTurns = this.moves.length;
@@ -222,9 +241,13 @@ class ReplayVisualizer {
       currentBoard = nextBoard;
     }
 
+    const savedTurn = Number(localStorage.getItem(`bracketReplayProgress:${this.matchId}`)) || 0;
+    const targetTurn = isFirstLoad ? savedTurn : this.currentTurn;
+    const visibleTurn = Math.min(targetTurn, this.totalTurns);
+
     if (this.dom.slider) {
       this.dom.slider.max = this.totalTurns;
-      this.dom.slider.value = 0;
+      this.dom.slider.value = visibleTurn;
     }
 
     // Display rule variant indicator if match was played under inverted RPS rules
@@ -239,7 +262,7 @@ class ReplayVisualizer {
     }
 
     this.populateMoveLog();
-    this.goToTurn(0);
+    this.goToTurn(visibleTurn);
   }
 
   /** Generate standard default starting board if initial_board is missing */
@@ -338,6 +361,9 @@ class ReplayVisualizer {
   goToTurn(turn) {
     turn = Math.max(0, Math.min(this.totalTurns, turn));
     this.currentTurn = turn;
+    if (this.matchId) {
+      localStorage.setItem(`bracketReplayProgress:${this.matchId}`, String(turn));
+    }
 
     if (this.dom.slider) {
       this.dom.slider.value = turn;
@@ -449,7 +475,7 @@ class ReplayVisualizer {
     if (!this.dom.turnBanner) return;
 
     this.dom.turnBanner.classList.remove('p1', 'p2');
-    const isFinished = turn === this.totalTurns && this.replayData;
+    const isFinished = turn === this.totalTurns && this.replayData && !this.replayData.live;
     const variantSuffix = (this.replayData && this.replayData.rule_variant === 'inverted_rps') ? ' [Đảo chiều RPS]' : '';
 
     if (isFinished) {
@@ -480,7 +506,9 @@ class ReplayVisualizer {
       }
 
       const nextPlayer = (turn % 2 === 0) ? 1 : 2;
-      this.dom.turnBanner.textContent = `Turn ${turn + 1}: Player ${nextPlayer}'s Move${variantSuffix}`;
+      this.dom.turnBanner.textContent = this.replayData && this.replayData.live
+        ? `LIVE · Turn ${turn + 1}: Player ${nextPlayer}'s Move${variantSuffix}`
+        : `Turn ${turn + 1}: Player ${nextPlayer}'s Move${variantSuffix}`;
       this.dom.turnBanner.classList.add(`p${nextPlayer}`);
     }
   }

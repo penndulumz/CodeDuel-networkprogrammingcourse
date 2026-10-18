@@ -375,3 +375,13 @@ Hệ thống hỗ trợ triển khai thử nghiệm qua WAN bằng mô hình HTT
 4. Quy tắc chạy kiểm thử:
    - Trước khi chạy pytest, phải xóa các biến môi trường WAN như ADMIN_PASSWORD, ADMIN_USERNAME, COOKIE_SECURE và ALLOWED_ORIGINS.
    - Nếu ADMIN_PASSWORD còn giữ giá trị demo WAN, test suite có thể fail vì các test mặc định dùng admin/admin123.
+
+## 19. Nhiều Bàn Chiếu Trực Tiếp Trong Vòng Bracket
+
+1. Khi tạo bracket, Admin chọn `concurrent_boards` từ 1 đến 8. Giá trị được lưu trong `TournamentSetting` và giới hạn số cặp BO3 chạy đồng thời trong mỗi vòng.
+2. `play_bracket_matches` chạy các cặp độc lập bằng worker giới hạn theo số bàn chiếu. Kết quả từng ván được lưu trong `BracketMatch.game_results`, gồm số ván, match ID và người thắng; hòa được ghi với `winner_id: null`. Kết quả series cuối vòng tiếp tục dùng `BracketMatch.winner_id`.
+3. `Match.bracket_match_id` liên kết ván thực tế với cặp bracket; `Match.live_moves` lưu các nước đã thực hiện để API và màn chiếu đọc trong lúc trận chạy. `init_db` thêm các cột mới cho SQLite hiện hữu mà không xóa dữ liệu.
+4. `GET /api/bracket/live` là API công khai cho màn hình lớn. Trang `/bracket` tự làm mới mỗi giây, hiển thị bàn 9x9, tỷ số series, kết quả từng ván và liên kết mở trang replay riêng.
+5. `GET /api/matches/{match_id}/replay` trả dữ liệu tạm thời khi trận đang chạy. Trang replay theo dõi nước đi mới mỗi giây và dừng polling khi replay hoàn tất.
+6. Các trận bracket lưu tiến trình sau mỗi nước và chèn khoảng nghỉ 0,45 giây giữa các lượt để khán giả theo dõi. Trang `/bracket` và replay chi tiết phát cùng thứ tự nước đi theo nhịp 0,3 giây; bộ đếm lưu trong `localStorage` để đồng bộ giữa các trang và tab trình duyệt.
+7. Admin có thể gọi `POST /api/admin/tournament/end` để đóng cổng FFA, xóa dữ liệu các trận FFA/bracket, cây bracket và replay JSON. API từ chối khi trận còn chạy hoặc đang chờ; tài khoản, Elo và thống kê người chơi được giữ lại. Nút trong Admin yêu cầu xác nhận trước khi gọi API.

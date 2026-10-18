@@ -123,13 +123,20 @@ On the concluding day of the tournament:
      - Match 3: Seed 2 vs Seed 7
      - Match 4: Seed 3 vs Seed 6
    - Generating again replaces the whole bracket, including results already played.
+   - Choose a concurrent board count from 1 to 8 before generating the bracket. This limits how many pairings run side by side in each round.
 3. **Play the Rounds**:
    - Click **Chạy vòng đấu tiếp theo** (`POST /api/admin/bracket/play`) once per round.
    - Each pairing is played as a series (`match_format`, default `BO3`) with sides alternating every game. Bracket games never change Elo.
    - Losers are eliminated. Once every pairing of a round is finished, the winners are drawn at random into the next round's pairings.
    - A player without an active bot forfeits; a level series goes to the better seed.
 4. **Public Bracket View**:
-   - Competitors inspect live playoff progress at [http://localhost:8000/bracket](http://localhost:8000/bracket).
+   - Competitors inspect the multi-board live scoreboard at [http://localhost:8000/bracket](http://localhost:8000/bracket). Boards refresh automatically and show current moves, the BO3 score, each game's winner, and the series winner. Use **Toàn màn hình** for the large display.
+   - Select **Mở màn chiếu trận** to open a single game's replay. It follows new moves automatically until the game ends.
+   - Use the **Start next round** button on `/bracket` to queue the next round without returning to Admin. Enable **Automatically start the next round** to continue as soon as all pairings in the current round finish. Moves are paced for the projector.
+
+5. **End Tournament and Clear Matches**:
+   - In Admin, select **Kết thúc giải đấu và xóa trận cũ**, then confirm. This closes the FFA portal and deletes match records, bracket pairings, and `match_*.json` replay files.
+   - The action is rejected while matches are running or queued. User accounts, Elo ratings, and player win/loss/draw totals are retained. Generate a new bracket after clearing if another bracket tournament is needed.
 5. **Final Composite Scoring**:
    - Shown on the bracket page once the Final is played (also at `GET /api/admin/bracket/standings`).
    $$\text{Final Score} = 0.5 \times \text{Normalized Elo} + 0.5 \times \text{Bracket Points}$$
