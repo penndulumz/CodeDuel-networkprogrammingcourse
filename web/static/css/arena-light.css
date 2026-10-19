@@ -1,0 +1,147 @@
+/* Light arena theme. Keep the replay board's semantic player colours. */
+:root {
+  color-scheme: light;
+  --bg-main: #f1f5fb;
+  --bg-surface: #ffffff;
+  --bg-1: #f1f5fb;
+  --bg-2: #ffffff;
+  --bg-card: #ffffff;
+  --panel: #ffffff;
+  --panel-2: #f4f7fc;
+  --panel-3: #eaf0fa;
+  --border-subtle: #d7e0ef;
+  --line: #d7e0ef;
+  --line-2: #b7c8e2;
+  --line-soft: #e9eef6;
+  --text-primary: #172641;
+  --text: #172641;
+  --text-soft: #3d506e;
+  --text-muted: #586b85;
+  --muted: #586b85;
+  --accent: #2454d6;
+  --accent-2: #193fa9;
+  --accent-hover: #193fa9;
+  --accent-ink: #ffffff;
+  --accent-soft: #eaf0ff;
+  --accent-line: #b9cbff;
+  --link: #2454d6;
+  --success-fg: #147747;
+  --danger-fg: #bd303b;
+  --radius: 16px;
+  --shadow-1: 0 3px 12px rgb(31 58 104 / 5%);
+  --shadow-2: 0 14px 40px rgb(31 58 104 / 10%);
+}
+body { background: var(--bg-main); }
+.page-grid { display: none; }
+.navbar {
+  background: rgb(255 255 255 / 96%);
+  box-shadow: 0 2px 16px rgb(31 58 104 / 5%);
+}
+.nav-brand { letter-spacing: -.025em; text-transform: none; font-size: 20px; }
+.nav-links a { font-size: 14px; }
+.nav-links a.active { background: var(--accent-soft); border-radius: 8px; }
+.container { max-width: 1380px; }
+.page-title { font-family: var(--font-sans); letter-spacing: -.035em; font-size: clamp(24px, 3vw, 34px); }
+.page-subtitle { font-size: 14px; line-height: 1.7; max-width: 780px; }
+.page-eyebrow { color: var(--accent); }
+.card, .chart-card, .stat, .table-wrap, .auth-wrap { box-shadow: var(--shadow-1); }
+.card-title, .chart-title { font-family: var(--font-sans); letter-spacing: -.02em; font-size: 18px; }
+.stat { position: relative; overflow: hidden; padding: 23px; border-top: 3px solid var(--accent); }
+.stat:nth-child(2) { border-top-color: #b57a0c; }
+.stat:nth-child(3) { border-top-color: #16865a; }
+.stat:nth-child(4) { border-top-color: #7b51c4; }
+.stat-label { color: var(--text-muted); font-family: var(--font-sans); letter-spacing: .025em; }
+.stat-value { font-family: var(--font-sans); font-size: 36px; font-weight: 800; letter-spacing: -.045em; }
+.btn { background: #fff; border-color: #cbd7e9; color: var(--text); box-shadow: 0 1px 2px rgb(31 58 104 / 4%); }
+.btn:hover { background: #edf2fd; border-color: #9cb4e4; color: #193fa9; }
+.btn-primary { background: var(--accent); border-color: var(--accent); color: #fff; box-shadow: 0 4px 12px rgb(36 84 214 / 18%); }
+.btn-primary:hover { background: #193fa9; border-color: #193fa9; color: #fff; }
+.btn-success { background: #e5f5ed; border-color: #abd7c0; color: #12693f; }
+.btn-success:hover { background: #cbead9; color: #0e5533; }
+.btn-danger { background: #fff0f1; border-color: #efbec3; color: #ad2634; }
+.btn-danger:hover { background: #ffe0e3; color: #8e1925; }
+.btn:disabled { opacity: .55; box-shadow: none; }
+.table-dark { font-size: 14px; }
+.table-dark th { color: #4c607e; font-family: var(--font-sans); font-size: 11px; letter-spacing: .055em; padding-top: 16px; padding-bottom: 16px; }
+.table-dark td { padding-top: 17px; padding-bottom: 17px; }
+.table-dark tbody tr:hover td { background: #f3f7ff; }
+.elo-badge { color: #1942b5; background: #edf2ff; }
+.tag.red { color: #b32735; background: #ffedf0; border-color: #efbec3; }
+.tag.blue { color: #234caa; background: #edf2ff; border-color: #bdcef1; }
+.tag.purple { color: #7037a6; background: #f4edfc; border-color: #d9c3ee; }
+.rank-1, .podium-item.place-1 .podium-place { color: #946000; }
+.podium-item { background: #f6f8fc; }
+.podium-item.place-1 { background: #fff8e8; border-color: #ead39b; }
+.form-control { background: #f8faff; color: var(--text); border-color: #c6d3e6; font-size: 15px; }
+.form-control:focus { background: #fff; border-color: var(--accent); box-shadow: 0 0 0 3px #2454d61a; }
+.drop-zone { background: #f1f5ff; border-color: #9fb6ec; }
+.drop-zone:hover { background: #e8efff; }
+.auth-side { background: #163c9c; color: #fff; }
+.auth-side h2, .auth-side .page-eyebrow { color: #fff; }
+.auth-side p { color: #d6e4ff; }
+.auth-form { background: #fff; }
+.chart-grid-line { stroke: #dfe7f2; }
+.chart-axis-text { fill: #586b85; }
+.chart-tooltip { box-shadow: var(--shadow-2); }
+.bracket-match { background: #fff; box-shadow: var(--shadow-1); }
+.team-row.winner { color: #1942b5; background: #eaf0ff; }
+.champion-card { background: #fff8e8; border-color: #e1c57e; }
+.champion-label { color: #875800; }
+.champion-name { color: #654400; }
+.board-wrap { --text-primary: #f0f6fc; --text: #f0f6fc; --muted: #b0bfd3; color: #f0f6fc; }
+.board-wrap .replay-controls { background: #fff; color: #172641; --muted: #586b85; }
+.site-footer { color: #586b85; }
+.arena-hero { display: grid; grid-template-columns: 1.3fr 1fr; gap: 32px; align-items: center; margin-bottom: 36px; padding: 42px; border: 1px solid #cfdbef; border-radius: 24px; background: #fff; overflow: hidden; box-shadow: var(--shadow-1); }
+.hero-kicker { font: 700 11px var(--font-mono); color: #2454d6; letter-spacing: .1em; }
+.arena-hero h2 { margin: 16px 0; font: 800 clamp(30px, 3.5vw, 48px)/1.13 var(--font-sans); letter-spacing: -.045em; }
+.arena-hero p { max-width: 490px; color: var(--muted); font-size: 16px; line-height: 1.7; margin: 0 0 24px; }
+.hero-board { position: relative; min-height: 240px; border-radius: 20px; background: #dce6f5; border: 1px solid #b8c8e0; box-shadow: inset 0 3px 8px #233e651a; }
+.hero-piece { position: absolute; display: grid; place-items: center; width: 82px; height: 82px; border-radius: 20px; font-size: 44px; box-shadow: 0 12px 20px #1e3e8026; border: 3px solid #fff; }
+.hero-piece.rock { top: 28px; left: 12%; background: #ffc5b9; transform: rotate(-10deg); }
+.hero-piece.scissors { top: 54px; left: 40%; background: #b6ccff; transform: rotate(8deg); }
+.hero-piece.paper { top: 105px; left: 67%; background: #ffe29c; transform: rotate(-8deg); }
+.hero-board-caption { position: absolute; bottom: 16px; left: 16px; right: 16px; font: 700 10px var(--font-mono); color: #36518a; letter-spacing: .04em; }
+@media (max-width: 760px) {
+  .arena-hero { grid-template-columns: 1fr; padding: 26px; gap: 24px; }
+  .hero-board { display: none; }
+  .stat { padding: 16px; }
+  .stat-value { font-size: 28px; }
+  .nav-brand { font-size: 17px; }
+}
+
+/* Solid surfaces form three distinct levels: canvas, panels, inset content. */
+:root {
+  --bg-main: #e5eaf1;
+  --bg-1: #e5eaf1;
+  --panel-2: #edf1f6;
+  --panel-3: #dfe7f1;
+  --border-subtle: #c6d0df;
+  --shadow-1: 0 2px 3px #23354f0d, 0 8px 20px #23354f0d;
+}
+.navbar { background: #172b46; border-bottom: 3px solid #3e68be; box-shadow: 0 4px 14px #172b4626; }
+.nav-brand, .nav-brand:hover { color: #fff; }
+.nav-links a { color: #c5d2e5; }
+.nav-links a:hover, .nav-links a.active { color: #fff; background: #2c466a; }
+.nav-user .user-badge { background: #263e5c; color: #fff; border-color: #49607d; }
+.nav-user .elo-tag { color: #ffdb8d; }
+.arena-hero { border-color: #c4cfde; box-shadow: 0 3px 0 #c4cfde, 0 14px 28px #2034500d; }
+.card, .chart-card { border-color: #c6d0df; box-shadow: var(--shadow-1); }
+.card-header { border-bottom-color: #dce3ed; }
+.stat { box-shadow: 0 3px 0 #cad4e2, 0 8px 18px #23354f0a; }
+.table-dark th { background: #e8eef6; border-bottom: 2px solid #c5d2e4; }
+.table-dark tbody tr:nth-child(even) td { background: #f6f8fb; }
+.table-dark tr.is-me td { background: #e7efff; }
+.table-dark tbody tr:hover td { background: #eaf0fa; }
+.podium { padding: 12px; background: #edf1f6; border-radius: 12px; }
+.podium-item { background: #fff; border: 1px solid #d0d9e6; box-shadow: 0 2px 0 #d4dce8; }
+.podium-item.place-1 { background: #fff5dc; }
+.champion-card { background: #fff3d2; }
+.hero-piece { box-shadow: 0 5px 0 #31496833, 0 15px 18px #243e652b; }
+.history-pagination { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin: 16px 0 24px; padding: 16px 20px; border: 1px solid #c6d0df; border-radius: 12px; background: #edf1f6; color: var(--muted); }
+.pagination-actions { display: flex; align-items: center; gap: 12px; }
+.pagination-current { font-size: 13px; font-weight: 600; color: var(--text); }
+.btn[aria-disabled="true"] { opacity: .45; cursor: default; pointer-events: none; }
+@media (max-width: 600px) {
+  .history-pagination { flex-direction: column; align-items: stretch; }
+  .pagination-actions { justify-content: space-between; gap: 8px; }
+}

@@ -17,6 +17,7 @@ from typing import Any, Callable
 from sqlalchemy.orm import Session
 
 from server.database import SessionLocal
+from server.games import get_active_bot, get_active_game
 from server.models import Bot, BracketMatch, Match, TournamentSetting, User
 from server.queue import execute_match_job
 from server.tournament import ROUND_NAMES, calculate_final_scores
@@ -174,11 +175,8 @@ def _draw_next_round(db: Session, round_name: str) -> None:
 
 
 def _active_bot(db: Session, user_id: int) -> Bot | None:
-    return (
-        db.query(Bot)
-        .filter(Bot.user_id == user_id, Bot.is_active == True)  # noqa: E712
-        .first()
-    )
+    """Return the player's active bot for the event's active game."""
+    return get_active_bot(db, user_id, get_active_game(db))
 
 
 def _break_tie(player1: User, player2: User) -> int:
@@ -256,6 +254,7 @@ def play_bracket_series(
                     p2_elo_before=second.elo,
                     is_bracket=True,
                     rule_variant=rule_variant,
+                    game_type=first_bot.game_type,
                 )
                 db.add(game)
                 db.commit()

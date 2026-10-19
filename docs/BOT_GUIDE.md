@@ -210,3 +210,31 @@ Because each turn is bounded by a **1.0-second timeout**, Minimax implementation
 3. Access the **Profile** section and upload your `.py` source file.
 4. The system automatically validates AST security constraints and sets your bot active.
 5. During scheduled FFA hours, challenge other players or server-side Boss bots from the **Leaderboard** to climb the competitive rating rankings.
+
+---
+
+## 7. Other Games: Connect Four and Caro
+
+The same `get_move(board, my_player, history)` signature is used for every game. The active game of an event is chosen by the organiser; pick the matching game when uploading on the Profile page.
+
+| Game | Board value | Return value | Win condition |
+| :--- | :--- | :--- | :--- |
+| `connect4` | 6x7 ints, `board[0]` is the top row, 0 empty, 1/2 stones | column `int` 0..6 (stone falls down) | 4 in a row |
+| `caro` | 15x15 ints, 0 empty, 1/2 stones | `(row, col)` of an empty cell | 5 or more in a row |
+
+For grid games, `history` items look like `{'turn': 1, 'player': 1, 'move': 3, 'cell': [5, 3]}`. Starter files: `starter_kit/connect4_template.py`, `starter_kit/caro_template.py`; reference opponents: `starter_kit/connect4_bot.py`, `starter_kit/caro_bot.py`.
+
+```bash
+python starter_kit/local_arena.py my_bot.py starter_kit/connect4_bot.py --game connect4 --rounds 4 --swap-sides -v
+```
+
+## 8. Automatic Grading
+
+`starter_kit/grade.py` plays your bot against a fixed ladder of reference opponents (sides alternate, win = 1, draw = 0.5) and prints a score out of 10. The same grader runs on the website at `/grade`.
+
+```bash
+python starter_kit/grade.py my_bot.py --game connect4
+python starter_kit/grade.py submissions/ --game caro --csv grades.csv
+```
+
+A bot that fails the AST sandbox scores 0.

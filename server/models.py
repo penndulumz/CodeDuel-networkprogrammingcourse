@@ -86,6 +86,9 @@ class Bot(Base):
     user_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id"), nullable=False)
     filename: Mapped[str] = mapped_column(String(255), nullable=False)
     filepath: Mapped[str] = mapped_column(String(512), nullable=False)
+    # Which game this bot plays (slug from engine.games.GAMES). A user keeps one
+    # active bot per game, so switching the event's game never loses old bots.
+    game_type: Mapped[str] = mapped_column(String(32), default="rps9x9", nullable=False)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     uploaded_at: Mapped[datetime] = mapped_column(
         DateTime,
@@ -116,6 +119,7 @@ class Match(Base):
     replay_path: Mapped[Optional[str]] = mapped_column(String(512), nullable=True)
     is_bracket: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     rule_variant: Mapped[str] = mapped_column(String(32), default="standard", nullable=False)
+    game_type: Mapped[str] = mapped_column(String(32), default="rps9x9", nullable=False)
     created_at: Mapped[datetime] = mapped_column(
         DateTime,
         default=lambda: datetime.now(timezone.utc),

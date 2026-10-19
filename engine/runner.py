@@ -27,6 +27,8 @@ from typing import Any
 import uuid
 
 from engine.game import GameState, create_initial_board
+from engine.games import GAME_RPS9, create_grid_game, is_grid_game
+from engine.games.grid import GridGame
 
 
 def _normalize_move(raw_move: Any) -> tuple[tuple[int, int], tuple[int, int]] | None:
@@ -381,8 +383,12 @@ def run_match(
     player1_info: dict[str, Any] | None = None,
     player2_info: dict[str, Any] | None = None,
     variant: str = "standard",
+    game_type: str = GAME_RPS9,
 ) -> dict[str, Any]:
-    """Execute a complete 9x9 Rock-Paper-Scissors Chess match between two bot scripts.
+    """Execute a complete match between two bot scripts.
+
+    The default game is 9x9 Rock-Paper-Scissors Chess; pass game_type to run one
+    of the grid games registered in engine.games (e.g. 'connect4', 'caro').
 
     Runs both bots in isolated worker subprocesses, enforces per-turn timeout limits,
     tracks board states and move history, and records forfeit penalties if a bot
@@ -396,6 +402,7 @@ def run_match(
         player1_info: Optional metadata dictionary for Player 1.
         player2_info: Optional metadata dictionary for Player 2.
         variant: Game rule variant ('standard' or 'inverted_rps', default: 'standard').
+        game_type: Game slug from engine.games.GAMES (default: 'rps9x9').
 
     Returns:
         Dictionary containing standardized match result and replay log:
@@ -436,6 +443,17 @@ def run_match(
     }
     if player2_info:
         p2_meta.update(copy.deepcopy(player2_info))
+
+    if is_grid_game(game_type):
+        return _run_grid_match(
+            match_id=match_id,
+            bot1_path=bot1_path,
+            bot2_path=bot2_path,
+            p1_meta=p1_meta,
+            p2_meta=p2_meta,
+            game=create_grid_game(game_type),
+            timeout_per_turn=timeout_per_turn,
+        )
 
     initial_board = create_initial_board()
     game = GameState(board=initial_board, turn=1, move_no=1, max_turns=max_turns, variant=variant)
@@ -611,12 +629,94 @@ def _format_match_result(
         "player2": p2_meta,
         "winner": winner,
         "win_reason": win_reason,
+        "game_type": GAME_RPS9,
         "rule_variant": variant,
         "total_turns": len(formatted_moves),
         "moves": formatted_moves,
         "bot1_error": bot1_error,
         "bot2_error": bot2_error,
         "initial_board": copy.deepcopy(initial_board),
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    }
+
+
+def _run_grid_match(
+    match_id: str,
+    bot1_path: str,
+    bot2_path: str,
+    p1_meta: dict[str, Any],
+    p2_meta: dict[str, Any],
+    game: GridGame,
+    timeout_per_turn: float,
+) -> dict[str, Any]:
+    """Run a stone-placement game (Connect Four, Caro) between two bot scripts.
+
+    Uses the same isolated BotProcess workers and forfeit rules as the RPS game:
+    a bot that fails to start, crashes, times out, or returns an illegal move
+    loses immediately. Grid games always end on their own (a line is formed or
+    the board fills up), so no turn limit is needed.
+    """
+    errors: dict[int, str | None] = {1: None, 2: None}
+    winner: int | None = None
+    win_reason = ""
+    workers: dict[int, BotProcess] = {}
+
+    try:
+        for player, path in ((1, bot1_path), (2, bot2_path)):
+            worker = BotProcess(path, timeout=timeout_per_turn)
+            workers[player] = worker
+            ok, err, reason = worker.start()
+            if not ok:
+                winner = 2 if player == 1 else 1
+                win_reason = reason or "error"
+                errors[player] = err
+                break
+
+        while winner is None and not game.is_game_over:
+            current = game.turn
+            opponent = 2 if current == 1 else 1
+
+            ok, raw_move, err_msg, reason = workers[current].request_move(
+                board=copy.deepcopy(game.board),
+                my_player=current,
+                history=copy.deepcopy(game.history),
+                timeout=timeout_per_turn,
+            )
+            if not ok:
+                winner, win_reason, errors[current] = opponent, reason or "error", err_msg
+                break
+
+            move = game.normalize_move(raw_move)
+            if move is None or move not in game.get_valid_moves():
+                winner, win_reason = opponent, "invalid_move"
+                errors[current] = f"Player {current} submitted an illegal move: {raw_move}"
+                break
+
+            game.apply_move(move)
+
+        if winner is None and game.is_game_over:
+            winner = game.winner
+            win_reason = game.win_reason or "board_full"
+    finally:
+        for worker in workers.values():
+            worker.kill()
+
+    return {
+        "match_id": match_id,
+        "game_type": game.slug,
+        "player1": p1_meta,
+        "player2": p2_meta,
+        "winner": winner,
+        "win_reason": win_reason,
+        "rule_variant": "standard",
+        "total_turns": len(game.history),
+        "moves": copy.deepcopy(game.history),
+        "winning_line": copy.deepcopy(game.winning_line),
+        "rows": game.rows,
+        "cols": game.cols,
+        "bot1_error": errors[1],
+        "bot2_error": errors[2],
+        "initial_board": game.initial_board(),
         "created_at": datetime.now(timezone.utc).isoformat(),
     }
 

@@ -10,7 +10,9 @@ from pydantic import BaseModel
 from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
+from engine.games import GAMES
 from server.database import get_db
+from server.games import get_active_bot, get_active_game
 from server.models import Bot, Match, TournamentSetting, User
 from server.queue import execute_match_job
 from server.routes.auth import get_current_user
@@ -56,6 +58,7 @@ def _serialize_match(m: Match) -> Dict[str, Any]:
         "replay_path": m.replay_path,
         "is_bracket": m.is_bracket,
         "rule_variant": getattr(m, "rule_variant", "standard"),
+        "game_type": getattr(m, "game_type", "rps9x9"),
         "created_at": m.created_at.isoformat() if m.created_at else None,
     }
 
@@ -87,27 +90,21 @@ def challenge_opponent(
             detail="Opponent user not found.",
         )
 
-    # Verify both users have active bot submissions
-    bot1 = (
-        db.query(Bot)
-        .filter(Bot.user_id == current_user.id, Bot.is_active == True)  # noqa: E712
-        .first()
-    )
+    # Verify both users have an active bot for the game currently being played
+    game_type = get_active_game(db)
+    game_name = GAMES[game_type]["name"]
+    bot1 = get_active_bot(db, current_user.id, game_type)
     if not bot1:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="You do not have an active bot uploaded.",
+            detail=f"You do not have an active bot uploaded for {game_name}.",
         )
 
-    bot2 = (
-        db.query(Bot)
-        .filter(Bot.user_id == opponent.id, Bot.is_active == True)  # noqa: E712
-        .first()
-    )
+    bot2 = get_active_bot(db, opponent.id, game_type)
     if not bot2:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Opponent does not have an active bot uploaded.",
+            detail=f"Opponent does not have an active bot uploaded for {game_name}.",
         )
 
     # Retrieve active tournament rule variant
@@ -124,6 +121,7 @@ def challenge_opponent(
         p2_elo_before=opponent.elo,
         is_bracket=False,
         rule_variant=active_variant,
+        game_type=game_type,
     )
     db.add(match)
     db.commit()
@@ -142,6 +140,7 @@ def challenge_opponent(
         "status": "queued",
         "player1_id": current_user.id,
         "player2_id": opponent.id,
+        "game_type": game_type,
     }
 
 

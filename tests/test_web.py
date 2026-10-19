@@ -29,7 +29,7 @@ def client() -> TestClient:
 
 
 def test_index_page_returns_200_and_renders_leaderboard(client: TestClient) -> None:
-    """Verify that the home page (/) returns 200 and contains leaderboard elements."""
+    """Verify that the leaderboard page returns 200 and contains leaderboard elements."""
     db = SessionLocal()
     user = User(username="alice", elo=1350, wins=5, losses=1, draws=0)
     user.set_password("password123")
@@ -37,7 +37,7 @@ def test_index_page_returns_200_and_renders_leaderboard(client: TestClient) -> N
     db.commit()
     db.close()
 
-    res = client.get("/")
+    res = client.get("/leaderboard")
     assert res.status_code == 200
     assert "text/html" in res.headers["content-type"]
     text = res.text
@@ -61,10 +61,10 @@ def test_index_page_authenticated_user_highlight(client: TestClient) -> None:
     ACTIVE_SESSIONS[session_token] = user_id
 
     client.cookies.set("session_token", session_token)
-    res = client.get("/")
+    res = client.get("/leaderboard")
     assert res.status_code == 200
     assert "charlie" in res.text
-    assert "Logout" in res.text
+    assert "Logout" in res.text or "Đăng xuất" in res.text
     assert "Bạn" in res.text
 
 
@@ -237,7 +237,7 @@ def test_rating_chart_css_classes_present(client: TestClient) -> None:
 
 def test_leaderboard_template_contains_rating_chart_elements(client: TestClient) -> None:
     """Verify that index.html contains rating chart container and script integration."""
-    res = client.get("/")
+    res = client.get("/leaderboard")
     assert res.status_code == 200
     assert 'id="rating-chart-card"' in res.text
     assert 'id="rating-chart-container"' in res.text
