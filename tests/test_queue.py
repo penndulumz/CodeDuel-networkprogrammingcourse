@@ -346,7 +346,7 @@ def test_execute_match_job_honors_database_setting_overrides():
         for k, v in [
             ("daily_multiplier_x", "2.5"),
             ("k_factor", "48"),
-            ("max_turns", "150"),
+            ("max_turns", "80"),
             ("turn_timeout_seconds", "0.75"),
         ]:
             s = db.query(TournamentSetting).filter(TournamentSetting.key == k).first()
@@ -392,7 +392,7 @@ def test_execute_match_job_honors_database_setting_overrides():
     # Assert run_match received the database overridden max_turns and timeout
     mock_run.assert_called_once()
     _, kwargs = mock_run.call_args
-    assert kwargs["max_turns"] == 150
+    assert kwargs["max_turns"] == 80
     assert kwargs["timeout_per_turn"] == 0.75
 
 

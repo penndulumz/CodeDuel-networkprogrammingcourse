@@ -18,7 +18,7 @@ tournament:
 
   # Giới hạn trận đấu
   match_rules:
-    max_turns: 200               # Tối đa 200 lượt đi, quá 200 turns tính theo số quân còn lại
+    max_turns: 100               # Kết thúc sau tối đa 100 lượt đi; phân định bằng số quân rồi điểm vị trí
     turn_timeout_seconds: 1.0    # Tối đa 1 giây cho mỗi nước đi của bot
 
   # Cấu hình giải đấu ngày cuối (Ngày n + 1)

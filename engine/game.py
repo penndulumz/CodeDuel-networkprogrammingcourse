@@ -1,6 +1,6 @@
-"""Core 9x9 Rock-Paper-Scissors Chess Game Logic Engine.
+"""Rock-Paper-Scissors Chess Game Logic Engine.
 
-This module provides the complete game simulation for the 9x9 RPS chess variant:
+This module provides the complete game simulation for standard and custom RPS variants:
 - Board coordinates: 9x9 matrix where row 0 = rank 1, row 8 = rank 9; col 0 = file a, col 8 = file i.
 - Pieces: 'R' (Rock), 'P' (Paper), 'S' (Scissors).
 - Combat rules: Rock beats Scissors, Scissors beats Paper, Paper beats Rock (Standard),
@@ -9,7 +9,7 @@ This module provides the complete game simulation for the 9x9 RPS chess variant:
 - Win conditions:
     1. Reaching the opponent's home goal square (P1 -> i9 (8,8); P2 -> a1 (0,0)).
     2. Wiping out all 3 pieces of any single opponent piece type.
-    3. Reaching turn 200 tiebreaker (highest surviving piece count wins; tie results in draw).
+    3. Reaching turn 100 tiebreaker (remaining pieces, then positional points).
 """
 
 from __future__ import annotations
@@ -38,9 +38,11 @@ TYPE_ICONS: dict[str, str] = {
 # Rule variants
 RULE_VARIANT_STANDARD: str = "standard"
 RULE_VARIANT_INVERTED_RPS: str = "inverted_rps"
+RULE_VARIANT_CUSTOM: str = "custom"
 SUPPORTED_RULE_VARIANTS: list[str] = [
     RULE_VARIANT_STANDARD,
     RULE_VARIANT_INVERTED_RPS,
+    RULE_VARIANT_CUSTOM,
 ]
 
 # Goal squares for each player: P1 targets (8, 8) [i9], P2 targets (0, 0) [a1]
@@ -50,7 +52,7 @@ GOALS: dict[int, tuple[int, int]] = {
 }
 
 # Maximum turns before turn-limit tiebreaker triggers
-MAX_TURNS: int = 200
+MAX_TURNS: int = 100
 
 # 8 directions for king-like movement
 DIRECTIONS: list[tuple[int, int]] = [
@@ -63,6 +65,29 @@ DIRECTIONS: list[tuple[int, int]] = [
     (1, 0),
     (1, 1),
 ]
+
+# Edit this single block to design the custom game. Coordinates are (row, column),
+# starting at (0, 0) in the bottom-left. Each movement offset is one legal move;
+# long offsets jump over intervening squares. Existing variants ignore this block.
+CUSTOM_RULES: dict[str, Any] = {
+    "board_size": (9, 9),  # (rows, columns)
+    "starting_pieces": [  # (player, piece_type, row, column)
+            (1, "R", 0, 0), (1, "R", 0, 1), (1, "R", 0, 2),
+            (1, "P", 0, 3), (1, "P", 0, 4), (1, "P", 0, 5),
+            (1, "S", 0, 6), (1, "S", 0, 7), (1, "S", 0, 8),
+            (2, "S", 8, 0), (2, "S", 8, 1), (2, "S", 8, 2),
+            (2, "P", 8, 3), (2, "P", 8, 4), (2, "P", 8, 5),
+            (2, "R", 8, 6), (2, "R", 8, 7), (2, "R", 8, 8),
+    ],
+    "moves": DIRECTIONS.copy(),
+    # "moves": {
+    #     1: [(1, -1), (1, 0), (1, 1)],   # P1
+    #     2: [(-1, -1), (-1, 0), (-1, 1)] # P2
+    # },
+    "wins_over": {("R", "S"), ("S", "P"), ("P", "R")},
+    "goals": {1: (8, 8), 2: (0, 0)},
+    "win_conditions": {"reach_goal": True, "wipeout": False},
+}
 
 
 def beats(a: str, b: str, variant: str = RULE_VARIANT_STANDARD) -> bool:
@@ -78,6 +103,8 @@ def beats(a: str, b: str, variant: str = RULE_VARIANT_STANDARD) -> bool:
         - Rock beats Paper
         - Paper beats Scissors
 
+    Under custom rules, CUSTOM_RULES['wins_over'] defines each winner/loser matchup.
+
     Args:
         a: Attacking piece type ('R', 'P', or 'S').
         b: Defending piece type ('R', 'P', or 'S').
@@ -86,6 +113,9 @@ def beats(a: str, b: str, variant: str = RULE_VARIANT_STANDARD) -> bool:
     Returns:
         True if 'a' beats 'b' under the given variant, False otherwise.
     """
+    if variant == RULE_VARIANT_CUSTOM:
+        _validate_custom_rules()
+        return (a, b) in CUSTOM_RULES["wins_over"]
     if variant == RULE_VARIANT_INVERTED_RPS:
         return (
             (a == "S" and b == "R")
@@ -99,26 +129,146 @@ def beats(a: str, b: str, variant: str = RULE_VARIANT_STANDARD) -> bool:
     )
 
 
-def coord_name(row: int, col: int) -> str:
+def _validate_custom_rules() -> None:
+    """Validate the editable custom game definition only when custom is selected."""
+    if not isinstance(CUSTOM_RULES, dict):
+        raise ValueError("CUSTOM_RULES must be a dictionary.")
+
+    board_size = CUSTOM_RULES.get("board_size")
+    if (
+        not isinstance(board_size, (tuple, list))
+        or len(board_size) != 2
+        or any(not isinstance(size, int) or isinstance(size, bool) or size < 1 for size in board_size)
+    ):
+        raise ValueError("Custom board_size must contain positive (rows, columns).")
+    rows, cols = board_size
+
+    moves = CUSTOM_RULES.get("moves")
+    if isinstance(moves, dict):
+        if set(moves) != {1, 2}:
+            raise ValueError("Custom moves dictionary must define players 1 and 2.")
+        move_lists = moves.values()
+    else:
+        # Backward compatibility: a single list means both players share moves.
+        move_lists = (moves,)
+    for player_moves in move_lists:
+        if not isinstance(player_moves, (list, tuple)) or not player_moves:
+            raise ValueError("Each custom player must have a non-empty list of moves.")
+        for offset in player_moves:
+            if (
+                not isinstance(offset, (tuple, list))
+                or len(offset) != 2
+                or any(not isinstance(step, int) or isinstance(step, bool) for step in offset)
+                or offset == (0, 0)
+                or list(offset) == [0, 0]
+            ):
+                raise ValueError("Each custom move must be a non-zero integer offset pair.")
+
+    starting_pieces = CUSTOM_RULES.get("starting_pieces")
+    if not isinstance(starting_pieces, (list, tuple)) or not starting_pieces:
+        raise ValueError("Custom starting_pieces must contain at least one piece.")
+    occupied: set[tuple[int, int]] = set()
+    players: set[int] = set()
+    for piece in starting_pieces:
+        if (
+            not isinstance(piece, (tuple, list))
+            or len(piece) != 4
+            or not isinstance(piece[0], int)
+            or isinstance(piece[0], bool)
+            or piece[0] not in (1, 2)
+            or piece[1] not in TYPES
+            or not isinstance(piece[2], int)
+            or not isinstance(piece[3], int)
+            or not (0 <= piece[2] < rows and 0 <= piece[3] < cols)
+        ):
+            raise ValueError("Each custom starting piece must be (player, type, row, column) on the board.")
+        position = (piece[2], piece[3])
+        if position in occupied:
+            raise ValueError("Custom starting pieces cannot share a square.")
+        occupied.add(position)
+        players.add(piece[0])
+    if players != {1, 2}:
+        raise ValueError("Custom starting_pieces must include both players.")
+
+    goals = CUSTOM_RULES.get("goals")
+    if not isinstance(goals, dict) or set(goals) != {1, 2}:
+        raise ValueError("Custom goals must define one coordinate for each player (1 and 2).")
+    for goal in goals.values():
+        if (
+            not isinstance(goal, (tuple, list))
+            or len(goal) != 2
+            or any(not isinstance(value, int) or isinstance(value, bool) for value in goal)
+            or not (0 <= goal[0] < rows and 0 <= goal[1] < cols)
+        ):
+            raise ValueError("Each custom goal must be a valid (row, column) on the board.")
+
+    win_conditions = CUSTOM_RULES.get("win_conditions")
+    if (
+        not isinstance(win_conditions, dict)
+        or set(win_conditions) != {"reach_goal", "wipeout"}
+        or any(not isinstance(enabled, bool) for enabled in win_conditions.values())
+    ):
+        raise ValueError("Custom win_conditions must define boolean reach_goal and wipeout flags.")
+
+    expected_matchups = {frozenset(pair) for pair in (("R", "P"), ("P", "S"), ("R", "S"))}
+    wins_over = CUSTOM_RULES.get("wins_over")
+    if not isinstance(wins_over, (set, frozenset)):
+        raise ValueError("Custom wins_over must be a set of (winner, loser) pairs.")
+
+    actual_matchups: set[frozenset[str]] = set()
+    for pair in wins_over:
+        if (
+            not isinstance(pair, tuple)
+            or len(pair) != 2
+            or pair[0] not in TYPES
+            or pair[1] not in TYPES
+            or pair[0] == pair[1]
+        ):
+            raise ValueError("Each custom rule must be a valid (winner, loser) pair.")
+        matchup = frozenset(pair)
+        if matchup in actual_matchups:
+            raise ValueError("Custom rules must define only one winner per matchup.")
+        actual_matchups.add(matchup)
+
+    if actual_matchups != expected_matchups:
+        raise ValueError("Custom wins_over must define exactly one winner for every R/P/S matchup.")
+
+
+
+def coord_name(
+    row: int,
+    col: int,
+    board_size: tuple[int, int] = (9, 9),
+) -> str:
     """Convert matrix coordinates (row, col) to standard algebraic square name (e.g., 'a1', 'i9').
 
     Args:
-        row: Integer row in range [0, 8].
-        col: Integer column in range [0, 8].
+        row: Zero-based row index.
+        col: Zero-based column index.
 
     Returns:
-        Square coordinate string like 'a1' or 'i9'.
+        Spreadsheet-style coordinate such as 'a1', 'i9', or 'aa10'.
 
     Raises:
-        ValueError: If row or col is outside the 0-8 range.
+        ValueError: If the coordinate is outside board_size.
     """
-    if not (0 <= row < 9 and 0 <= col < 9):
-        raise ValueError(f"Coordinate ({row}, {col}) out of 9x9 board bounds.")
-    return FILES[col] + RANKS[row]
+    rows, cols = board_size
+    if not (0 <= row < rows and 0 <= col < cols):
+        raise ValueError(f"Coordinate ({row}, {col}) is outside the {rows}x{cols} board.")
+    file_name = ""
+    remaining = col + 1
+    while remaining > 0:
+        digit = (remaining - 1) % 26
+        file_name = chr(ord("a") + digit) + file_name
+        remaining = (remaining - 1) // 26
+    return f"{file_name}{row + 1}"
 
 
-def parse_coord(name: str) -> tuple[int, int]:
-    """Parse standard algebraic notation string (e.g. 'a1', 'i9') to matrix coordinates (row, col).
+def parse_coord(
+    name: str,
+    board_size: tuple[int, int] = (9, 9),
+) -> tuple[int, int]:
+    """Parse algebraic notation (e.g. 'a1', 'i9', 'aa10') to matrix coordinates.
 
     Args:
         name: Coordinate string like 'a1'.
@@ -127,14 +277,27 @@ def parse_coord(name: str) -> tuple[int, int]:
         Tuple of (row, col).
 
     Raises:
-        ValueError: If coordinate format or values are invalid.
+        ValueError: If coordinate format or board_size bounds are invalid.
     """
-    if len(name) != 2:
-        raise ValueError(f"Invalid coordinate format '{name}'. Expected 2 characters.")
-    col_str, rank_str = name[0].lower(), name[1]
-    if col_str not in FILES or rank_str not in RANKS:
-        raise ValueError(f"Coordinate '{name}' is out of 9x9 board bounds.")
-    return RANKS.index(rank_str), FILES.index(col_str)
+    normalized = name.lower()
+    split_at = 0
+    while split_at < len(normalized) and normalized[split_at].isalpha():
+        split_at += 1
+    file_name, rank_name = normalized[:split_at], normalized[split_at:]
+    if not file_name or not rank_name.isdigit() or int(rank_name) < 1:
+        raise ValueError(f"Invalid coordinate format '{name}'.")
+
+    col = 0
+    for char in file_name:
+        if not ("a" <= char <= "z"):
+            raise ValueError(f"Invalid file in coordinate '{name}'.")
+        col = col * 26 + ord(char) - ord("a") + 1
+    row = int(rank_name) - 1
+    rows, cols = board_size
+    col -= 1
+    if not (0 <= row < rows and 0 <= col < cols):
+        raise ValueError(f"Coordinate '{name}' is outside the {rows}x{cols} board.")
+    return row, col
 
 
 def notation(
@@ -144,6 +307,7 @@ def notation(
     tr: int,
     tc: int,
     captured: dict[str, Any] | None = None,
+    board_size: tuple[int, int] = (9, 9),
 ) -> str:
     """Generate Short Algebraic Notation (SAN) for a move.
 
@@ -163,27 +327,31 @@ def notation(
         Formatted SAN notation string.
     """
     tag = TYPE_ICONS[piece["type"]]
-    from_name = coord_name(fr, fc)
-    to_name = coord_name(tr, tc)
+    from_name = coord_name(fr, fc, board_size)
+    to_name = coord_name(tr, tc, board_size)
     if captured:
         captured_tag = TYPE_ICONS[captured["type"]]
         return f"{tag}{from_name}x{to_name}({captured_tag})"
     return f"{tag}{from_name}-{to_name}"
 
 
-def create_initial_board() -> list[list[dict[str, Any] | None]]:
-    """Construct the initial 9x9 board configuration.
-
-    Row 0 (Player 1): R, R, R, P, P, P, S, S, S
-    Row 8 (Player 2): S, S, S, P, P, P, R, R, R
-    Rows 1-7: Empty (None)
+def create_initial_board(
+    variant: str = RULE_VARIANT_STANDARD,
+) -> list[list[dict[str, Any] | None]]:
+    """Construct the initial board for the selected ruleset.
 
     Returns:
-        9x9 list of lists containing piece dicts or None.
+        A rows-by-columns list containing piece dictionaries or None.
     """
-    board: list[list[dict[str, Any] | None]] = [
-        [None for _ in range(9)] for _ in range(9)
-    ]
+    if variant == RULE_VARIANT_CUSTOM:
+        _validate_custom_rules()
+        rows, cols = CUSTOM_RULES["board_size"]
+        board: list[list[dict[str, Any] | None]] = [[None for _ in range(cols)] for _ in range(rows)]
+        for player, piece_type, row, col in CUSTOM_RULES["starting_pieces"]:
+            board[row][col] = {"type": piece_type, "player": player}
+        return board
+
+    board: list[list[dict[str, Any] | None]] = [[None for _ in range(9)] for _ in range(9)]
     p1_row = ["R", "R", "R", "P", "P", "P", "S", "S", "S"]
     p2_row = ["S", "S", "S", "P", "P", "P", "R", "R", "R"]
 
@@ -192,6 +360,44 @@ def create_initial_board() -> list[list[dict[str, Any] | None]]:
         board[8][col] = {"type": p2_row[col], "player": 2}
 
     return board
+
+
+def _movement_offsets(variant: str, player: int | None = None) -> list[tuple[int, int]]:
+    """Return legal destination offsets for the selected ruleset."""
+    if variant == RULE_VARIANT_CUSTOM:
+        _validate_custom_rules()
+        configured_moves = CUSTOM_RULES["moves"]
+        if isinstance(configured_moves, dict):
+            if player in (1, 2):
+                return [tuple(offset) for offset in configured_moves[player]]
+            return list(dict.fromkeys(
+                tuple(offset)
+                for player_moves in configured_moves.values()
+                for offset in player_moves
+            ))
+        return [tuple(offset) for offset in configured_moves]
+    return DIRECTIONS
+
+
+def _goal_positions(variant: str) -> dict[int, tuple[int, int]]:
+    """Return goal squares for the selected ruleset."""
+    if variant == RULE_VARIANT_CUSTOM:
+        _validate_custom_rules()
+        return {player: tuple(position) for player, position in CUSTOM_RULES["goals"].items()}
+    return GOALS
+
+
+def _win_condition_enabled(name: str, variant: str) -> bool:
+    """Return whether an optional win condition is enabled for this ruleset."""
+    if variant == RULE_VARIANT_CUSTOM:
+        _validate_custom_rules()
+        return CUSTOM_RULES["win_conditions"][name]
+    return True
+
+
+def get_goal_positions(variant: str = RULE_VARIANT_STANDARD) -> dict[int, tuple[int, int]]:
+    """Return goal squares for replay metadata and game presentation."""
+    return copy.deepcopy(_goal_positions(variant))
 
 
 def _parse_move_positions(
@@ -251,7 +457,7 @@ def is_valid_move(
     """Validate whether a proposed move is legal under the specified rule variant.
 
     Args:
-        board: 9x9 board matrix.
+        Board matrix.
         move: Move representation ((fr, fc), (tr, tc)) or dict.
         player: Player number (1 or 2) making the move.
         variant: Game rule variant identifier (default: "standard").
@@ -264,7 +470,11 @@ def is_valid_move(
         return False
 
     (fr, fc), (tr, tc) = coords
-    if not (0 <= fr < 9 and 0 <= fc < 9 and 0 <= tr < 9 and 0 <= tc < 9):
+    rows = len(board)
+    cols = len(board[0]) if rows else 0
+    if any(len(row) != cols for row in board):
+        return False
+    if not (0 <= fr < rows and 0 <= fc < cols and 0 <= tr < rows and 0 <= tc < cols):
         return False
 
     piece = board[fr][fc]
@@ -272,7 +482,7 @@ def is_valid_move(
         return False
 
     dr, dc = tr - fr, tc - fc
-    if not (abs(dr) <= 1 and abs(dc) <= 1 and (dr != 0 or dc != 0)):
+    if (dr, dc) not in _movement_offsets(variant, player):
         return False
 
     target = board[tr][tc]
@@ -294,7 +504,7 @@ def make_move(
     """Execute a move on a board matrix copy, validating rules under the specified variant.
 
     Args:
-        board: 9x9 board matrix.
+        Board matrix.
         move: Move representation ((fr, fc), (tr, tc)) or dict.
         player: Player number (1 or 2) making the move.
         variant: Game rule variant identifier (default: "standard").
@@ -322,7 +532,7 @@ def make_move(
     new_board[tr][tc] = piece
     new_board[fr][fc] = None
 
-    san = notation(piece, fr, fc, tr, tc, captured)
+    san = notation(piece, fr, fc, tr, tc, captured, (len(board), len(board[0])))
     move_dict: dict[str, Any] = {
         "player": player,
         "from": (fr, fc),
@@ -343,7 +553,7 @@ def generate_legal_moves(
     """Generate all legal moves available for a player under the specified variant.
 
     Args:
-        board: 9x9 board matrix.
+        Board matrix.
         player: Player number (1 or 2).
         variant: Game rule variant identifier (default: "standard").
 
@@ -351,11 +561,11 @@ def generate_legal_moves(
         List of ((from_row, from_col), (to_row, to_col)) coordinate tuples.
     """
     legal_moves: list[tuple[tuple[int, int], tuple[int, int]]] = []
-    for r in range(9):
-        for c in range(9):
+    for r in range(len(board)):
+        for c in range(len(board[r])):
             piece = board[r][c]
             if piece and piece.get("player") == player:
-                for dr, dc in DIRECTIONS:
+                for dr, dc in _movement_offsets(variant, player):
                     nr, nc = r + dr, c + dc
                     candidate = ((r, c), (nr, nc))
                     if is_valid_move(board, candidate, player, variant=variant):
@@ -364,7 +574,7 @@ def generate_legal_moves(
 
 
 class Game:
-    """Represents the complete state and rule evaluation of a 9x9 RPS chess match."""
+    """Represents a game state and evaluates moves under its selected ruleset."""
 
     def __init__(
         self,
@@ -377,14 +587,24 @@ class Game:
         """Initialize game state.
 
         Args:
-            board: Optional 9x9 board matrix. If None, default initial board is used.
+            board: Optional board matrix. If None, the selected ruleset's setup is used.
             turn: Current player turn (1 or 2). Defaults to 1.
             move_no: Move sequence number (starts at 1). Defaults to 1.
-            max_turns: Maximum number of moves before tiebreaker triggers. Defaults to 200.
-            variant: Active rule variant identifier (e.g. 'standard' or 'inverted_rps').
+            max_turns: Maximum number of moves before tiebreaker triggers. Defaults to 100.
+            variant: Active rule variant identifier ('standard', 'inverted_rps', or 'custom').
         """
+        resolved_variant = variant if variant in SUPPORTED_RULE_VARIANTS else RULE_VARIANT_STANDARD
+        if resolved_variant == RULE_VARIANT_CUSTOM:
+            _validate_custom_rules()
+            expected_size = tuple(CUSTOM_RULES["board_size"])
+            provided_size = (len(board), len(board[0]) if board else 0) if board is not None else expected_size
+            if provided_size != expected_size:
+                raise ValueError(
+                    f"Custom board must match configured size {expected_size}; received {provided_size}."
+                )
+
         if board is None:
-            self.board = create_initial_board()
+            self.board = create_initial_board(variant=resolved_variant)
         else:
             self.board = copy.deepcopy(board)
 
@@ -392,16 +612,13 @@ class Game:
         self.move_no: int = move_no
         self.max_turns: int = max_turns
 
-        self.variant: str = (
-            variant
-            if variant in SUPPORTED_RULE_VARIANTS
-            else RULE_VARIANT_STANDARD
-        )
+        self.variant: str = resolved_variant
         self.rule_variant: str = self.variant
 
         self.winner: int | None = None
         self.win_reason: str | None = None  # 'goal', 'wipeout', 'max_turns'
         self.wiped_type: str | None = None  # 'R', 'P', 'S' if win_reason == 'wipeout'
+        self.tiebreak_scores: dict[str, Any] | None = None
         self.history: list[dict[str, Any]] = []
 
     @property
@@ -420,13 +637,37 @@ class Game:
             Number of matching pieces remaining on the board.
         """
         count = 0
-        for r in range(9):
-            for c in range(9):
+        for r in range(len(self.board)):
+            for c in range(len(self.board[r])):
                 cell = self.board[r][c]
                 if cell and cell["player"] == player:
                     if piece_type is None or cell["type"] == piece_type:
                         count += 1
         return count
+
+    def _calculate_tiebreak_scores(self) -> dict[str, Any]:
+        """Score remaining pieces and their position for a turn-limit result."""
+        rows = len(self.board)
+        cols = len(self.board[0]) if rows else 0
+        goals = _goal_positions(self.variant)
+        center_rows = {(rows - 1) // 2, rows // 2}
+        center_cols = {(cols - 1) // 2, cols // 2}
+        position_points = {1: 0, 2: 0}
+
+        for row, board_row in enumerate(self.board):
+            for col, piece in enumerate(board_row):
+                if piece is None:
+                    continue
+                goal_row, goal_col = goals[piece["player"]]
+                distance = max(abs(row - goal_row), abs(col - goal_col))
+                position_points[piece["player"]] += max(rows, cols) - distance
+                if row in center_rows and col in center_cols:
+                    position_points[piece["player"]] += 2
+
+        return {
+            "remaining_pieces": {1: self.count_pieces(1), 2: self.count_pieces(2)},
+            "position_points": position_points,
+        }
 
     def get_valid_destinations(self, row: int, col: int) -> list[tuple[int, int]]:
         """Get all legal target coordinates for a piece located at (row, col).
@@ -443,9 +684,11 @@ class Game:
             return []
 
         valid: list[tuple[int, int]] = []
-        for dr, dc in DIRECTIONS:
+        rows = len(self.board)
+        cols = len(self.board[0]) if rows else 0
+        for dr, dc in _movement_offsets(self.variant, piece["player"]):
             nr, nc = row + dr, col + dc
-            if 0 <= nr < 9 and 0 <= nc < 9:
+            if 0 <= nr < rows and 0 <= nc < cols:
                 target = self.board[nr][nc]
                 if target is None:
                     # Move to empty square
@@ -533,7 +776,9 @@ class Game:
         fr, fc = from_pos
         tr, tc = to_pos
 
-        if not (0 <= fr < 9 and 0 <= fc < 9 and 0 <= tr < 9 and 0 <= tc < 9):
+        rows = len(self.board)
+        cols = len(self.board[0]) if rows else 0
+        if not (0 <= fr < rows and 0 <= fc < cols and 0 <= tr < rows and 0 <= tc < cols):
             raise ValueError(f"Move coordinates out of bounds: {from_pos} -> {to_pos}")
 
         piece = self.board[fr][fc]
@@ -544,9 +789,9 @@ class Game:
                 f"Cannot move opponent piece at {from_pos}. Current turn is Player {self.turn}."
             )
 
-        # Validate step distance (must be exactly 1 step in 8 directions)
+        # Check the configured destination offset before resolving combat.
         dr, dc = tr - fr, tc - fc
-        if not (abs(dr) <= 1 and abs(dc) <= 1 and (dr != 0 or dc != 0)):
+        if (dr, dc) not in _movement_offsets(self.variant, piece["player"]):
             raise ValueError(f"Illegal move distance from {from_pos} to {to_pos}.")
 
         target = self.board[tr][tc]
@@ -563,34 +808,57 @@ class Game:
         self.board[tr][tc] = piece
         self.board[fr][fc] = None
 
-        san = notation(piece, fr, fc, tr, tc, captured)
+        san = notation(
+            piece,
+            fr,
+            fc,
+            tr,
+            tc,
+            captured,
+            (len(self.board), len(self.board[0])),
+        )
         current_player = piece["player"]
 
         # Win Condition 1: Reaching opponent's home goal square
-        goal = GOALS[current_player]
-        if (tr, tc) == goal:
+        goal = _goal_positions(self.variant)[current_player]
+        if _win_condition_enabled("reach_goal", self.variant) and (tr, tc) == goal:
             self.winner = current_player
             self.win_reason = "goal"
 
         # Win Condition 2: Wiping out all pieces of any opponent type
-        if self.winner is None and captured is not None:
+        if (
+            self.winner is None
+            and captured is not None
+            and _win_condition_enabled("wipeout", self.variant)
+        ):
             opp_player = captured["player"]
             if self.count_pieces(opp_player, captured["type"]) == 0:
                 self.winner = current_player
                 self.win_reason = "wipeout"
                 self.wiped_type = captured["type"]
 
-        # Win Condition 3: Reaching maximum allowed turns tiebreaker
+        # Win Condition 3: Resolve the match at the turn limit using public score rules.
         if self.winner is None and self.move_no >= self.max_turns:
-            p1_count = self.count_pieces(1)
-            p2_count = self.count_pieces(2)
             self.win_reason = "max_turns"
-            if p1_count > p2_count:
+            self.tiebreak_scores = self._calculate_tiebreak_scores()
+            pieces = self.tiebreak_scores["remaining_pieces"]
+            positions = self.tiebreak_scores["position_points"]
+            if pieces[1] > pieces[2]:
                 self.winner = 1
-            elif p2_count > p1_count:
+                self.tiebreak_scores["resolved_by"] = "remaining_pieces"
+            elif pieces[2] > pieces[1]:
                 self.winner = 2
+                self.tiebreak_scores["resolved_by"] = "remaining_pieces"
+            elif positions[1] > positions[2]:
+                self.winner = 1
+                self.tiebreak_scores["resolved_by"] = "position_points"
+            elif positions[2] > positions[1]:
+                self.winner = 2
+                self.tiebreak_scores["resolved_by"] = "position_points"
             else:
-                self.winner = None  # Draw
+                self.winner = None
+                self.tiebreak_scores["resolved_by"] = "exact_tie"
+            self.tiebreak_scores["winner"] = self.winner
 
         # Append move record to game history
         current_move_no = self.move_no
@@ -615,6 +883,7 @@ class Game:
             "winner": self.winner,
             "win_reason": self.win_reason,
             "wiped_type": self.wiped_type,
+            "tiebreak_scores": copy.deepcopy(self.tiebreak_scores),
             "captured": captured,
             "san": san,
             "from": from_pos,
@@ -654,11 +923,14 @@ class Game:
             "turn": self.turn,
             "move_no": self.move_no,
             "max_turns": self.max_turns,
+            "board_size": (len(self.board), len(self.board[0]) if self.board else 0),
+            "goals": copy.deepcopy(_goal_positions(self.variant)),
             "variant": self.variant,
             "rule_variant": self.variant,
             "winner": self.winner,
             "win_reason": self.win_reason,
             "wiped_type": self.wiped_type,
+            "tiebreak_scores": copy.deepcopy(self.tiebreak_scores),
             "history": copy.deepcopy(self.history),
         }
 
@@ -691,6 +963,7 @@ class Game:
         new_state.winner = self.winner
         new_state.win_reason = self.win_reason
         new_state.wiped_type = self.wiped_type
+        new_state.tiebreak_scores = copy.deepcopy(self.tiebreak_scores)
         new_state.history = copy.deepcopy(self.history)
         return new_state
 

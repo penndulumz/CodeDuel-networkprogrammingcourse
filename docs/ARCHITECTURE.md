@@ -79,7 +79,7 @@ graph TB
 - **Victory Conditions**:
   1. **Goal Reach**: Player 1 piece reaches `i9` (`row=8, col=8`), or Player 2 piece reaches `a1` (`row=0, col=0`).
   2. **Wipeout**: Complete elimination of any single piece type (all 3 Rocks, all 3 Papers, or all 3 Scissors) of the opponent.
-  3. **Turn Limit (200 Turns)**: The player with the highest total surviving piece count wins. In case of an exact tie, the match is evaluated as a Draw.
+  3. **Turn Limit (100 Moves)**: Compare surviving piece count, then the sum of each piece's 0–8 progress score toward the opponent's row. Optional center-square and near-goal components are configured in `engine/game.py`'s `POSITION_SCORING`. If both totals are equal, the match is a draw; scores and component breakdown are saved in the replay result.
 
 ### 3.2 AST Static Security Validator (`engine/sandbox.py`)
 Uploaded Python bot files are analyzed prior to filesystem storage and execution. The validator inspects the Abstract Syntax Tree (AST) against 74 attack patterns:

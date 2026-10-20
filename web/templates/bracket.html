@@ -127,7 +127,7 @@
       </thead>
       <tbody>
         {% for bm in bracket_matches %}
-        <tr>
+        <tr data-bracket-pairing="{{ bm.id }}">
           <td>#{{ bm.id }}</td>
           <td><b>{{ bm.round_name }}</b></td>
           <td>Trận {{ bm.match_index }}</td>

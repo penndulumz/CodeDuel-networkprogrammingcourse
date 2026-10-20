@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}Đấu trường Trực quan 9x9 (Replay Match #{{ match_id }}) - Battlecode 9x9{% endblock %}
+{% block title %}Đấu trường Trực quan (Replay Match #{{ match_id }}) - Battlecode{% endblock %}
 
 {% block content %}
 <div class="page-header">
@@ -38,16 +38,20 @@
         <div id="ruleVariantBadge" class="variant-badge">
           Chế độ: <span class="tag purple">Đảo chiều ngũ hành (Kéo > Búa > Bao)</span>
         </div>
+        {% elif match and match.rule_variant == 'custom' %}
+        <div id="ruleVariantBadge" class="variant-badge">
+          Chế độ: <span class="tag purple">Luật tùy chỉnh (Custom)</span>
+        </div>
         {% else %}
         <div id="ruleVariantBadge" class="variant-badge" style="display: none;">
-          Chế độ: <span class="tag purple">Đảo chiều ngũ hành (Kéo > Búa > Bao)</span>
+          Chế độ: <span class="tag purple"></span>
         </div>
         {% endif %}
       </div>
     </div>
   </aside>
 
-  <!-- Center Section: 9x9 Board & Replay Controls -->
+  <!-- Center Section: Game Board & Replay Controls -->
   <section class="board-wrap">
     <div class="turn-banner" id="turnBanner">Đang tải dữ liệu trận đấu...</div>
 
@@ -111,7 +115,7 @@
 {% endblock %}
 
 {% block scripts %}
-<script src="/static/js/visualizer.js"></script>
+<script src="/static/js/visualizer.js?v=turn-limit-score-v1"></script>
 <script>
   document.addEventListener('DOMContentLoaded', async () => {
     const matchId = {{ match_id }};
@@ -131,6 +135,12 @@
         if (m.rule_variant === 'inverted_rps') {
           const badge = document.getElementById('ruleVariantBadge');
           if (badge) badge.style.display = 'block';
+        } else if (m.rule_variant === 'custom') {
+          const badge = document.getElementById('ruleVariantBadge');
+          if (badge) {
+            badge.style.display = 'block';
+            badge.innerHTML = 'Chế độ: <span class="tag purple">Luật tùy chỉnh (Custom)</span>';
+          }
         }
       }
     } catch (err) {

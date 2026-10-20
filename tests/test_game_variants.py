@@ -10,6 +10,7 @@ from engine.game import (
     generate_legal_moves,
     RULE_VARIANT_STANDARD,
     RULE_VARIANT_INVERTED_RPS,
+    RULE_VARIANT_CUSTOM,
     SUPPORTED_RULE_VARIANTS,
 )
 
@@ -18,9 +19,62 @@ def test_constants_defined():
     """Verify supported rule variant constants are correctly exposed."""
     assert RULE_VARIANT_STANDARD == "standard"
     assert RULE_VARIANT_INVERTED_RPS == "inverted_rps"
+    assert RULE_VARIANT_CUSTOM == "custom"
     assert RULE_VARIANT_STANDARD in SUPPORTED_RULE_VARIANTS
     assert RULE_VARIANT_INVERTED_RPS in SUPPORTED_RULE_VARIANTS
-    assert len(SUPPORTED_RULE_VARIANTS) == 2
+    assert RULE_VARIANT_CUSTOM in SUPPORTED_RULE_VARIANTS
+    assert len(SUPPORTED_RULE_VARIANTS) == 3
+
+
+def test_custom_variant_uses_source_configured_cycle():
+    """Custom combat follows the editable mapping without changing existing variants."""
+    assert beats("R", "S", variant=RULE_VARIANT_CUSTOM) is True
+    assert beats("S", "R", variant=RULE_VARIANT_CUSTOM) is False
+    assert beats("R", "S", variant=RULE_VARIANT_STANDARD) is True
+    assert beats("S", "R", variant=RULE_VARIANT_INVERTED_RPS) is True
+    assert Game(variant=RULE_VARIANT_CUSTOM).variant == RULE_VARIANT_CUSTOM
+
+
+def test_invalid_custom_rules_fail_only_custom_variant(monkeypatch):
+    """A broken custom mapping raises only when custom rules are selected."""
+    import engine.game as game_module
+
+    monkeypatch.setitem(game_module.CUSTOM_RULES, "wins_over", {("R", "R")})
+    assert beats("R", "S", variant=RULE_VARIANT_STANDARD) is True
+    assert beats("S", "R", variant=RULE_VARIANT_INVERTED_RPS) is True
+    with pytest.raises(ValueError, match="custom"):
+        Game(variant=RULE_VARIANT_CUSTOM)
+
+
+def test_custom_configuration_controls_board_setup_and_moves(monkeypatch):
+    """Custom settings can define a smaller board, piece positions, and legal moves."""
+    import engine.game as game_module
+
+    monkeypatch.setattr(game_module, "CUSTOM_RULES", {
+        "board_size": (4, 5),
+        "starting_pieces": [(1, "R", 0, 0), (1, "P", 0, 1), (2, "S", 3, 4)],
+        "moves": [(0, 1), (0, -1)],
+        "wins_over": {("R", "S"), ("S", "P"), ("P", "R")},
+        "goals": {1: (3, 4), 2: (0, 0)},
+        "win_conditions": {"reach_goal": True, "wipeout": True},
+    })
+
+    game = Game(variant=RULE_VARIANT_CUSTOM)
+    assert len(game.board) == 4
+    assert len(game.board[0]) == 5
+    assert game.board[0][0] == {"type": "R", "player": 1}
+    assert game.board[3][4] == {"type": "S", "player": 2}
+    assert game.get_valid_destinations(0, 0) == []
+    game.board[0][1] = None
+    assert game.get_valid_destinations(0, 0) == [(0, 1)]
+
+
+def test_coordinate_helpers_support_custom_board_dimensions():
+    """Custom boards can use dimensions beyond the original nine files and ranks."""
+    from engine.game import coord_name, parse_coord
+
+    assert coord_name(9, 26, board_size=(10, 27)) == "aa10"
+    assert parse_coord("aa10", board_size=(10, 27)) == (9, 26)
 
 
 def test_beats_standard_vs_inverted():

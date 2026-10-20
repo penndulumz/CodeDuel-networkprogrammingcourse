@@ -27,7 +27,7 @@ import threading
 from typing import Any, Callable
 import uuid
 
-from engine.game import GameState, create_initial_board
+from engine.game import MAX_TURNS, GameState, create_initial_board, get_goal_positions
 
 logger = logging.getLogger(__name__)
 
@@ -379,7 +379,7 @@ class BotProcess:
 def run_match(
     bot1_path: str,
     bot2_path: str,
-    max_turns: int = 200,
+    max_turns: int = MAX_TURNS,
     timeout_per_turn: float = 1.0,
     player1_info: dict[str, Any] | None = None,
     player2_info: dict[str, Any] | None = None,
@@ -395,21 +395,21 @@ def run_match(
     Args:
         bot1_path: Path to Player 1 Python bot script.
         bot2_path: Path to Player 2 Python bot script.
-        max_turns: Maximum half-turns before tiebreaker triggers (default: 200).
+        max_turns: Maximum half-turns before tiebreaker triggers (default: 100).
         timeout_per_turn: Maximum duration in seconds allowed for get_move (default: 1.0).
         player1_info: Optional metadata dictionary for Player 1.
         player2_info: Optional metadata dictionary for Player 2.
-        variant: Game rule variant ('standard' or 'inverted_rps', default: 'standard').
+        variant: Game rule variant ('standard', 'inverted_rps', or 'custom', default: 'standard').
 
     Returns:
         Dictionary containing standardized match result and replay log:
             - match_id: Unique match identifier string.
             - player1: Metadata dictionary for Player 1.
             - player2: Metadata dictionary for Player 2.
-            - winner: Winning player (1, 2, or None for draw).
+            - winner: Winning player (1 or 2 for a completed match).
             - win_reason: Reason string ('goal', 'wipeout', 'max_turns', 'timeout',
                           'error', 'invalid_move').
-            - rule_variant: Game rule variant string ('standard' or 'inverted_rps').
+            - rule_variant: Game rule variant string ('standard', 'inverted_rps', or 'custom').
             - total_turns: Total number of moves executed.
             - moves: Chronological list of move record dictionaries.
             - bot1_error: Error message string for Player 1, or None.
@@ -441,7 +441,7 @@ def run_match(
     if player2_info:
         p2_meta.update(copy.deepcopy(player2_info))
 
-    initial_board = create_initial_board()
+    initial_board = create_initial_board(variant=variant)
     game = GameState(board=initial_board, turn=1, move_no=1, max_turns=max_turns, variant=variant)
 
     bot1_error: str | None = None
@@ -641,6 +641,8 @@ def _format_match_result(
         "bot1_error": bot1_error,
         "bot2_error": bot2_error,
         "initial_board": copy.deepcopy(initial_board),
+        "goals": get_goal_positions(variant),
+        "tiebreak_scores": copy.deepcopy(game.tiebreak_scores),
         "created_at": datetime.now(timezone.utc).isoformat(),
     }
 

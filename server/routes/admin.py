@@ -8,7 +8,7 @@ from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
-from engine.game import SUPPORTED_RULE_VARIANTS
+from engine.game import MAX_TURNS, RULE_VARIANT_CUSTOM, SUPPORTED_RULE_VARIANTS, create_initial_board
 from server.boss_manager import deploy_boss, get_all_bosses_status, retract_boss
 from server.bracket import (
     STATUS_RUNNING,
@@ -20,6 +20,7 @@ from server.bracket import (
 )
 from server.database import get_db
 from server.models import Bot, BracketMatch, Match, TournamentSetting, User
+from server.queue import speed_up_bracket_round
 from server.routes.auth import get_current_admin
 from server.tournament import generate_bracket, is_ffa_portal_open
 from server.tournament_config import load_tournament_config
@@ -47,7 +48,7 @@ class UpdateSettingsRequest(BaseModel):
     daily_multiplier_x: Optional[float] = Field(None, ge=0.1, le=10.0)
     current_day: Optional[int] = Field(None, ge=1)
     total_days: Optional[int] = Field(None, ge=1)
-    max_turns: Optional[int] = Field(None, ge=10, le=1000)
+    max_turns: Optional[int] = Field(None, ge=10, le=MAX_TURNS)
     turn_timeout_seconds: Optional[float] = Field(None, ge=0.1, le=10.0)
     rule_variant: Optional[str] = None
 
@@ -119,9 +120,10 @@ def _get_all_settings_dict(db: Session) -> Dict[str, Any]:
 
     # Max turns
     if "max_turns" in settings_map:
-        max_turns = int(settings_map["max_turns"])
+        max_turns = min(MAX_TURNS, int(settings_map["max_turns"]))
     else:
-        max_turns = int(rules_cfg.get("max_turns", 200))
+        max_turns = int(rules_cfg.get("max_turns", MAX_TURNS))
+    max_turns = max(10, min(MAX_TURNS, max_turns))
 
     # Timeout
     if "turn_timeout_seconds" in settings_map:
@@ -199,6 +201,14 @@ def update_settings(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Unsupported rule variant.",
             )
+        if candidate_variant == RULE_VARIANT_CUSTOM:
+            try:
+                create_initial_board(variant=candidate_variant)
+            except ValueError as exc:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Custom rules are invalid: {exc}",
+                ) from exc
         _upsert_setting(db, "rule_variant", candidate_variant)
 
     db.commit()
@@ -292,6 +302,16 @@ def play_next_bracket_round(
             detail="The bracket is already finished.",
         )
 
+    active_variant = _get_setting_row(db, "rule_variant")
+    if active_variant and active_variant.value == RULE_VARIANT_CUSTOM:
+        try:
+            create_initial_board(variant=RULE_VARIANT_CUSTOM)
+        except ValueError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Custom rules are invalid; no bracket games were started: {exc}",
+            ) from exc
+
     ready = get_ready_matches(db)
     if not ready:
         raise HTTPException(
@@ -320,6 +340,21 @@ def play_next_bracket_round(
         "bracket_match_ids": match_ids,
         "concurrent_boards": concurrent_boards,
     }
+
+
+@router.post("/bracket/speed-up")
+def speed_up_running_bracket_round(
+    current_admin: User = Depends(get_current_admin),
+    db: Session = Depends(get_db),
+) -> Dict[str, str]:
+    """Skip spectator delays for the running bracket round."""
+    if not db.query(BracketMatch).filter(BracketMatch.status == STATUS_RUNNING).first():
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="There is no running bracket round to speed up.",
+        )
+    speed_up_bracket_round()
+    return {"status": "speeding_up"}
 
 
 @router.post("/tournament/end")

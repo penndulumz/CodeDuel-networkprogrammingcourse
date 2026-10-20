@@ -36,10 +36,11 @@
         <select id="rule_variant" name="rule_variant" class="form-control" style="background: var(--bg-card); color: var(--text);">
           <option value="standard" {% if settings.rule_variant == 'standard' or not settings.rule_variant %}selected{% endif %}>Tiêu chuẩn (Standard: Búa > Kéo > Bao)</option>
           <option value="inverted_rps" {% if settings.rule_variant == 'inverted_rps' %}selected{% endif %}>Đảo chiều ngũ hành (Inverted Combat: Kéo > Búa > Bao)</option>
+          <option value="custom" {% if settings.rule_variant == 'custom' %}selected{% endif %}>Tùy chỉnh (Custom: cấu hình trong engine/game.py)</option>
         </select>
       </div>
 
-      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px;">
         <div class="form-group">
           <label class="form-label" for="start_time">Giờ mở cổng (Start Time)</label>
           <input type="time" id="start_time" name="start_time" class="form-control" value="{{ settings.start_time or '19:00' }}" required>
@@ -74,7 +75,7 @@
       <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
         <div class="form-group">
           <label class="form-label" for="max_turns">Giới hạn số lượt tối đa (Max Turns)</label>
-          <input type="number" min="10" max="1000" id="max_turns" name="max_turns"
+          <input type="number" min="10" max="100" id="max_turns" name="max_turns"
                  class="form-control" value="{{ settings.max_turns }}" required>
         </div>
 
@@ -83,6 +84,7 @@
           <input type="number" step="0.1" min="0.1" max="10.0" id="turn_timeout_seconds" name="turn_timeout_seconds"
                  class="form-control" value="{{ settings.turn_timeout_seconds }}" required>
         </div>
+
       </div>
 
       <div id="settingsMsg" style="margin-bottom: 12px; font-size: 13px; display: none;"></div>
@@ -115,6 +117,9 @@
       </button>
       <button class="btn btn-primary" onclick="playNextBracketRound()" style="width: 100%; padding: 12px; margin-top: 12px;">
         ▶ Chạy vòng đấu tiếp theo
+      </button>
+      <button class="btn btn-primary" onclick="speedUpBracketRound()" style="width: 100%; padding: 12px; margin-top: 12px;">
+        Tăng tốc vòng đang chạy
       </button>
       <button class="btn btn-danger" onclick="endTournament()" style="width: 100%; padding: 12px; margin-top: 12px;">
         Kết thúc giải đấu và xóa trận cũ
@@ -351,6 +356,23 @@
       msgEl.style.color = '#34d399';
       msgEl.textContent = `Đã xóa ${data.deleted_matches} trận, ${data.deleted_bracket_pairings} cặp bracket và ${data.deleted_replays} replay. Cổng FFA đã đóng.`;
       setTimeout(() => window.location.reload(), 1500);
+    } catch (error) {
+      msgEl.style.color = '#f87171';
+      msgEl.textContent = error.message;
+    }
+  }
+
+  async function speedUpBracketRound() {
+    const msgEl = document.getElementById('bracketMsg');
+    msgEl.style.display = 'block';
+    msgEl.style.color = 'var(--muted)';
+    msgEl.textContent = 'Enabling faster bracket playback...';
+    try {
+      const response = await fetch('/api/admin/bracket/speed-up', { method: 'POST' });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.detail || 'Could not speed up the bracket round.');
+      msgEl.style.color = '#34d399';
+      msgEl.textContent = 'Display delays are skipped. Running games will finish under the current rules.';
     } catch (error) {
       msgEl.style.color = '#f87171';
       msgEl.textContent = error.message;

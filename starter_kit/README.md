@@ -63,6 +63,7 @@ You may only move onto an opponent piece's square if your piece **beats** the op
 The arena engine supports rule variants configurable both on the server and locally:
 - **`standard` (default)**: Classic cycle — Rock beats Scissors, Scissors beats Paper, Paper beats Rock.
 - **`inverted_rps`**: Inverted cycle — Scissors beats Rock, Rock beats Paper, Paper beats Scissors.
+- **`custom`**: Uses the editable `CUSTOM_RULES` block in `engine/game.py` for board size, setup, per-player moves, combat, goals, and optional goal/wipeout conditions. `moves` may be a shared list or `{1: [...], 2: [...]}`; each move is a `(row_delta, column_delta)` offset. The current sample only lets Player 1 increase row and Player 2 decrease row.
 
 Test your bots offline under inverted rules via:
 ```bash
@@ -81,7 +82,7 @@ A game terminates immediately when any of these conditions are met:
 2. **Piece Type Wipeout:**
    - A player eliminates **all 3 pieces** of any single opponent piece type (e.g., all 3 opponent Scissors).
 3. **Turn Limit (Tiebreaker):**
-   - If move 200 is reached without a goal or wipeout, the player with the **highest remaining piece count** wins. If piece counts are equal, the game is declared a **Draw**.
+   - If the 100-move limit is reached without a goal or wipeout, compare remaining pieces, then positional points. A tie on both scores is a draw.
 
 ---
 
@@ -155,7 +156,7 @@ Bots will be **immediately rejected** if they contain:
 `local_arena.py` provides rich options for local benchmarking:
 
 ```text
-usage: local_arena.py [-h] [-r ROUNDS] [-m MAX_TURNS] [-v] [--swap-sides] [--variant {standard,inverted_rps}] bot1 bot2
+usage: local_arena.py [-h] [-r ROUNDS] [-m MAX_TURNS] [-v] [--swap-sides] [--variant {standard,inverted_rps,custom}] bot1 bot2
 
 positional arguments:
   bot1                  Path to Player 1 Python bot file
@@ -165,10 +166,10 @@ options:
   -h, --help            Show help message and exit
   -r, --rounds ROUNDS   Number of rounds to play (default: 1)
   -m, --max-turns MAX_TURNS
-                        Max turns per round (default: 200)
+                        Max turns per round (default: 100)
   -v, --verbose         Print move-by-move details during match
   --swap-sides          Alternate bot starting positions every round
-  --variant {standard,inverted_rps}
+  --variant {standard,inverted_rps,custom}
                         Game rule variant (default: standard)
 ```
 
@@ -178,7 +179,7 @@ options:
   LOCAL ARENA BATTLE SIMULATOR
   Bot 1: bot_template (bot_template.py)
   Bot 2: heuristic_bot (heuristic_bot.py)
-  Rounds: 3 | Max Turns: 200 | Swap Sides: True
+  Rounds: 3 | Max Turns: 100 | Swap Sides: True
 ============================================================
 
 --- Round 1/3 ---
@@ -211,4 +212,4 @@ options:
 3. **Danger Sensing (Threat Maps):**
    Before moving into a square, check if an adjacent enemy piece beats your piece. Walking into a free enemy capture is the most common blunder for beginner bots.
 4. **Endgame Pieces Count:**
-   If a match reaches turn 200, the player with more remaining pieces wins. Maintaining a piece advantage is a viable defensive strategy.
+   If a match reaches the 100-move limit, compare remaining pieces, then the summed positional score for each side. Each piece scores 0–8 for progress toward the opponent's row by default; optional scoring components are configured in `engine/game.py` under `POSITION_SCORING`. A tie on both totals is a draw.

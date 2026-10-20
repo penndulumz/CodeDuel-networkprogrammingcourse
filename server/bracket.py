@@ -21,7 +21,7 @@ from sqlalchemy.orm import Session
 
 from server.database import SessionLocal
 from server.models import Bot, BracketMatch, Match, TournamentSetting, User
-from server.queue import execute_match_job
+from server.queue import execute_match_job, reset_bracket_speed
 from server.tournament import ROUND_NAMES, calculate_final_scores
 from server.tournament_config import load_tournament_config
 
@@ -272,6 +272,10 @@ def play_bracket_series(
                     second_bot.filepath,
                     db_factory=session_factory,
                 )
+                if result is None:
+                    raise RuntimeError(
+                        f"Bracket game {game.id} failed to execute; the series remains pending."
+                    )
 
                 winner_code = result.get("winner") if result else None
                 game_winner = None
@@ -340,13 +344,16 @@ def play_bracket_matches(
 ) -> None:
     """Play independent bracket pairings concurrently up to the configured board count."""
     worker_count = max(1, min(int(max_workers), len(bracket_match_ids) or 1))
-    with ThreadPoolExecutor(max_workers=worker_count) as executor:
-        futures = [
-            executor.submit(play_bracket_series, match_id, db_factory)
-            for match_id in bracket_match_ids
-        ]
-        for future in futures:
-            future.result()
+    try:
+        with ThreadPoolExecutor(max_workers=worker_count) as executor:
+            futures = [
+                executor.submit(play_bracket_series, match_id, db_factory)
+                for match_id in bracket_match_ids
+            ]
+            for future in futures:
+                future.result()
+    finally:
+        reset_bracket_speed()
 
 
 def compute_bracket_standings(matches: list[BracketMatch]) -> dict[int, int]:

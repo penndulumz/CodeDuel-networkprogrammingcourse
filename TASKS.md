@@ -183,5 +183,24 @@
 - [ ] Add and run unit/integration coverage for concurrency bounds, SQLite migration, live progress, and game/series winner reporting.
 - [ ] Review the implementation and update verification results after tests are run.
 
+## Bổ sung: Biến thể luật Custom
+- [x] Thêm `custom` như một biến thể được hỗ trợ; cấu hình kích thước bàn, vị trí quân, nước đi, chiến đấu, đích và điều kiện thắng tập trung trong `engine/game.py` qua `CUSTOM_RULES`.
+- Chỉ xác thực cấu hình khi khởi tạo hoặc kiểm tra trận `custom`; lỗi cấu hình không làm thay đổi luật hay luồng chạy của các biến thể hiện có.
+- Tích hợp chọn `custom` trong Admin và local arena; bracket/live projections truyền và lưu biến thể trên từng game, replay ghi nhận biến thể đã dùng.
+- [x] Sửa cấu hình mẫu custom 8x8 để không trùng vị trí quân hoặc vượt biên; Admin từ chối cấu hình custom lỗi trước khi lưu/chạy FFA hoặc bracket; replay của trận lỗi trả thông báo 409 thay vì 500.
+- Verification: Chưa chạy theo yêu cầu chỉ triển khai, chưa yêu cầu kiểm thử.
+
+## Bổ sung: Tăng tốc vòng bracket đang chạy
+- [x] Thêm endpoint Admin `POST /api/admin/bracket/speed-up`; endpoint bật chế độ nhanh cho batch bracket đang chạy và từ chối khi không có vòng active.
+- [x] Thêm nút Admin bỏ thời gian chờ hiển thị 0,45 giây giữa các nước; engine vẫn chạy đủ lượt và giữ nguyên timeout bot, kết quả và replay.
+- Verification: Chưa chạy test.
+
+## Bổ sung: Giới hạn lượt và phân định trận
+- [x] Giới hạn tối đa 100 lượt đi; cấu hình cũ trong CSDL lớn hơn mức này được giới hạn khi đọc.
+- [x] Khi hết lượt, so số quân còn lại rồi điểm vị trí (khoảng cách tới đích và thưởng ô trung tâm); nếu cả hai tiêu chí bằng nhau thì hòa.
+- [x] Giữ timeout tính toán riêng cho từng nước; bỏ đồng hồ suy nghĩ tích lũy toàn trận.
+- [x] Lỗi chạy ván bracket không còn tự động bị tính thành kết quả hòa và thắng theo Elo.
+- Verification: Chưa chạy test.
+
 
 

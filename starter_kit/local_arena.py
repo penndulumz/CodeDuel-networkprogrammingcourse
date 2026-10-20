@@ -90,7 +90,7 @@ def play_match(
         verbose: If True, print move-by-move actions.
         bot1_name: Label for Player 1 in output.
         bot2_name: Label for Player 2 in output.
-        variant: Game rule variant ('standard' or 'inverted_rps', default: 'standard').
+        variant: Game rule variant ('standard', 'inverted_rps', or 'custom', default: 'standard').
 
     Returns:
         Dictionary containing match results:
@@ -188,7 +188,7 @@ def run_arena(
         max_turns: Maximum half-moves per round.
         verbose: Whether to print detailed move-by-move traces.
         swap_sides: Whether to alternate starting player on each round.
-        variant: Game rule variant ('standard' or 'inverted_rps', default: 'standard').
+        variant: Game rule variant ('standard', 'inverted_rps', or 'custom', default: 'standard').
 
     Returns:
         Dictionary containing overall tournament statistics.
@@ -321,9 +321,9 @@ def main() -> None:
     parser.add_argument("--swap-sides", action="store_true", help="Alternate bot starting positions every round")
     parser.add_argument(
         "--variant",
-        choices=["standard", "inverted_rps"],
+        choices=["standard", "inverted_rps", "custom"],
         default="standard",
-        help="Game rule variant ('standard' or 'inverted_rps', default: 'standard')",
+        help="Game rule variant ('standard', 'inverted_rps', or 'custom'; default: 'standard')",
     )
 
     args = parser.parse_args()

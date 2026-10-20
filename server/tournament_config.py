@@ -21,7 +21,7 @@ DEFAULT_TOURNAMENT_CONFIG: Dict[str, Any] = {
             "daily_multiplier_x": 1.5,
         },
         "match_rules": {
-            "max_turns": 200,
+            "max_turns": 100,
             "turn_timeout_seconds": 1.0,
         },
         "final_bracket": {

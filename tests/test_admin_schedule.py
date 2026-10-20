@@ -262,6 +262,15 @@ def test_admin_settings_rule_variant_get_and_update():
     assert res_get2.status_code == 200
     assert res_get2.json().get("rule_variant") == "inverted_rps"
 
+    # The custom source-configured variant is selectable through the same setting.
+    res_custom = client.post(
+        "/api/admin/settings",
+        json={"rule_variant": "custom"},
+        headers=admin_headers,
+    )
+    assert res_custom.status_code == 200
+    assert res_custom.json().get("rule_variant") == "custom"
+
 
 def test_admin_settings_rule_variant_invalid_rejected():
     """Verify POST /api/admin/settings rejects invalid rule variant with HTTP 400."""

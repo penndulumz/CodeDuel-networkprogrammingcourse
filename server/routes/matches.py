@@ -10,7 +10,7 @@ from pydantic import BaseModel
 from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
-from engine.game import create_initial_board
+from engine.game import create_initial_board, get_goal_positions
 from server.database import get_db
 from server.models import Bot, Match, TournamentSetting, User
 from server.queue import execute_match_job
@@ -114,6 +114,14 @@ def challenge_opponent(
     # Retrieve active tournament rule variant
     setting = db.query(TournamentSetting).filter(TournamentSetting.key == "rule_variant").first()
     active_variant = setting.value if setting and setting.value else "standard"
+    if active_variant == "custom":
+        try:
+            create_initial_board(variant=active_variant)
+        except ValueError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Custom rules are invalid; no match was queued: {exc}",
+            ) from exc
 
     # Create pending Match record
     match = Match(
@@ -191,6 +199,11 @@ def get_match_replay(
         )
 
     if not match.replay_path:
+        if match.win_reason is not None:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=f"Replay is unavailable because match execution failed: {match.win_reason}",
+            )
         if not match.is_bracket:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
@@ -207,9 +220,10 @@ def get_match_replay(
             "winner": None,
             "win_reason": match.win_reason,
             "rule_variant": match.rule_variant,
+            "goals": get_goal_positions(match.rule_variant),
             "total_turns": len(moves),
             "moves": moves,
-            "initial_board": create_initial_board(),
+            "initial_board": create_initial_board(variant=match.rule_variant),
             "live": match.win_reason is None,
         }
 

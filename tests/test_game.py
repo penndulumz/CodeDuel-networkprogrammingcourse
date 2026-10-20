@@ -252,8 +252,8 @@ def test_max_turns_win_condition_piece_advantage():
     assert game.win_reason == "max_turns"
 
 
-def test_max_turns_tiebreaker_draw():
-    """Verify tiebreaker at turn limit results in a Draw when piece counts are equal."""
+def test_max_turns_tiebreaker_uses_goal_progress_when_piece_counts_tie():
+    """Verify equal material at the turn limit is resolved by progress toward goals."""
     board = [[None for _ in range(9)] for _ in range(9)]
     board[0][0] = {"type": "R", "player": 1}
     board[8][8] = {"type": "R", "player": 2}
@@ -263,9 +263,9 @@ def test_max_turns_tiebreaker_draw():
     res = game.apply_move((0, 0), (1, 0))
 
     assert res["ok"] is True
-    assert res["winner"] is None
+    assert res["winner"] == 1
     assert res["win_reason"] == "max_turns"
-    assert game.winner is None
+    assert game.winner == 1
     assert game.win_reason == "max_turns"
 
 

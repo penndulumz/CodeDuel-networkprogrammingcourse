@@ -60,8 +60,8 @@ A match terminates immediately when any of the following triggers occurs:
    - CPU calculation time exceeds **1.0 second** in a single turn (`win_reason = 'timeout'`).
    - Unhandled runtime exception or crash (`win_reason = 'error'`).
    - Return of an illegal movement coordinate or malformed data structure (`win_reason = 'invalid_move'`).
-4. **Turn Limit (200 Turns)**:
-   - If turn count reaches 200 without a goal or wipeout, the player with the greater total remaining piece count wins. If counts are identical, the result is recorded as a Draw.
+4. **Turn Limit (100 Moves)**:
+   - If the 100-move limit is reached without a goal or wipeout, compare remaining pieces, then positional points. By default, each piece scores `round(progress * 8 / (board_rows - 1))`, where progress is its row for Player 1 and `board_rows - 1 - row` for Player 2. Equal piece and position totals mean a draw. `engine/game.py`'s `POSITION_SCORING` controls the enabled components, weights, and optional center/goal bonuses.
 
 ---
 

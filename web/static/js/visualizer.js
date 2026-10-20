@@ -1,21 +1,26 @@
 /**
- * Battlecode 9x9 RPS Platform - Interactive Replay Visualizer
+ * Battlecode RPS Platform - Interactive Replay Visualizer
  *
  * Provides turn-by-turn playback, slider scrubbing, speed toggles,
- * move highlights, piece counting, and SAN move logging for 9x9 RPS Chess.
+ * move highlights, piece counting, and SAN move logging for standard and custom boards.
  */
 
-const FILES = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i'];
-const RANKS = ['1', '2', '3', '4', '5', '6', '7', '8', '9'];
 const TYPE_ICONS = { R: '✊', P: '✋', S: '✌' };
 const TYPE_NAMES = { R: 'Rock', P: 'Paper', S: 'Scissors' };
 
-/** Helper to format internal row/col to coordinate string (e.g. 0, 0 -> a1) */
+/** Format zero-based coordinates with spreadsheet-style files and one-based ranks. */
 function getCoordName(row, col) {
-  return FILES[col] + RANKS[row];
+  let file = '';
+  let remaining = col + 1;
+  while (remaining > 0) {
+    const digit = (remaining - 1) % 26;
+    file = String.fromCharCode(97 + digit) + file;
+    remaining = Math.floor((remaining - 1) / 26);
+  }
+  return file + String(row + 1);
 }
 
-/** Deep clone a 9x9 board matrix */
+/** Deep clone a board matrix */
 function cloneBoard(board) {
   return board.map(row => row.map(cell => (cell ? { ...cell } : null)));
 }
@@ -43,6 +48,9 @@ class ReplayVisualizer {
 
     this.historyStates = []; // Array of board snapshots at each turn index [0..totalTurns]
     this.moves = [];
+    this.boardRows = 9;
+    this.boardCols = 9;
+    this.goals = { 1: [8, 8], 2: [0, 0] };
 
     // DOM element references
     this.dom = {
@@ -80,15 +88,17 @@ class ReplayVisualizer {
     }
   }
 
-  /** Build 9x9 grid cells with ranks and files */
+  /** Build the grid from the active replay's board dimensions. */
   buildBoardGrid() {
     if (!this.dom.board) return;
 
     this.dom.board.innerHTML = '';
-    // Render ranks 9 down to 1 (visual row 0 to 8 corresponds to internal row 8 to 0)
-    for (let vr = 0; vr < 9; vr++) {
-      const row = 8 - vr;
-      for (let col = 0; col < 9; col++) {
+    this.dom.board.style.gridTemplateColumns = `repeat(${this.boardCols}, var(--cell))`;
+    this.dom.board.style.gridTemplateRows = `repeat(${this.boardRows}, var(--cell))`;
+    // Render the highest internal row at the top of the board.
+    for (let vr = 0; vr < this.boardRows; vr++) {
+      const row = this.boardRows - 1 - vr;
+      for (let col = 0; col < this.boardCols; col++) {
         const cell = document.createElement('div');
         cell.className = 'cell ' + ((row + col) % 2 === 0 ? 'dark' : 'light');
         cell.dataset.row = row;
@@ -99,35 +109,35 @@ class ReplayVisualizer {
         coord.textContent = getCoordName(row, col);
         cell.appendChild(coord);
 
-        // Highlight goal squares: P2 goal is a1 (row 0, col 0); P1 goal is i9 (row 8, col 8)
-        if (row === 0 && col === 0) {
-          cell.classList.add('goal-p2');
-          cell.dataset.goal = 'P2 GOAL';
-        } else if (row === 8 && col === 8) {
-          cell.classList.add('goal-p1');
-          cell.dataset.goal = 'P1 GOAL';
+        for (const [player, goal] of Object.entries(this.goals)) {
+          if (goal[0] === row && goal[1] === col) {
+            cell.classList.add(player === '1' ? 'goal-p1' : 'goal-p2');
+            cell.dataset.goal = `P${player} GOAL`;
+          }
         }
 
         this.dom.board.appendChild(cell);
       }
     }
 
-    // Build ranks labels (top=9 to bottom=1)
+    // Build ranks labels from top row to bottom row.
     if (this.dom.ranks) {
       this.dom.ranks.innerHTML = '';
-      for (let vr = 0; vr < 9; vr++) {
+      this.dom.ranks.style.gridTemplateRows = `repeat(${this.boardRows}, var(--cell))`;
+      for (let vr = 0; vr < this.boardRows; vr++) {
         const div = document.createElement('div');
-        div.textContent = RANKS[8 - vr];
+        div.textContent = String(this.boardRows - vr);
         this.dom.ranks.appendChild(div);
       }
     }
 
-    // Build files labels (left=a to right=i)
+    // Build files labels from left to right.
     if (this.dom.files) {
       this.dom.files.innerHTML = '';
-      for (let c = 0; c < 9; c++) {
+      this.dom.files.style.gridTemplateColumns = `repeat(${this.boardCols}, var(--cell))`;
+      for (let c = 0; c < this.boardCols; c++) {
         const div = document.createElement('div');
-        div.textContent = FILES[c];
+        div.textContent = getCoordName(0, c).replace(/\d+$/, '');
         this.dom.files.appendChild(div);
       }
     }
@@ -224,8 +234,12 @@ class ReplayVisualizer {
     this.moves = data.moves || [];
     this.totalTurns = this.moves.length;
 
-    // Create starting board
+    // Match board dimensions and goals are part of replay metadata for custom games.
     const initialBoard = data.initial_board || this.createDefaultInitialBoard();
+    this.boardRows = initialBoard.length;
+    this.boardCols = initialBoard[0]?.length || 9;
+    this.goals = data.goals || { 1: [8, 8], 2: [0, 0] };
+    this.buildBoardGrid();
     this.historyStates = [cloneBoard(initialBoard)];
 
     // Apply moves incrementally to construct board state at each turn index
@@ -250,12 +264,14 @@ class ReplayVisualizer {
       this.dom.slider.value = visibleTurn;
     }
 
-    // Display rule variant indicator if match was played under inverted RPS rules
-    if (data.rule_variant === 'inverted_rps') {
+    // Display the rule variant indicator for non-standard combat rules.
+    if (data.rule_variant === 'inverted_rps' || data.rule_variant === 'custom') {
       const variantBadge = document.getElementById('ruleVariantBadge');
       if (variantBadge) {
         variantBadge.style.display = 'block';
-        if (!variantBadge.innerHTML.includes('Đảo chiều')) {
+        if (data.rule_variant === 'custom') {
+          variantBadge.innerHTML = 'Chế độ: <span class="tag purple">Luật tùy chỉnh (Custom)</span>';
+        } else if (!variantBadge.innerHTML.includes('Đảo chiều')) {
           variantBadge.innerHTML = 'Chế độ: <span class="tag purple">Đảo chiều ngũ hành (Kéo > Búa > Bao)</span>';
         }
       }
@@ -426,8 +442,8 @@ class ReplayVisualizer {
       2: { R: 0, P: 0, S: 0 },
     };
 
-    for (let r = 0; r < 9; r++) {
-      for (let c = 0; c < 9; c++) {
+    for (let r = 0; r < boardState.length; r++) {
+      for (let c = 0; c < boardState[r].length; c++) {
         const p = boardState[r][c];
         if (p && counts[p.player] && counts[p.player][p.type] !== undefined) {
           counts[p.player][p.type]++;
@@ -455,6 +471,29 @@ class ReplayVisualizer {
     });
   }
 
+  /** Reconstruct the current progress-only tiebreak for older replay files. */
+  calculateTiebreakScoresForDisplay() {
+    const board = this.historyStates[this.totalTurns] || [];
+    const rows = board.length;
+    const result = {
+      remaining_pieces: { 1: 0, 2: 0 },
+      position_points: { 1: 0, 2: 0 },
+      position_breakdown: { advance_toward_enemy_row: { 1: 0, 2: 0 } },
+    };
+
+    board.forEach((boardRow, row) => boardRow.forEach((piece) => {
+      if (!piece || !(piece.player in result.remaining_pieces)) return;
+      const player = piece.player;
+      const progress = player === 1 ? row : rows - 1 - row;
+      const points = rows > 1 ? Math.round(progress * 8 / (rows - 1)) : 8;
+      result.remaining_pieces[player] += 1;
+      result.position_points[player] += points;
+      result.position_breakdown.advance_toward_enemy_row[player] += points;
+    }));
+
+    return result;
+  }
+
   /** Highlight the active turn entry in the move log list */
   updateLogHighlight(turn) {
     if (!this.dom.logList) return;
@@ -476,7 +515,9 @@ class ReplayVisualizer {
 
     this.dom.turnBanner.classList.remove('p1', 'p2');
     const isFinished = turn === this.totalTurns && this.replayData && !this.replayData.live;
-    const variantSuffix = (this.replayData && this.replayData.rule_variant === 'inverted_rps') ? ' [Đảo chiều RPS]' : '';
+    const variantSuffix = this.replayData && this.replayData.rule_variant === 'custom'
+      ? ' [Custom]'
+      : (this.replayData && this.replayData.rule_variant === 'inverted_rps') ? ' [Đảo chiều RPS]' : '';
 
     if (isFinished) {
       const winner = this.replayData.winner;
@@ -497,7 +538,21 @@ class ReplayVisualizer {
           this.dom.winnerTitle.textContent = winner ? `Player ${winner} Victorious!` : 'Draw!';
         }
         if (this.dom.winnerDesc) {
-          this.dom.winnerDesc.textContent = `Victory condition: ${reason} in ${this.totalTurns} turns.`;
+          const tiebreak = this.replayData.tiebreak_scores || this.calculateTiebreakScoresForDisplay();
+          if (reason === 'max_turns') {
+            const pieces = tiebreak.remaining_pieces || {};
+            const positions = tiebreak.position_points || {};
+            const breakdown = tiebreak.position_breakdown || {};
+            const detail = (player) => Object.entries(breakdown)
+              .map(([name, values]) => `${name}: ${values[player] ?? values[String(player)] ?? 0}`)
+              .join(', ');
+            this.dom.winnerDesc.textContent =
+              `Turn limit after ${this.totalTurns} moves. Remaining pieces — P1: ${pieces[1] ?? pieces['1'] ?? 0}, P2: ${pieces[2] ?? pieces['2'] ?? 0}. ` +
+              `Position points — P1: ${positions[1] ?? positions['1'] ?? 0} (${detail(1)}); ` +
+              `P2: ${positions[2] ?? positions['2'] ?? 0} (${detail(2)}).`;
+          } else {
+            this.dom.winnerDesc.textContent = `Victory condition: ${reason} in ${this.totalTurns} moves.`;
+          }
         }
       }
     } else {

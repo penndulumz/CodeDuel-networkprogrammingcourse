@@ -10,9 +10,11 @@ from __future__ import annotations
 import json
 import logging
 from pathlib import Path
+import threading
 import time
 from typing import Any, Callable
 
+from engine.game import MAX_TURNS
 from engine.runner import run_match, save_replay
 from server.database import SessionLocal
 from server.models import Match, TournamentSetting, User
@@ -21,6 +23,17 @@ from server.tournament_config import load_tournament_config
 
 logger = logging.getLogger(__name__)
 BRACKET_MOVE_DISPLAY_DELAY_SECONDS = 0.45
+_bracket_fast_mode = threading.Event()
+
+
+def speed_up_bracket_round() -> None:
+    """Skip spectator pacing delays for the currently running bracket round."""
+    _bracket_fast_mode.set()
+
+
+def reset_bracket_speed() -> None:
+    """Restore normal spectator pacing after a bracket round finishes."""
+    _bracket_fast_mode.clear()
 
 
 def _get_setting_value(db, key: str, default: Any, caster: Callable[[str], Any]) -> Any:
@@ -80,8 +93,9 @@ def execute_match_job(
             db, "k_factor", elo_cfg.get("k_factor", 32), int
         )
         max_turns = _get_setting_value(
-            db, "max_turns", rules_cfg.get("max_turns", 200), int
+            db, "max_turns", rules_cfg.get("max_turns", MAX_TURNS), int
         )
+        max_turns = max(10, min(MAX_TURNS, max_turns))
         timeout_seconds = _get_setting_value(
             db, "turn_timeout_seconds", rules_cfg.get("turn_timeout_seconds", 1.0), float
         )
@@ -123,7 +137,8 @@ def execute_match_job(
                 logger.exception("Failed to persist live progress for bracket match %d", match_id)
             finally:
                 progress_db.close()
-            time.sleep(BRACKET_MOVE_DISPLAY_DELAY_SECONDS)
+            if not _bracket_fast_mode.is_set():
+                time.sleep(BRACKET_MOVE_DISPLAY_DELAY_SECONDS)
 
         # Run match in isolated worker processes
         match_result = run_match(

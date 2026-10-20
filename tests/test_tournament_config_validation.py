@@ -282,7 +282,7 @@ class TestLoadTournamentConfig:
         assert cfg["tournament"]["total_days"] == 14
         # Defaults for unspecified keys must survive the merge
         assert cfg["tournament"]["elo"]["k_factor"] == 32
-        assert cfg["tournament"]["match_rules"]["max_turns"] == 200
+        assert cfg["tournament"]["match_rules"]["max_turns"] == 100
 
     def test_yaml_with_empty_document(self, tmp_path):
         """An empty YAML document must not crash and should return defaults."""

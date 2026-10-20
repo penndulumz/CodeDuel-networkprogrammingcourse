@@ -31,7 +31,7 @@
   - Player 2 (Xanh): Hàng 8 (rank 9) gồm `['S','S','S','P','P','P','R','R','R']`. Ô đích cần đến: `a1` (`row=0, col=0`).
 - **Nước đi**: Đi 1 ô theo 8 hướng (ngang, dọc, chéo như quân Vua trong cờ vua).
 - **Thắng**: Chạm ô đích của đối thủ HOẶC diệt sạch cả 3 quân của 1 loại (R, P, hoặc S) của đối thủ.
-- **Timeout**: Tối đa 1.0 giây/turn. Tối đa 200 turns/trận.
+- **Timeout**: Tối đa 1.0 giây cho mỗi nước. Tối đa 100 lượt đi; nếu chưa có điều kiện thắng, phân định bằng số quân còn lại rồi điểm vị trí; bằng nhau thì hòa.
 
 ### 2.2 Bot Python Interface (`bot.py`)
 Mỗi bot sinh viên viết phải có signature chuẩn sau:
@@ -336,14 +336,16 @@ Nhằm đánh giá năng lực thích ứng thuật toán thực chiến của c
 1. **Chu Trình Tác Chiến Đảo Chiều Ngũ Hành (Inverted Combat Cycle - `inverted_rps`)**:
    - Quy tắc chuẩn (`standard`): Búa thắng Kéo, Kéo thắng Bao, Bao thắng Búa ($R > S > P > R$).
    - Quy tắc đảo chiều (`inverted_rps`): Kéo thắng Búa, Búa thắng Bao, Bao thắng Kéo ($S > R > P > S$).
+   - Biến thể tùy chỉnh (`custom`): Lập trình viên chỉnh khối `CUSTOM_RULES` trong `engine/game.py` để đổi kích thước bàn, vị trí quân ban đầu, nước đi, quan hệ ăn quân, ô đích và điều kiện thắng. `moves` có thể là một danh sách chung cho cả hai bên (tương thích cấu hình cũ), hoặc dictionary `{1: [...], 2: [...]}` để đặt hướng riêng theo player. Mẫu hiện tại chỉ cho P1 tăng `row` và P2 giảm `row`, tức chỉ tiến về phía đối phương. Tọa độ là `(row, column)` bắt đầu từ `(0, 0)`; giới hạn lượt vẫn lấy từ cấu hình giải đấu. Engine xác thực nước đi và các luật custom trước khi chạy; lỗi chỉ ảnh hưởng custom, không ảnh hưởng `standard` hay `inverted_rps`.
    - Quy tắc di chuyển cờ và điều kiện thắng cuộc (chạm đích hàng 9/hàng 1 hoặc tiêu diệt toàn bộ quân đối phương) được giữ nguyên, đảm bảo tính nhất quán của mô hình 9x9.
-   - Các hằng số định danh biến thể trong `engine/game.py`: `RULE_VARIANT_STANDARD = "standard"`, `RULE_VARIANT_INVERTED_RPS = "inverted_rps"`, và danh sách hợp lệ `SUPPORTED_RULE_VARIANTS = ["standard", "inverted_rps"]`.
+   - Các hằng số định danh biến thể trong `engine/game.py`: `RULE_VARIANT_STANDARD = "standard"`, `RULE_VARIANT_INVERTED_RPS = "inverted_rps"`, `RULE_VARIANT_CUSTOM = "custom"`, và danh sách hợp lệ `SUPPORTED_RULE_VARIANTS = ["standard", "inverted_rps", "custom"]`.
    - Hàm `beats(a, b, variant=RULE_VARIANT_STANDARD)` và các phương thức `is_valid_move`, `make_move`, `generate_legal_moves` trong `engine/game.py` nhận tham số `variant` để kiểm tra tính hợp lệ của nước đi ăn quân theo đúng chu trình tác chiến.
    - Lớp đối tượng `Game(variant=...)` hỗ trợ phương thức `clone()` bảo toàn biến thể và xuất siêu dữ liệu `rule_variant` trong lịch sử trận đấu (`export_history`).
 
 2. **Lưu Trữ & Khởi Tạo Trận Đấu (`server/models.py`, `server/queue.py`)**:
    - Trường dữ liệu `rule_variant` (kiểu chuỗi ký tự, mặc định `"standard"`, không rỗng) được bổ sung vào mô hình bảng CSDL `TournamentSetting` và `Match`.
    - Hàng đợi bất đồng bộ (`server/queue.py`): Khi thực thi trận đấu, hệ thống truy xuất giá trị `rule_variant` từ cài đặt giải đấu hiện hành `TournamentSetting` (hoặc từ chính thực thể `Match.rule_variant` nếu đã được chỉ định trước) và chuyển giao qua `GameRunner.play_match(..., variant=...)`. Sau khi trận đấu kết thúc, giá trị biến thể được lưu vết vĩnh viễn trên bản ghi `Match`.
+   - Bracket BO3 và live tournament projections dùng cùng `TournamentSetting.rule_variant`; mỗi game được lưu thành một `Match` với biến thể đã chụp, nên luật `custom` được áp dụng và giữ nguyên trong replay tiến trình trực tiếp.
    - Endpoint tạo trận đấu thách đấu `POST /api/matches/challenge` (`server/routes/matches.py`) tự động sao chép cấu hình `rule_variant` đang hoạt động của giải đấu sang trận đấu mới.
 
 3. **Quản Trị Giải Đấu & Kiểm Thử Thí Sinh (Admin & Competitor Interfaces)**:
@@ -352,7 +354,7 @@ Nhằm đánh giá năng lực thích ứng thuật toán thực chiến của c
      ```bash
      python starter_kit/local_arena.py my_bot.py starter_kit/heuristic_bot.py --variant inverted_rps --rounds 10
      ```
-   - **Trình Trực Quan Hóa Replay (`web/templates/replay.html`, `web/static/js/visualizer.js`)**: Khi xem lại các trận đấu thuộc biến thể `inverted_rps`, giao diện hiển thị huy hiệu nhận diện nổi bật "Chế độ: Đảo chiều ngũ hành (Kéo > Búa > Bao)" trên thanh điều hướng phát lại.
+   - **Trình Trực Quan Hóa Replay (`web/templates/replay.html`, `web/static/js/visualizer.js`)**: Replay hiển thị huy hiệu tương ứng với biến thể `inverted_rps` hoặc `custom` đã lưu trên trận đấu.
 
 ## 18. WAN Deployment & HTTPS Tunnel Configuration
 
@@ -379,9 +381,22 @@ Hệ thống hỗ trợ triển khai thử nghiệm qua WAN bằng mô hình HTT
 ## 19. Nhiều Bàn Chiếu Trực Tiếp Trong Vòng Bracket
 
 1. Khi tạo bracket, Admin chọn `concurrent_boards` từ 1 đến 8. Giá trị được lưu trong `TournamentSetting` và giới hạn số cặp BO3 chạy đồng thời trong mỗi vòng.
-2. `play_bracket_matches` chạy các cặp độc lập bằng worker giới hạn theo số bàn chiếu. Kết quả từng ván được lưu trong `BracketMatch.game_results`, gồm số ván, match ID và người thắng; hòa được ghi với `winner_id: null`. Kết quả series cuối vòng tiếp tục dùng `BracketMatch.winner_id`.
+2. `play_bracket_matches` chạy các cặp độc lập bằng worker giới hạn theo số bàn chiếu. Kết quả từng ván được lưu trong `BracketMatch.game_results`, gồm số ván, match ID và người thắng. Game mới dùng tiebreak tại max turns để xác định winner; kết quả hòa `winner_id: null` chỉ có thể xuất hiện trong dữ liệu cũ.
 3. `Match.bracket_match_id` liên kết ván thực tế với cặp bracket; `Match.live_moves` lưu các nước đã thực hiện để API và màn chiếu đọc trong lúc trận chạy. `init_db` thêm các cột mới cho SQLite hiện hữu mà không xóa dữ liệu.
 4. `GET /api/bracket/live` là API công khai cho màn hình lớn. Trang `/bracket` tự làm mới mỗi giây, hiển thị bàn 9x9, tỷ số series, kết quả từng ván và liên kết mở trang replay riêng.
 5. `GET /api/matches/{match_id}/replay` trả dữ liệu tạm thời khi trận đang chạy. Trang replay theo dõi nước đi mới mỗi giây và dừng polling khi replay hoàn tất.
 6. Các trận bracket lưu tiến trình sau mỗi nước và chèn khoảng nghỉ 0,45 giây giữa các lượt để khán giả theo dõi. Trang `/bracket` và replay chi tiết phát cùng thứ tự nước đi theo nhịp 0,3 giây; bộ đếm lưu trong `localStorage` để đồng bộ giữa các trang và tab trình duyệt.
 7. Admin có thể gọi `POST /api/admin/tournament/end` để đóng cổng FFA, xóa dữ liệu các trận FFA/bracket, cây bracket và replay JSON. API từ chối khi trận còn chạy hoặc đang chờ; tài khoản, Elo và thống kê người chơi được giữ lại. Nút trong Admin yêu cầu xác nhận trước khi gọi API.
+
+## 20. Tăng Tốc Vòng Bracket Đang Chạy
+
+1. Admin có thể gọi `POST /api/admin/bracket/speed-up` khi có ít nhất một cặp bracket đang chạy. Endpoint yêu cầu quyền Admin và trả HTTP 409 nếu không có vòng đang chạy.
+2. Nút `Tăng tốc vòng đang chạy` bật chế độ nhanh trong tiến trình server hiện tại. Hàm ghi tiến trình trong `server/queue.py` bỏ khoảng chờ hiển thị 0,45 giây giữa các nước còn lại; khi batch vòng kết thúc, chế độ nhanh tự tắt.
+3. Tăng tốc chỉ bỏ thời gian chờ hiển thị, không hủy bot, bỏ lượt hay thay đổi thắng/thua và replay. Thời gian bot tính toán nước đi vẫn theo `turn_timeout_seconds` hiện hành.
+
+## 21. Giới Hạn Thời Gian Và Phân Định Trận
+
+1. Giới hạn mặc định và tối đa là `MAX_TURNS = 100` lượt đi. Admin có thể chọn mức từ 10 đến 100; giá trị cũ trong CSDL lớn hơn 100 được giới hạn về 100 khi đọc và khi chạy trận.
+2. Timeout `turn_timeout_seconds` chỉ giới hạn thời gian xử lý `get_move` cho từng nước; vượt quá giới hạn này bot thua do timeout. Không có đồng hồ suy nghĩ tích lũy theo cả trận.
+3. Nếu hết lượt, so số quân còn lại trước. Nếu bằng nhau, so tổng điểm vị trí của từng bên. Mặc định mỗi quân được 0–8 điểm theo mức tiến về hàng quân địch: P1 dùng chỉ số hàng, P2 dùng `số_hàng - 1 - row`. Cấu hình `POSITION_SCORING` trong `engine/game.py` bật/tắt và đặt trọng số cho tiến hàng, ô trung tâm, hoặc gần ô đích. Kết quả replay lưu tổng điểm và điểm từng thành phần; nếu bằng nhau thì ván hòa. `win_reason` là `max_turns`.
+4. Engine trả hòa khi số quân và điểm vị trí bằng nhau tại giới hạn lượt. FFA ghi nhận đây là trận hòa; nếu một series bracket hòa điểm, hệ thống xử lý theo luật phân định series hiện có.
