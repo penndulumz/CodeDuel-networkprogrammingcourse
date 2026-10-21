@@ -38,3 +38,17 @@ def test_style_css_typography_tokens():
     assert "JetBrains Mono" in content
     # Bahnschrift should not be the primary display font
     assert '--font-display: "Bahnschrift"' not in content
+
+
+def test_guide_page_is_student_friendly():
+    init_db()
+    client = TestClient(app)
+    resp = client.get("/guide")
+    assert resp.status_code == 200
+    html = resp.text
+
+    assert "get_move" in html
+    assert "local_arena.py" in html
+    assert "Cấp độ 1" in html or "Level 1" in html
+    assert "chiến lược" in html.lower() or "chiến thuật" in html.lower()
+
