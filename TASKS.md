@@ -221,3 +221,12 @@
 - *Verification*: `pytest -q` -> toàn bộ test PASS (bao gồm `tests/test_multi_game.py`, `tests/test_site_pages.py`).
 
 - 2026-10-18: Applied the approved clubhouse UI from `.worktrees/midterm-review` to the original checkout at the user request. Includes local SVG pieces, club-room home, compact interior pages and admin-managed public catalog (RPS only by default). Previous affected source files backed up under `local_backups/`. Local databases and uploaded bots were not copied. No GitHub push.
+
+---
+
+## Milestone 13: Giao Diện Unified Clubhouse 2.0 & Phông Chữ Tiếng Việt Chuẩn Hóa
+- [x] **Task 13.1**: Chuẩn hóa Typography toàn hệ thống với Be Vietnam Pro (display & sans) và JetBrains Mono (code & stats). Loại bỏ hoàn toàn lỗi vỡ glyph dấu tiếng Việt từ Bahnschrift và Trebuchet MS.
+- [x] **Task 13.2**: Hợp nhất Design Tokens Clubhouse trên toàn bộ các trang: Cây đấu loại trực tiếp (/bracket), Màn chiếu trực tiếp (Live Projections), Replay (/replay/<id>), và Bảng quản trị (/admin).
+- [x] **Task 13.3**: Đại tu cẩm nang lập trình bot cho sinh viên (web/templates/guide.html) với văn phong truyền cảm hứng, giải thích trực quan hàm get_move(), 3 cấp độ thuật toán bot, và hướng dẫn tự kiểm thử bằng local_arena.py.
+- [x] **Task 13.4**: Tối ưu khả năng tương tác di động (touch target >= 42-44px, chống tràn màn hình ngang ở các góc nghiêng).
+- *Verification*: pytest -v -> 100% tests PASS (bao gồm tests/test_ui_typography.py, tests/test_ui_pages_consistency.py).

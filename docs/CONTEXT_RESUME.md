@@ -466,3 +466,10 @@ Hệ thống hỗ trợ triển khai thử nghiệm qua WAN bằng mô hình HTT
 3. Cung cấp các sub-skill đi kèm: design-system, ui-styling, rand, design, anner-design, slides phục vụ việc nâng cấp và hoàn thiện giao diện cho nền tảng.
 
 - 2026-10-18: Applied the approved clubhouse UI from `.worktrees/midterm-review` to the original checkout at the user request. Includes local SVG pieces, club-room home, compact interior pages and admin-managed public catalog (RPS only by default). Previous affected source files backed up under `local_backups/`. Local databases and uploaded bots were not copied. No GitHub push.
+
+## 28. Hệ Thống Giao Diện Clubhouse 2.0 & Phông Chữ Tiếng Việt (Unified Clubhouse & Vietnamese Typography)
+
+1. **Chuẩn hóa Phông chữ Quốc tế cho Tiếng Việt**: Thay thế phông chữ dễ lỗi dấu trên Windows (Trebuchet MS, Bahnschrift) bằng bộ phông Be Vietnam Pro (tiêu đề, nhãn, nội dung UI) và JetBrains Mono (mã nguồn, điểm số Elo, tọa độ bàn cờ), tải qua Google Fonts CDN với đầy đủ Latin-ext và Vietnamese subsets.
+2. **Hợp nhất Design Tokens Clubhouse**: Đưa toàn bộ các trang chuyên biệt như Cây đấu loại trực tiếp (/bracket), Khung Replay ván đấu (/replay/<id>) và Bảng quản trị (/admin) về cùng một ngôn ngữ thiết kế: Nền giấy kem #faf5e9, thẻ trắng ấm #fffdf6, viền mực #29352d, bóng cứng đổ nhẹ 3px 4px 0 #29352d và điểm nhấn hổ phách #ffcf56.
+3. **Cải tiến Trải nghiệm Hướng dẫn cho Sinh viên (/guide)**: Thiết kế lại toàn diện trang hướng dẫn với ngôn ngữ thân thiện, dễ hiểu, lộ trình 6 bước rõ ràng từ luật chơi 60 giây, cấu trúc hàm get_move(), 3 cấp độ chiến thuật bot, đến kiểm tra cục bộ bằng local_arena.py.
+4. **Tối ưu Mobile & Khả năng Tiếp cận (A11y)**: Loại bỏ các góc nghiêng gây tràn khung ngang trên màn hình nhỏ (< 640px), đảm bảo kích thước vùng bấm (touch target) tối thiểu 42-44px.
