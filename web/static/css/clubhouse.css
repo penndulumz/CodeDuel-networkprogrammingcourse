@@ -10,8 +10,9 @@
   --accent-soft:#e5ecf8; --link:#2c559a;
   --navy:#29352d; --navy-2:#465447; --navy-line:#819177;
   --amber:#ffcf56; --amber-soft:#fff0bc; --blue:#355eae;
-  --font-sans:"Trebuchet MS","Segoe UI",sans-serif;
-  --font-display:"Trebuchet MS","Segoe UI",sans-serif;
+  --font-sans:"Be Vietnam Pro", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-display:"Be Vietnam Pro", sans-serif;
+  --font-mono:"JetBrains Mono", Consolas, monospace;
   --shadow-1:3px 4px 0 #29352d; --shadow-2:5px 7px 0 #29352d;
 }
 body { background-color:var(--bg-main); background-image:radial-gradient(#c7c9b5 0.8px,transparent 0.8px); background-size:22px 22px; }
