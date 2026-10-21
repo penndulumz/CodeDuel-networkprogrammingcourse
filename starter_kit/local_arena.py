@@ -5,11 +5,13 @@ without connecting to the tournament server. It loads two bot scripts, simulates
 matches using engine.game.GameState, validates moves, and displays match statistics.
 
 Usage:
-    python starter_kit/local_arena.py <bot1_path> <bot2_path> [--rounds N] [--max-turns M] [--verbose] [--swap-sides]
+    python starter_kit/local_arena.py <bot1_path> <bot2_path> [--game G] [--rounds N] [--max-turns M] [--verbose] [--swap-sides]
 
 Examples:
     python starter_kit/local_arena.py starter_kit/bot_template.py starter_kit/heuristic_bot.py
     python starter_kit/local_arena.py my_bot.py starter_kit/heuristic_bot.py --rounds 5 --max-turns 200
+    python starter_kit/local_arena.py starter_kit/connect4_template.py starter_kit/connect4_bot.py --game connect4
+    python starter_kit/local_arena.py starter_kit/caro_template.py starter_kit/caro_bot.py --game caro -v
 """
 
 from __future__ import annotations
@@ -28,6 +30,7 @@ if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
 from engine.game import GameState, MAX_TURNS, TYPE_ICONS
+from engine.games import GAME_RPS9, SUPPORTED_GAMES, create_grid_game, is_grid_game
 from engine.sandbox import validate_bot_file
 
 
@@ -170,6 +173,58 @@ def play_match(
     }
 
 
+def play_grid_match(
+    bot1_fn: Callable[..., Any],
+    bot2_fn: Callable[..., Any],
+    game_type: str,
+    verbose: bool = False,
+    bot1_name: str = "Player 1",
+    bot2_name: str = "Player 2",
+) -> dict[str, Any]:
+    """Simulate one Connect Four / Caro game between two in-process bot functions.
+
+    Returns the same result shape as play_match so run_arena can treat every
+    game identically ('p1_pieces'/'p2_pieces' count stones on the board).
+    """
+    game = create_grid_game(game_type)
+    bot_map = {1: (bot1_fn, bot1_name), 2: (bot2_fn, bot2_name)}
+
+    def _result(winner: int | None, reason: str, error: str | None) -> dict[str, Any]:
+        stones = [cell for row in game.board for cell in row]
+        return {
+            "winner": winner,
+            "win_reason": reason,
+            "error": error,
+            "turns": len(game.history),
+            "moves": game.history,
+            "p1_pieces": stones.count(1),
+            "p2_pieces": stones.count(2),
+        }
+
+    while not game.is_game_over:
+        current = game.turn
+        opponent = 2 if current == 1 else 1
+        bot_fn, name = bot_map[current]
+        try:
+            raw = bot_fn(copy.deepcopy(game.board), current, copy.deepcopy(game.history))
+        except Exception as exc:
+            return _result(opponent, "error", f"{name} raised an unhandled exception: {exc}")
+
+        move = game.normalize_move(raw)
+        if move is None or move not in game.get_valid_moves():
+            return _result(opponent, "invalid_move", f"{name} submitted an illegal move: {raw}")
+
+        record = game.apply_move(move)
+        if verbose:
+            print(f"  Move {record['turn']:3d} | {name:12s} | cell {tuple(record['cell'])}")
+
+    if verbose:
+        symbols = {0: ".", 1: "X", 2: "O"}
+        for row in game.board:
+            print("    " + " ".join(symbols[cell] for cell in row))
+    return _result(game.winner, game.win_reason or "board_full", None)
+
+
 def run_arena(
     bot1_path: str | Path,
     bot2_path: str | Path,
@@ -178,6 +233,7 @@ def run_arena(
     verbose: bool = False,
     swap_sides: bool = False,
     variant: str = "standard",
+    game: str = GAME_RPS9,
 ) -> dict[str, Any]:
     """Execute a series of matches between two bot scripts and output summary statistics.
 
@@ -189,6 +245,7 @@ def run_arena(
         verbose: Whether to print detailed move-by-move traces.
         swap_sides: Whether to alternate starting player on each round.
         variant: Game rule variant ('standard', 'inverted_rps', or 'custom', default: 'standard').
+        game: Game slug ('rps9x9', 'connect4' or 'caro', default: 'rps9x9').
 
     Returns:
         Dictionary containing overall tournament statistics.
@@ -207,7 +264,7 @@ def run_arena(
     print(f"  Bot 1: {b1_label} ({p1_path.name})")
     print(f"  Bot 2: {b2_label} ({p2_path.name})")
     print(f"  Rounds: {rounds} | Max Turns: {max_turns} | Swap Sides: {swap_sides}")
-    print(f"  Rule Variant: {variant}")
+    print(f"  Game: {game} | Rule Variant: {variant}")
     print("=" * 60)
 
     b1_wins = 0
@@ -231,15 +288,25 @@ def run_arena(
             print(f"  Player 1: {first_name} vs Player 2: {second_name}")
 
         start_time = time.perf_counter()
-        result = play_match(
-            first_fn,
-            second_fn,
-            max_turns=max_turns,
-            verbose=verbose,
-            bot1_name=first_name,
-            bot2_name=second_name,
-            variant=variant,
-        )
+        if is_grid_game(game):
+            result = play_grid_match(
+                first_fn,
+                second_fn,
+                game_type=game,
+                verbose=verbose,
+                bot1_name=first_name,
+                bot2_name=second_name,
+            )
+        else:
+            result = play_match(
+                first_fn,
+                second_fn,
+                max_turns=max_turns,
+                verbose=verbose,
+                bot1_name=first_name,
+                bot2_name=second_name,
+                variant=variant,
+            )
         elapsed = time.perf_counter() - start_time
 
         winner = result["winner"]
@@ -300,6 +367,7 @@ def run_arena(
         "bot2": b2_label,
         "rounds": rounds,
         "variant": variant,
+        "game": game,
         "bot1_wins": b1_wins,
         "bot2_wins": b2_wins,
         "draws": draws,
@@ -311,7 +379,13 @@ def run_arena(
 def main() -> None:
     """CLI entrypoint for local arena."""
     parser = argparse.ArgumentParser(
-        description="Run local simulations of 9x9 Rock-Paper-Scissors Chess matches between two bot files."
+        description="Run local simulations between two bot files (RPS 9x9, Connect Four or Caro)."
+    )
+    parser.add_argument(
+        "--game",
+        choices=SUPPORTED_GAMES,
+        default=GAME_RPS9,
+        help="Game to play (default: rps9x9)",
     )
     parser.add_argument("bot1", help="Path to Player 1 Python bot file (e.g. starter_kit/bot_template.py)")
     parser.add_argument("bot2", help="Path to Player 2 Python bot file (e.g. starter_kit/heuristic_bot.py)")
@@ -337,6 +411,7 @@ def main() -> None:
             verbose=args.verbose,
             swap_sides=args.swap_sides,
             variant=args.variant,
+            game=args.game,
         )
     except Exception as exc:
         print(f"Arena Error: {exc}", file=sys.stderr)

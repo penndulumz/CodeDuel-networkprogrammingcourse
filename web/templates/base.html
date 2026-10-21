@@ -1,47 +1,90 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="vi">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>{% block title %}Battlecode 9x9 RPS Platform{% endblock %}</title>
+  <meta name="description" content="CodeDuel - đấu trường bot lập trình Python cho sinh viên: Connect Four, Caro, Cờ Oẳn Tù Tì 9x9.">
+  <title>{% block title %}CodeDuel Arena{% endblock %}</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%23172b46'/%3E%3Ccircle cx='11' cy='21' r='5' fill='%23ef4444'/%3E%3Ccircle cx='21' cy='11' r='5' fill='%233b82f6'/%3E%3C/svg%3E">
   <link rel="stylesheet" href="/static/css/style.css">
+  <link rel="stylesheet" href="/static/css/arena-light.css">
+  <link rel="stylesheet" href="/static/css/site.css">
+  <link rel="stylesheet" href="/static/css/clubhouse.css?v=club-pieces-7">
   {% block extra_head %}{% endblock %}
 </head>
-<body>
-  <nav class="navbar">
+<body class="{% block body_class %}{% endblock %}">
+  <a class="skip-link" href="#main">Bỏ qua điều hướng</a>
+
+  {% set path = request.url.path %}
+  <nav class="navbar" aria-label="Điều hướng chính">
     <a href="/" class="nav-brand">
-      <span>⚔️ Battlecode 9x9</span>
-      <span class="brand-badge">RPS Chess</span>
+      <svg class="brand-mark" viewBox="0 0 28 28" aria-hidden="true">
+        <rect x="0.5" y="0.5" width="27" height="27" rx="7" fill="#203a5e" stroke="#4d6d99"/>
+        <circle cx="9.5" cy="18.5" r="4.5" fill="#ef4444"/>
+        <circle cx="18.5" cy="9.5" r="4.5" fill="#3b82f6"/>
+        <path d="M17 18.5h4M19 16.5v4" stroke="#fbbf24" stroke-width="2" stroke-linecap="round"/>
+      </svg>
+      <span>CodeDuel</span>
+      <span class="brand-badge">Bot Arena</span>
     </a>
 
-    <ul class="nav-links">
-      <li><a href="/" class="{% if request.url.path == '/' %}active{% endif %}">Leaderboard</a></li>
-      <li><a href="/bracket" class="{% if request.url.path == '/bracket' %}active{% endif %}">Bracket</a></li>
-      <li><a href="/profile" class="{% if request.url.path == '/profile' %}active{% endif %}">Profile</a></li>
-      {% if current_user and current_user.is_admin %}
-        <li><a href="/admin" class="{% if request.url.path == '/admin' %}active{% endif %}">Admin</a></li>
-      {% endif %}
-    </ul>
+    <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="navMenu" onclick="toggleNav(this)">
+      <span class="sr-only">Mở menu</span>
+      <span class="nav-toggle-bar"></span><span class="nav-toggle-bar"></span><span class="nav-toggle-bar"></span>
+    </button>
 
-    <div class="nav-user">
-      {% if current_user %}
-        <div class="user-badge">
-          <span>👤 {{ current_user.username }}</span>
-          <span class="elo-tag">⭐ {{ current_user.elo }}</span>
-        </div>
-        <button class="btn btn-sm" onclick="logout()">Logout</button>
-      {% else %}
-        <a href="/login" class="btn btn-sm">Login</a>
-        <a href="/register" class="btn btn-primary btn-sm">Register</a>
-      {% endif %}
+    <div class="nav-menu" id="navMenu">
+      <ul class="nav-links">
+        <li><a href="/" class="{% if path == '/' %}active{% endif %}">Trang chủ</a></li>
+        <li><a href="/games" class="{% if path.startswith('/games') or path.startswith('/play') %}active{% endif %}">Trò chơi</a></li>
+        <li><a href="/guide" class="{% if path.startswith('/guide') %}active{% endif %}">Hướng dẫn</a></li>
+        <li><a href="/leaderboard" class="{% if path == '/leaderboard' %}active{% endif %}">Bảng xếp hạng</a></li>
+        <li><a href="/bracket" class="{% if path == '/bracket' %}active{% endif %}">Vòng loại</a></li>
+        <li><a href="/grade" class="{% if path == '/grade' %}active{% endif %}">Tự chấm điểm</a></li>
+        {% if current_user and current_user.is_admin %}
+          <li><a href="/admin" class="{% if path == '/admin' %}active{% endif %}">Admin</a></li>
+        {% endif %}
+      </ul>
+
+      <div class="nav-user">
+        {% if current_user %}
+          <a href="/profile" class="user-badge {% if path == '/profile' %}active{% endif %}" title="Hồ sơ & bot của bạn">
+            <span>{{ current_user.username }}</span>
+            <span class="elo-tag">{{ current_user.elo }}</span>
+          </a>
+          <button class="btn btn-sm btn-ghost" onclick="logout()" title="Logout">Đăng xuất</button>
+        {% else %}
+          <a href="/login" class="btn btn-sm btn-ghost">Đăng nhập</a>
+          <a href="/register" class="btn btn-primary btn-sm">Đăng ký</a>
+        {% endif %}
+      </div>
     </div>
   </nav>
 
-  <main class="container">
+  <main class="container" id="main">
     {% block content %}{% endblock %}
   </main>
 
+  <footer class="site-footer">
+    <div class="footer-inner">
+      <div class="footer-brand">
+        <strong>CodeDuel Arena</strong>
+        <span>Câu lạc bộ bot Python. Chơi, thử bot và tổ chức thi đấu trong lớp.</span>
+      </div>
+      <nav class="footer-links" aria-label="Liên kết cuối trang">
+        <a href="/guide">Hướng dẫn người mới</a>
+        <a href="/guide/organizer">Dành cho ban tổ chức</a>
+        <a href="/download/starter-kit.zip">Tải bộ công cụ offline</a>
+        <a href="/docs">API docs</a>
+      </nav>
+    </div>
+  </footer>
+
   <script>
+    function toggleNav(btn) {
+      const open = document.body.classList.toggle('nav-open');
+      btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+    }
     async function logout() {
       try {
         await fetch('/api/auth/logout', { method: 'POST' });

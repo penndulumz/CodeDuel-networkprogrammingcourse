@@ -274,3 +274,18 @@ Uploads bot & challenges       Inspects matches & replay
 ```
 
 The server binds to `0.0.0.0:8000`. On startup, `get_lan_ip()` resolves the host address and displays the LAN network URL on the console for competitors on the local network.
+
+## 10. Multi-Game Extension
+
+```text
+engine/games/__init__.py   GAMES registry (connect4, caro, rps9x9), helpers
+engine/games/grid.py       GridGame -> Connect4Game, CaroGame
+engine/game.py             original RPS 9x9 engine (unchanged)
+engine/runner.py           run_match(game_type=...) -> RPS loop or _run_grid_match
+engine/grader.py           grade_bot(): reference ladder, score out of 10
+server/games.py            active game setting, per-game active bot lookup
+server/network.py          LAN IP, public URL, Secure-cookie decision
+server/routes/grade.py     background grading jobs (max 2 concurrent)
+```
+
+`Bot.game_type` and `Match.game_type` select the engine; `init_db()` adds the columns to older SQLite files in place. The browser-side `web/static/js/games.js` mirrors the rules for the play-against-computer pages and `web/static/js/board_view.js` renders every board for play and grid replays.

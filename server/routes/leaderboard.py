@@ -2,8 +2,11 @@
 
 from __future__ import annotations
 
+import csv
+import io
 from typing import Any, Dict, List
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi.responses import Response
 from sqlalchemy.orm import Session
 
 from server.database import get_db
@@ -41,6 +44,33 @@ def get_leaderboard(db: Session = Depends(get_db)) -> List[Dict[str, Any]]:
         })
 
     return rankings
+
+
+@router.get("/export.csv")
+def export_leaderboard_csv(db: Session = Depends(get_db)) -> Response:
+    """Download the leaderboard as CSV so teachers can open it in Excel for grading.
+
+    Written with a UTF-8 BOM so Excel shows Vietnamese usernames correctly.
+    """
+    buffer = io.StringIO()
+    writer = csv.writer(buffer)
+    writer.writerow(["rank", "username", "elo", "wins", "draws", "losses", "matches", "win_rate_percent"])
+    # Only students: skip the organiser account and benchmark boss bots
+    admin_names = {u.username for u in db.query(User).filter(User.is_admin == True)}  # noqa: E712
+    players = [
+        row for row in get_leaderboard(db)
+        if row["username"] not in admin_names and not row["username"].startswith("[Boss]")
+    ]
+    for rank, row in enumerate(players, start=1):
+        total = row["wins"] + row["draws"] + row["losses"]
+        rate = round(100.0 * row["wins"] / total, 1) if total else 0.0
+        writer.writerow([rank, row["username"], row["elo"], row["wins"], row["draws"],
+                         row["losses"], total, rate])
+    return Response(
+        content="\ufeff" + buffer.getvalue(),
+        media_type="text/csv; charset=utf-8",
+        headers={"Content-Disposition": 'attachment; filename="leaderboard.csv"'},
+    )
 
 
 @router.get("/rating-history")

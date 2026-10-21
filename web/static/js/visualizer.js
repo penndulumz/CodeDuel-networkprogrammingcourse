@@ -5,7 +5,13 @@
  * move highlights, piece counting, and SAN move logging for standard and custom boards.
  */
 
-const TYPE_ICONS = { R: '✊', P: '✋', S: '✌' };
+const FILES = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i'];
+const RANKS = ['1', '2', '3', '4', '5', '6', '7', '8', '9'];
+const TYPE_ICONS = {
+  R: '<img class="rps-symbol" src="/static/img/rps-rock.svg" alt="Rock" draggable="false">',
+  P: '<img class="rps-symbol" src="/static/img/rps-paper.svg?v=hand-2" alt="Paper" draggable="false">',
+  S: '<img class="rps-symbol" src="/static/img/rps-scissors.svg" alt="Scissors" draggable="false">'
+};
 const TYPE_NAMES = { R: 'Rock', P: 'Paper', S: 'Scissors' };
 
 /** Format zero-based coordinates with spreadsheet-style files and one-based ranks. */

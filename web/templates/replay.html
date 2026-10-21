@@ -1,17 +1,18 @@
 {% extends "base.html" %}
 
-{% block title %}Đấu trường Trực quan (Replay Match #{{ match_id }}) - Battlecode{% endblock %}
+{% block title %}Xem lại trận #{{ match_id }} — CodeDuel{% endblock %}
 
 {% block content %}
 <div class="page-header">
   <div>
-    <h1 class="page-title">Trực quan hóa Trận đấu #{{ match_id }} (Match Replay)</h1>
-    <div class="page-subtitle">Xem lại từng nước đi trên bàn cờ 9×9 Rock-Paper-Scissors Chess</div>
+    <div class="page-eyebrow">Xem lại trận</div>
+    <h1 class="page-title">Trận đấu #{{ match_id }}</h1>
+    <div class="page-subtitle">Dùng nút phát hoặc phím mũi tên để xem từng nước đi.</div>
   </div>
 
-  <div style="display: flex; gap: 10px;">
-    <a href="/" class="btn btn-sm">⬅ Về Bảng xếp hạng</a>
-    <a href="/profile" class="btn btn-sm">👤 Hồ sơ của tôi</a>
+  <div class="page-actions">
+    <a href="/leaderboard" class="btn btn-sm">← Bảng xếp hạng</a>
+    <a href="/profile" class="btn btn-sm">Hồ sơ của tôi</a>
   </div>
 </div>
 
@@ -27,13 +28,12 @@
       <div class="counts" id="p1counts"></div>
     </div>
 
-    <div class="card" style="font-size: 13px;">
-      <h4 style="margin: 0 0 8px; color: var(--muted); text-transform: uppercase; font-size: 11px; letter-spacing: 1px;">
-        Thông tin Trận đấu
-      </h4>
-      <div style="display: flex; flex-direction: column; gap: 6px;">
-        <div>Mã trận: <b>#{{ match_id }}</b></div>
-        <div>Phím tắt: <b>←</b> Lùi / <b>→</b> Tiến / <b>Space</b> Dừng</div>
+    <div class="log-panel">
+      <h3>Thông tin trận</h3>
+      <div class="info-list">
+        <div class="row"><span>Mã trận</span><b>#{{ match_id }}</b></div>
+        <div class="row"><span>Lùi / Tiến</span><span><kbd>←</kbd> <kbd>→</kbd></span></div>
+        <div class="row"><span>Phát / Dừng</span><kbd>Space</kbd></div>
         {% if match and match.rule_variant == 'inverted_rps' %}
         <div id="ruleVariantBadge" class="variant-badge">
           Chế độ: <span class="tag purple">Đảo chiều ngũ hành (Kéo > Búa > Bao)</span>
@@ -66,14 +66,14 @@
       <div class="controls-row">
         <button class="btn btn-sm" id="btnFirst" title="Về nước đầu tiên">⏮ Đầu</button>
         <button class="btn btn-sm" id="btnPrev" title="Lùi 1 nước (←)">◀ Lùi</button>
-        <button class="btn btn-primary btn-sm" id="btnPlayPause" style="min-width: 90px;" title="Phát / Tạm dừng (Space)">
+        <button class="btn btn-primary btn-sm" id="btnPlayPause" style="min-width: 96px;" title="Phát / Tạm dừng (Space)">
           ▶ Phát
         </button>
         <button class="btn btn-sm" id="btnNext" title="Tiến 1 nước (→)">Tiến ▶</button>
         <button class="btn btn-sm" id="btnLast" title="Tới nước cuối cùng">Cuối ⏭</button>
 
         <!-- Speed Switch -->
-        <div class="speed-switch" style="margin-left: 12px;">
+        <div class="speed-switch">
           <button class="speed-btn active" data-speed="1">1x</button>
           <button class="speed-btn" data-speed="2">2x</button>
           <button class="speed-btn" data-speed="4">4x</button>
@@ -82,7 +82,7 @@
 
       <!-- Scrubber Row -->
       <div class="scrubber-row">
-        <span style="font-size: 12px; color: var(--muted);">Lượt:</span>
+        <span class="scrubber-label">Lượt</span>
         <input type="range" class="scrubber-slider" id="turnSlider" min="0" max="0" value="0">
         <span class="turn-counter" id="turnCounter">0 / 0</span>
       </div>
@@ -115,7 +115,7 @@
 {% endblock %}
 
 {% block scripts %}
-<script src="/static/js/visualizer.js?v=turn-limit-score-v1"></script>
+<script src="/static/js/visualizer.js?v=club-pieces-3"></script>
 <script>
   document.addEventListener('DOMContentLoaded', async () => {
     const matchId = {{ match_id }};

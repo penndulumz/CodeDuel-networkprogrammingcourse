@@ -15,8 +15,9 @@ import time
 from typing import Any, Callable
 
 from engine.game import MAX_TURNS
+from engine.games import normalize_game_type
 from engine.runner import run_match, save_replay
-from server.database import SessionLocal
+from server.database import DATA_DIR, SessionLocal
 from server.models import Match, TournamentSetting, User
 from server.tournament import apply_elo_change, calculate_elo_delta
 from server.tournament_config import load_tournament_config
@@ -113,6 +114,8 @@ def execute_match_job(
         if not rule_variant:
             rule_variant = "standard"
 
+        game_type = normalize_game_type(getattr(match, "game_type", None))
+
         p1_meta = {
             "id": player1.id,
             "username": player1.username,
@@ -149,11 +152,12 @@ def execute_match_job(
             player1_info=p1_meta,
             player2_info=p2_meta,
             variant=rule_variant,
+            game_type=game_type,
             progress_callback=save_live_progress if match.is_bracket else None,
         )
 
         # Save replay JSON
-        replays_dir = Path("replays").resolve()
+        replays_dir = (DATA_DIR / "replays").resolve()
         replays_dir.mkdir(parents=True, exist_ok=True)
         replay_filepath = str(replays_dir / f"match_{match_id}.json")
         save_replay(match_result, replay_filepath)

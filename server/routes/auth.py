@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session
 
 from server.database import get_db
 from server.models import User
+from server.network import should_use_secure_cookie
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -158,7 +159,8 @@ async def login(
     token = secrets.token_hex(24)
     ACTIVE_SESSIONS[token] = user.id
 
-    secure_cookie = os.getenv("COOKIE_SECURE", "false").strip().lower() == "true"
+    # Secure flag follows COOKIE_SECURE, or the request scheme when unset (auto)
+    secure_cookie = should_use_secure_cookie(request)
 
     response.set_cookie(
         key="session_token",
@@ -189,7 +191,8 @@ def logout(
     if token and token in ACTIVE_SESSIONS:
         del ACTIVE_SESSIONS[token]
 
-    secure_cookie = os.getenv("COOKIE_SECURE", "false").strip().lower() == "true"
+    # Secure flag follows COOKIE_SECURE, or the request scheme when unset (auto)
+    secure_cookie = should_use_secure_cookie(request)
 
     response.delete_cookie(
         key="session_token",

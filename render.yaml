@@ -1,0 +1,24 @@
+services:
+  - type: web
+    name: codeduel
+    runtime: docker
+    plan: starter            # persistent disks need a paid instance
+    healthCheckPath: /
+    autoDeploy: true
+    disk:
+      name: codeduel-data
+      mountPath: /data
+      sizeGB: 1
+    envVars:
+      - key: DATA_DIR
+        value: /data
+      - key: ADMIN_USERNAME
+        value: admin
+      - key: ADMIN_PASSWORD
+        sync: false          # set in the Render dashboard, never commit it
+      - key: COOKIE_SECURE
+        value: "true"
+      - key: PUBLIC_URL
+        sync: false          # e.g. https://codeduel.onrender.com
+      - key: ALLOWED_ORIGINS
+        sync: false          # same as PUBLIC_URL

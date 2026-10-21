@@ -1,13 +1,19 @@
 """Database connection, SQLite engine configuration, and session management."""
 
 import os
+from pathlib import Path
 from typing import Generator
 from sqlalchemy import create_engine, event, inspect, text
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import declarative_base, sessionmaker, Session
 
-# Database URL defaulting to SQLite app.db, configurable via DATABASE_URL environment variable
-DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///app.db")
+# Writable directory for the SQLite database, uploaded bots and replays. Point
+# DATA_DIR at a persistent volume (e.g. /data on Render/Railway) in production.
+DATA_DIR = Path(os.getenv("DATA_DIR", "."))
+DATA_DIR.mkdir(parents=True, exist_ok=True)
+
+# Database URL defaulting to SQLite app.db inside DATA_DIR, configurable via DATABASE_URL
+DATABASE_URL = os.getenv("DATABASE_URL", f"sqlite:///{(DATA_DIR / 'app.db').as_posix()}")
 
 connect_args = {}
 if DATABASE_URL.startswith("sqlite"):
@@ -50,43 +56,41 @@ def get_db() -> Generator[Session, None, None]:
         db.close()
 
 
+# Columns added after the first release. create_all() never alters existing
+# tables, so older app.db files get these columns added in place on startup.
+# Format: (table, column, SQL type and default).
+ADDED_COLUMNS: list[tuple[str, str, str]] = [
+    ("bots", "game_type", "VARCHAR(32) NOT NULL DEFAULT 'rps9x9'"),
+    ("matches", "game_type", "VARCHAR(32) NOT NULL DEFAULT 'rps9x9'"),
+    ("matches", "bracket_match_id", "INTEGER"),
+    ("matches", "live_moves", "TEXT NOT NULL DEFAULT '[]'"),
+    ("bracket_matches", "game_results", "TEXT NOT NULL DEFAULT '[]'"),
+]
+
+
+def _add_missing_columns(eng) -> None:
+    """Add columns from ADDED_COLUMNS that an existing database is missing."""
+    inspector = inspect(eng)
+    existing_tables = set(inspector.get_table_names())
+    with eng.begin() as conn:
+        for table, column, ddl in ADDED_COLUMNS:
+            if table not in existing_tables:
+                continue
+            columns = {col["name"] for col in inspector.get_columns(table)}
+            if column not in columns:
+                conn.execute(text(f"ALTER TABLE {table} ADD COLUMN {column} {ddl}"))
+        if "matches" in existing_tables:
+            conn.execute(
+                text(
+                    "CREATE INDEX IF NOT EXISTS ix_matches_bracket_match_id "
+                    "ON matches (bracket_match_id)"
+                )
+            )
+
+
 def init_db(target_engine=None) -> None:
-    """Create registered tables and add live tournament columns to older SQLite files."""
+    """Create all database tables and upgrade older schemas in place."""
     from server import models  # noqa: F401
     eng = target_engine or engine
     Base.metadata.create_all(bind=eng)
-
-    # SQLite create_all does not add newly declared columns to an existing database.
-    if eng.dialect.name == "sqlite":
-        with eng.begin() as connection:
-            tables = inspect(connection).get_table_names()
-            if "matches" in tables:
-                match_columns = {
-                    column["name"] for column in inspect(connection).get_columns("matches")
-                }
-                if "bracket_match_id" not in match_columns:
-                    connection.execute(
-                        text("ALTER TABLE matches ADD COLUMN bracket_match_id INTEGER")
-                    )
-                if "live_moves" not in match_columns:
-                    connection.execute(
-                        text("ALTER TABLE matches ADD COLUMN live_moves TEXT NOT NULL DEFAULT '[]'")
-                    )
-                connection.execute(
-                    text(
-                        "CREATE INDEX IF NOT EXISTS ix_matches_bracket_match_id "
-                        "ON matches (bracket_match_id)"
-                    )
-                )
-            if "bracket_matches" in tables:
-                bracket_columns = {
-                    column["name"]
-                    for column in inspect(connection).get_columns("bracket_matches")
-                }
-                if "game_results" not in bracket_columns:
-                    connection.execute(
-                        text(
-                            "ALTER TABLE bracket_matches ADD COLUMN "
-                            "game_results TEXT NOT NULL DEFAULT '[]'"
-                        )
-                    )
+    _add_missing_columns(eng)

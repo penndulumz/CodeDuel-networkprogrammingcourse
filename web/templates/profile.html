@@ -1,49 +1,82 @@
 {% extends "base.html" %}
 
-{% block title %}Hồ sơ & Quản lý Bot (Profile) - Battlecode 9x9{% endblock %}
+{% block title %}Hồ sơ & Quản lý Bot — CodeDuel{% endblock %}
 
 {% block content %}
 <div class="page-header">
   <div>
-    <h1 class="page-title">Hồ sơ người chơi & Quản lý Bot (Profile)</h1>
-    <div class="page-subtitle">Tải lên thuật toán Python (.py) và theo dõi lịch sử trận đấu</div>
+    <div class="page-eyebrow">Bot của bạn</div>
+    <h1 class="page-title">{% if current_user %}{{ current_user.username }}{% else %}Hồ sơ người chơi{% endif %}</h1>
+    <div class="page-subtitle">Nộp bot, chọn bản dùng để thi đấu và xem lại các trận đã chơi.</div>
   </div>
 
   {% if current_user %}
-  <div style="display: flex; gap: 12px; align-items: center;">
-    <div class="card" style="padding: 8px 16px; display: flex; gap: 16px;">
-      <div>Elo: <strong class="elo-badge">{{ current_user.elo }}</strong></div>
-      <div>Thắng: <strong style="color: #34d399;">{{ current_user.wins }}</strong></div>
-      <div>Thua: <strong style="color: #f87171;">{{ current_user.losses }}</strong></div>
-    </div>
+  <div class="page-actions">
+    <a href="/grade" class="btn btn-sm">Tự chấm điểm</a>
+    <a href="/leaderboard" class="btn btn-primary btn-sm">Tìm đối thủ</a>
   </div>
   {% endif %}
 </div>
 
 {% if not current_user %}
-<div class="card" style="text-align: center; padding: 48px 24px;">
-  <h2>Vui lòng đăng nhập để quản lý Bot</h2>
-  <p style="color: var(--muted); margin: 8px 0 24px;">Bạn cần đăng nhập tài khoản để tải lên file mã nguồn bot Python (.py) và tham gia thi đấu.</p>
-  <div>
+<div class="card" style="text-align: center; padding: 56px 24px;">
+  <h2 style="margin: 0;">Đăng nhập để nộp bot</h2>
+  <p class="text-muted" style="margin: 8px auto 24px; max-width: 460px;">Bạn cần đăng nhập tài khoản để tải lên file mã nguồn bot Python (.py) và tham gia thi đấu.</p>
+  <div class="page-actions" style="justify-content: center;">
     <a href="/login" class="btn btn-primary">Đăng nhập</a>
-    <a href="/register" class="btn" style="margin-left: 8px;">Đăng ký tài khoản</a>
+    <a href="/register" class="btn">Đăng ký tài khoản</a>
   </div>
 </div>
 {% else %}
 
-<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-bottom: 24px;">
+{% set games = current_user.wins + current_user.losses + current_user.draws %}
+<div class="stat-grid">
+  <div class="stat">
+    <div class="stat-label">Elo</div>
+    <div class="stat-value accent">{{ current_user.elo }}</div>
+    <div class="stat-note">{{ games }} trận đã đấu</div>
+  </div>
+  <div class="stat">
+    <div class="stat-label">Thắng</div>
+    <div class="stat-value good">{{ current_user.wins }}</div>
+    <div class="stat-note">Tỉ lệ thắng {{ ((current_user.wins * 100 / games) | round | int) if games else 0 }}%</div>
+  </div>
+  <div class="stat">
+    <div class="stat-label">Thua</div>
+    <div class="stat-value bad">{{ current_user.losses }}</div>
+    <div class="stat-note">{{ current_user.draws }} trận hòa</div>
+  </div>
+  <div class="stat">
+    <div class="stat-label">Bot đã nộp</div>
+    <div class="stat-value">{{ user_bots | length }}</div>
+    <div class="stat-note">{% if user_bots | selectattr('is_active') | selectattr('game_type', 'equalto', active_game.slug) | list %}Có bot cho {{ active_game.name }}{% else %}Chưa có bot cho {{ active_game.name }}{% endif %}</div>
+  </div>
+</div>
+
+<div class="grid-2 section">
   <!-- Bot Upload Box -->
   <div class="card">
     <div class="card-header">
-      <h2 class="card-title">Tải lên Bot mới (.py)</h2>
+      <div>
+        <h2 class="card-title">Nộp bot mới</h2>
+        <div class="card-desc">Chọn file Python có hàm get_move(). Nếu file có lỗi, bạn sẽ nhận được thông báo sau khi nộp.</div>
+      </div>
     </div>
 
     <form id="uploadBotForm" onsubmit="handleBotUpload(event)">
+      <div class="form-group">
+        <label class="form-label" for="uploadGame">Bot này dùng cho trò chơi</label>
+        <select id="uploadGame" class="form-control">
+          {% for g in games_list %}
+          <option value="{{ g.slug }}" {% if g.slug == active_game.slug %}selected{% endif %}>{{ g.name_vi }}{% if g.slug == active_game.slug %} — đang thi đấu{% endif %}</option>
+          {% endfor %}
+        </select>
+      </div>
       <div class="drop-zone" id="dropZone" onclick="document.getElementById('botFileInput').click()">
-        <div class="drop-icon">📤</div>
+        <div class="drop-icon">↑</div>
         <div class="drop-text">Kéo thả file bot .py vào đây hoặc nhấp để chọn</div>
         <div class="drop-sub">File mã nguồn Python chứa hàm <code>get_move(board, my_player, history)</code></div>
-        <div id="selectedFileName" style="margin-top: 10px; font-weight: 700; color: var(--accent);"></div>
+        <div id="selectedFileName" class="drop-file"></div>
       </div>
 
       <input type="file" id="botFileInput" name="file" accept=".py" style="display: none;" onchange="handleFileSelect(event)">
@@ -51,55 +84,55 @@
       <div id="uploadStatus" style="margin-top: 12px; font-size: 13px; display: none;"></div>
 
       <div style="margin-top: 16px;">
-        <button type="submit" id="btnUploadSubmit" class="btn btn-primary" style="width: 100%;" disabled>
-          Tải lên và Kích hoạt Bot
+        <button type="submit" id="btnUploadSubmit" class="btn btn-primary btn-lg btn-block" disabled>
+          Nộp và dùng bot này
         </button>
       </div>
     </form>
   </div>
 
   <!-- Bot List Box -->
-  <div class="card">
-    <div class="card-header">
-      <h2 class="card-title">Danh sách Bot đã nộp</h2>
+  <div class="card card-flush">
+    <div class="card-header" style="padding-bottom: 16px;">
+      <h2 class="card-title">Các bản đã nộp</h2>
     </div>
 
-    <div style="max-height: 280px; overflow-y: auto;">
-      <table class="table-dark" style="font-size: 13px;">
+    <div class="table-wrap" style="max-height: 330px; overflow-y: auto;">
+      <table class="table-dark">
         <thead>
           <tr>
             <th>Tên file</th>
+            <th>Trò chơi</th>
             <th>Trạng thái</th>
-            <th style="text-align: right;">Hành động</th>
+            <th class="right">Hành động</th>
           </tr>
         </thead>
         <tbody id="botTableBody">
           {% for bot in user_bots %}
           <tr>
             <td>
-              <strong>{{ bot.filename }}</strong>
-              <div style="color: var(--muted); font-size: 11px;">{{ bot.uploaded_at }}</div>
+              <strong class="mono">{{ bot.filename }}</strong>
+              <div class="text-muted" style="font-size: 11px;">{{ bot.uploaded_at.strftime('%d/%m/%Y %H:%M') if bot.uploaded_at else '' }}</div>
             </td>
+            <td><span class="chip">{{ games_map[bot.game_type].name if bot.game_type in games_map else bot.game_type }}</span></td>
             <td>
               {% if bot.is_active %}
-                <span class="tag" style="background: rgba(16, 185, 129, 0.2); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.4);">
-                  ● Đang kích hoạt
-                </span>
+                <span class="tag green">● Đang kích hoạt</span>
               {% else %}
-                <span style="color: var(--muted); font-size: 12px;">Không kích hoạt</span>
+                <span class="tag gray">Không kích hoạt</span>
               {% endif %}
             </td>
-            <td style="text-align: right;">
+            <td class="right">
               {% if not bot.is_active %}
                 <button class="btn btn-sm" onclick="activateBot({{ bot.id }})">Kích hoạt</button>
               {% else %}
-                <span style="color: var(--muted); font-size: 12px;">Đang dùng</span>
+                <span class="text-muted" style="font-size: 12px;">Đang dùng</span>
               {% endif %}
             </td>
           </tr>
           {% else %}
           <tr>
-            <td colspan="3" style="text-align: center; color: var(--muted); padding: 20px;">
+            <td colspan="4" class="empty-cell">
               Chưa tải lên bot nào. Hãy nộp bot đầu tiên bằng form bên cạnh!
             </td>
           </tr>
@@ -111,7 +144,7 @@
 </div>
 
 <!-- User Rating Trajectory Chart -->
-<div id="user-rating-chart-card" class="chart-card" style="margin-bottom: 24px;">
+<div id="user-rating-chart-card" class="chart-card section">
   <div class="chart-header">
     <h2 class="chart-title">Biến động Elo cá nhân</h2>
   </div>
@@ -119,9 +152,9 @@
 </div>
 
 <!-- Recent Matches History -->
-<div class="card">
-  <div class="card-header">
-    <h2 class="card-title">Lịch sử trận đấu gần đây</h2>
+<div class="card card-flush" id="match-history">
+  <div class="card-header" style="padding-bottom: 16px;">
+    <h2 class="card-title">Lịch sử trận đấu</h2>
   </div>
 
   <div class="table-wrap">
@@ -129,18 +162,20 @@
       <thead>
         <tr>
           <th style="width: 80px;">Trận</th>
+          <th>Trò chơi</th>
           <th>Người chơi 1 (Đỏ)</th>
           <th>Người chơi 2 (Xanh)</th>
           <th>Kết quả</th>
           <th>Số lượt</th>
           <th>Thời gian</th>
-          <th style="text-align: right;">Xem lại</th>
+          <th class="right">Xem lại</th>
         </tr>
       </thead>
       <tbody>
         {% for match in user_matches %}
         <tr>
-          <td>#{{ match.id }}</td>
+          <td class="num">#{{ match.id }}</td>
+          <td><span class="chip">{{ games_map[match.game_type].name if match.game_type in games_map else match.game_type }}</span></td>
           <td>
             <strong style="color: var(--p1);">{{ match.player1.username if match.player1 else 'P1' }}</strong>
           </td>
@@ -149,24 +184,23 @@
           </td>
           <td>
             {% if match.winner_id == current_user.id %}
-              <span class="tag" style="background: rgba(16, 185, 129, 0.2); color: #34d399;">Thắng ({{ match.win_reason }})</span>
+              <span class="tag green">Thắng ({{ match.win_reason }})</span>
             {% elif match.winner_id is none %}
-              <span class="tag" style="background: rgba(148, 163, 184, 0.2); color: #94a3b8;">Hòa</span>
+              <span class="tag gray">Hòa</span>
             {% else %}
-              <span class="tag" style="background: rgba(239, 68, 68, 0.2); color: #f87171;">Thua ({{ match.win_reason }})</span>
+              <span class="tag red">Thua ({{ match.win_reason }})</span>
             {% endif %}
+            {% if match.is_bracket %}<span class="tag amber">Bracket</span>{% endif %}
           </td>
-          <td>{{ match.total_turns }} lượt</td>
-          <td style="color: var(--muted); font-size: 12px;">{{ match.created_at or '' }}</td>
-          <td style="text-align: right;">
-            <a href="/replay/{{ match.id }}" class="btn btn-sm btn-primary">
-              🎬 Replay
-            </a>
+          <td class="num">{{ match.total_turns }} lượt</td>
+          <td class="text-muted" style="font-size: 12px;">{{ match.created_at.strftime('%d/%m/%Y %H:%M') if match.created_at else '' }}</td>
+          <td class="right">
+            <a href="/replay/{{ match.id }}" class="btn btn-sm">Replay</a>
           </td>
         </tr>
         {% else %}
         <tr>
-          <td colspan="7" style="text-align: center; color: var(--muted); padding: 24px;">
+          <td colspan="8" class="empty-cell">
             Chưa có trận đấu nào được ghi nhận. Hãy thách đấu người chơi khác trên Bảng xếp hạng!
           </td>
         </tr>
@@ -176,6 +210,20 @@
   </div>
 </div>
 
+{% if history_total %}
+<nav class="history-pagination" aria-label="Phân trang lịch sử đấu">
+  <span>{{ history_start }}–{{ history_end }} / {{ history_total }} trận</span>
+  <div class="pagination-actions">
+    {% if history_page > 1 %}
+    <a class="btn btn-sm" href="/profile?page={{ history_page - 1 }}#match-history" rel="prev">← Trước</a>
+    {% else %}<span class="btn btn-sm" aria-disabled="true">← Trước</span>{% endif %}
+    <span class="pagination-current">Trang {{ history_page }} / {{ history_total_pages }}</span>
+    {% if history_page < history_total_pages %}
+    <a class="btn btn-sm" href="/profile?page={{ history_page + 1 }}#match-history" rel="next">Sau →</a>
+    {% else %}<span class="btn btn-sm" aria-disabled="true">Sau →</span>{% endif %}
+  </div>
+</nav>
+{% endif %}
 {% endif %}
 {% endblock %}
 
@@ -255,6 +303,7 @@
 
     const formData = new FormData();
     formData.append('file', selectedFile);
+    formData.append('game_type', document.getElementById('uploadGame').value);
 
     try {
       const res = await fetch('/api/bots/upload', {

@@ -1,0 +1,149 @@
+{% extends "base.html" %}
+
+{% block title %}Hướng dẫn tổ chức — CodeDuel{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <div class="page-eyebrow"><a href="/guide">Hướng dẫn</a> / Ban tổ chức & giảng viên</div>
+    <h1 class="page-title">Tổ chức buổi chơi</h1>
+    <p class="lead">Chuẩn bị máy chủ, kết nối các máy trong phòng và thu bài để chấm. Có kịch bản 120 phút ở cuối trang.</p>
+  </div>
+</div>
+
+<div class="doc-layout">
+  <nav class="doc-toc" aria-label="Mục lục">
+    <span class="toc-title">Nội dung</span>
+    <a href="#chuan-bi">1. Chuẩn bị máy chủ</a>
+    <a href="#lan">2. Chạy offline qua LAN</a>
+    <a href="#wan">3. Mở ra Internet (WAN)</a>
+    <a href="#dieu-hanh">4. Điều hành buổi thi</a>
+    <a href="#cham-diem">5. Chấm điểm</a>
+    <a href="#kich-ban">Kịch bản 120 phút</a>
+    <a href="#su-co">Xử lý sự cố</a>
+  </nav>
+
+  <div class="prose">
+    <section id="chuan-bi">
+      <h2><span class="step-num">1</span>Chuẩn bị máy chủ</h2>
+      <p>Chuẩn bị một máy chủ có Python 3.10+ và chạy thử với số máy dự kiến trước buổi thi. Cài thư viện khi còn Internet; sau đó có thể tổ chức hoàn toàn qua LAN.</p>
+      <pre class="code">pip install -r requirements.txt
+<span class="c"># Đặt mật khẩu admin riêng trước khi cho người khác truy cập</span>
+set ADMIN_PASSWORD=mat-khau-cua-ban        <span class="c"># Windows (cmd)</span>
+export ADMIN_PASSWORD=mat-khau-cua-ban     <span class="c"># macOS / Linux</span>
+python main.py</pre>
+      <p>Màn hình khởi động in ra địa chỉ <strong>LAN Network URL</strong>, ví dụ <code>http://192.168.1.15:8000</code>. Đăng nhập <a href="/admin">trang Admin</a> bằng tài khoản admin để cấu hình giải.</p>
+    </section>
+
+    <section id="lan">
+      <h2><span class="step-num">2</span>Chạy offline qua mạng LAN</h2>
+      <p>Không cần Internet. Server, các máy sinh viên và router chỉ cần chung một mạng Wi-Fi hoặc mạng dây.</p>
+      <ol class="checklist">
+        <li>Máy chủ và máy sinh viên kết nối cùng một router/Wi-Fi (có thể dùng router mang theo, không cần cắm mạng ngoài).</li>
+        <li>Mở cổng 8000 trên tường lửa máy chủ. Windows (PowerShell chạy quyền Admin):
+          <pre class="code">netsh advfirewall firewall add rule name="CodeDuel 8000" dir=in action=allow protocol=TCP localport=8000</pre></li>
+        <li>Chiếu địa chỉ LAN lên màn hình lớn; sinh viên gõ vào trình duyệt. Thanh trạng thái ở <a href="/">trang chủ</a> có nút sao chép địa chỉ.</li>
+        <li>Phát <a href="/download/starter-kit.zip">bộ công cụ offline</a> qua USB hoặc cho sinh viên tải từ chính server LAN.</li>
+      </ol>
+      <div class="callout ok"><span class="callout-icon">✓</span><p>Trang web không tải tài nguyên nào từ Internet (không CDN, không font ngoài), nên hoạt động đầy đủ trong mạng nội bộ khép kín.</p></div>
+    </section>
+
+    <section id="wan">
+      <h2><span class="step-num">3</span>Mở ra Internet (WAN)</h2>
+      <p>Dùng khi có người tham gia từ xa, hoặc muốn có website công khai cho cả khóa.</p>
+
+      <h3>Cách A — Cloudflare Tunnel (khuyến nghị, miễn phí, không cần mở port router)</h3>
+      <ol>
+        <li>Cài <code>cloudflared</code> một lần. Windows: <code>winget install --id Cloudflare.cloudflared</code>; macOS: <code>brew install cloudflared</code>.</li>
+        <li>Chạy server kèm cờ <code>--tunnel</code>:
+          <pre class="code">python main.py --tunnel</pre></li>
+        <li>Banner in thêm dòng <strong>Public WAN URL</strong> dạng <code>https://ten-ngau-nhien.trycloudflare.com</code>. Gửi link này cho người chơi; trang chủ cũng tự hiển thị link đó.</li>
+      </ol>
+      <p>Hoạt động sau NAT/tường lửa trường học vì chỉ cần kết nối HTTPS đi ra. Cookie đăng nhập tự bật chế độ <code>Secure</code> khi truy cập qua HTTPS, nên không cần cấu hình thêm.</p>
+
+      <h3>Cách B — máy chủ riêng / VPS / reverse proxy</h3>
+      <pre class="code">python main.py --public-url https://arena.ten-mien-cua-ban.vn
+<span class="c"># Nếu proxy (Nginx, Caddy…) chạy ở máy khác, khai báo IP của proxy:</span>
+FORWARDED_ALLOW_IPS=10.0.0.5 python main.py --public-url https://arena.ten-mien-cua-ban.vn</pre>
+
+      <h3>Vì sao chơi qua WAN vẫn mượt</h3>
+      <ul>
+        <li>Trận đấu chạy hoàn toàn trên server; trình duyệt chỉ gửi yêu cầu thách đấu và tải replay khi xong, nên độ trễ mạng không ảnh hưởng kết quả hay giới hạn 1 giây/nước.</li>
+        <li>Trang web và file replay được nén gzip (giảm dung lượng truyền tùy nội dung).</li>
+        <li>Chơi thử với máy chạy hoàn toàn trong trình duyệt, không cần gửi dữ liệu về server.</li>
+      </ul>
+      <div class="callout warn"><span class="callout-icon">!</span><p>Khi mở ra Internet: luôn đổi <code>ADMIN_PASSWORD</code>, và tắt server sau buổi thi. Link <code>trycloudflare.com</code> thay đổi mỗi lần khởi động.</p></div>
+    </section>
+
+    <section id="dieu-hanh">
+      <h2><span class="step-num">4</span>Điều hành buổi thi</h2>
+      <p>Tại <a href="/admin">trang Admin</a>:</p>
+      <table>
+        <thead><tr><th>Thiết lập</th><th>Gợi ý cho sinh viên năm nhất</th></tr></thead>
+        <tbody>
+          <tr><td>Game đang thi đấu</td><td><strong>Connect Four</strong> cho buổi đầu; Caro cho buổi 2; RPS 9×9 cho vòng nâng cao.</td></tr>
+          <tr><td>Chế độ cổng</td><td>Chọn <em>Force Open</em> trong giờ thi để không phụ thuộc đồng hồ máy.</td></tr>
+          <tr><td>Thời gian mỗi nước</td><td>1 giây (mặc định). Máy chủ yếu thì tăng lên 2 giây.</td></tr>
+          <tr><td>Boss Arena</td><td>Triển khai Boss cấp 1–2 để sinh viên có đối thủ ngay từ đầu (chỉ áp dụng cho RPS 9×9).</td></tr>
+          <tr><td>Bracket</td><td>Cuối buổi bấm tạo Bracket để top người chơi đấu loại trực tiếp BO3.</td></tr>
+        </tbody>
+      </table>
+      <p>Mỗi người giữ một bot đang kích hoạt cho <em>từng</em> game, nên đổi game giữa các buổi không làm mất bot cũ.</p>
+    </section>
+
+    <section id="cham-diem">
+      <h2><span class="step-num">5</span>Chấm điểm</h2>
+      <h3>Điểm kỹ thuật (tự động, khách quan)</h3>
+      <p>Bộ chấm cho bot đấu với các đối thủ chuẩn từ dễ đến khó và quy ra thang 10. Sinh viên tự chấm ở trang <a href="/grade">Tự chấm điểm</a>; giảng viên chấm cả lớp offline bằng một lệnh:</p>
+      <pre class="code"><span class="c"># Mỗi sinh viên nộp một file .py vào thư mục bai_nop/</span>
+python starter_kit/grade.py bai_nop --game connect4 --csv diem_ky_thuat.csv</pre>
+      <h3>Điểm thi đấu</h3>
+      <p>Tải bảng xếp hạng Elo dạng CSV tại <a href="/api/leaderboard/export.csv">/api/leaderboard/export.csv</a> (mở bằng Excel). Có thể quy đổi thứ hạng thành điểm cộng.</p>
+      <h3>Phiếu đánh giá chéo sau buổi chơi</h3>
+      <p>Mỗi nhóm chấm một phiếu cho nhóm được phân công, không tự chấm nhóm mình. Ghi tên nhóm chấm, nhóm được chấm, game, thời gian và bằng chứng (mã trận, replay hoặc ảnh lỗi). Có thể in phần này để dùng khi không có Internet.</p>
+      <table aria-label="Tiêu chí đánh giá chéo">
+        <thead><tr><th>Tiêu chí</th><th>Điểm tối đa</th><th>Bằng chứng cần ghi</th></tr></thead>
+        <tbody>
+          <tr><td>Người mới làm theo hướng dẫn và chơi được</td><td>3</td><td>Thực hiện từ trang chủ đến một trận hoàn chỉnh</td></tr>
+          <tr><td>Chơi offline và tự chấm bot được</td><td>3</td><td>Lệnh chấm, kết quả và file CSV</td></tr>
+          <tr><td>Luật chơi, kết quả và replay đúng</td><td>2</td><td>Mã trận và tình huống kiểm tra</td></tr>
+          <tr><td>Giao diện dễ đọc, dùng được trên màn hình nhỏ</td><td>2</td><td>Thiết bị, trang và thao tác đã thử</td></tr>
+        </tbody>
+      </table>
+      <p>Cuối phiếu ghi một điểm tốt, một lỗi có bước tái hiện và một đề xuất cải thiện. Ban tổ chức tổng hợp các phiếu, xử lý nhận xét mâu thuẫn dựa trên bằng chứng trước khi công bố điểm.</p>
+      <p>Điểm tự chấm bot là điểm luyện tập theo đối thủ chuẩn. Nếu môn học quy đổi điểm giữa kỳ theo phân bố chuẩn, giảng viên công bố cách quy đổi sau khi tổng hợp cả lớp; hệ thống không tự ép điểm luyện tập thành phân bố chuẩn.</p>
+      <h3>Gợi ý công thức</h3>
+      <table>
+        <tbody>
+          <tr><td>60%</td><td>Điểm kỹ thuật từ bộ chấm tự động (thang 10)</td></tr>
+          <tr><td>30%</td><td>Thứ hạng Elo / kết quả Bracket</td></tr>
+          <tr><td>10%</td><td>Trình bày ý tưởng thuật toán (vấn đáp ngắn)</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section id="kich-ban">
+      <h2>Kịch bản buổi 120 phút</h2>
+      <table>
+        <thead><tr><th>Thời gian</th><th>Hoạt động</th></tr></thead>
+        <tbody>
+          <tr><td>0–10'</td><td>Giới thiệu, chiếu địa chỉ server, sinh viên đăng ký tài khoản.</td></tr>
+          <tr><td>10–25'</td><td>Chơi thử Connect Four với máy trên trình duyệt để nắm luật.</td></tr>
+          <tr><td>25–40'</td><td>Đọc <a href="/guide">hướng dẫn</a>, tải bộ công cụ, chạy bot mẫu.</td></tr>
+          <tr><td>40–85'</td><td>Viết bot, tự chấm điểm, nộp bot lên server, thách đấu tự do.</td></tr>
+          <tr><td>85–110'</td><td>Đóng cổng, tạo Bracket, chiếu replay các trận chung kết.</td></tr>
+          <tr><td>110–120'</td><td>Tổng kết, xuất bảng điểm CSV.</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section id="su-co" class="faq">
+      <h2>Xử lý sự cố</h2>
+      <details><summary>Máy sinh viên không vào được địa chỉ LAN</summary><p>Kiểm tra cùng mạng Wi-Fi, tường lửa đã mở cổng 8000, và Wi-Fi không bật chế độ "client isolation" (hay gặp ở Wi-Fi công cộng — dùng router riêng).</p></details>
+      <details><summary>Đăng nhập xong vẫn bị đăng xuất khi dùng link HTTPS</summary><p>Không đặt <code>COOKIE_SECURE=false</code> khi chạy qua HTTPS. Để trống biến này thì server tự nhận biết.</p></details>
+      <details><summary>Khởi động lại server, mọi người bị đăng xuất</summary><p>Phiên đăng nhập lưu trong bộ nhớ, nên sinh viên chỉ cần đăng nhập lại. Bot, trận đấu và Elo vẫn còn trong <code>app.db</code>.</p></details>
+      <details><summary>Server chậm khi cả lớp cùng chấm điểm</summary><p>Server chỉ chấm tối đa 2 bot cùng lúc, các yêu cầu khác tự xếp hàng. Có thể khuyến khích sinh viên chấm offline bằng bộ công cụ.</p></details>
+    </section>
+  </div>
+</div>
+{% endblock %}

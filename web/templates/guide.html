@@ -1,0 +1,122 @@
+{% extends "base.html" %}
+
+{% block title %}Hướng dẫn cho người mới — CodeDuel{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <div class="page-eyebrow">Hướng dẫn sử dụng</div>
+    <h1 class="page-title">Viết và nộp bot đầu tiên</h1>
+    <p class="lead">Bạn cần Python và bộ công cụ của CodeDuel. Hướng dẫn dưới đây đi từ chạy bot mẫu đến nộp bot lên thi đấu.</p>
+  </div>
+  <div class="page-actions">
+    <a href="/guide/organizer" class="btn">Hướng dẫn cho ban tổ chức</a>
+  </div>
+</div>
+
+<div class="doc-layout">
+  <nav class="doc-toc" aria-label="Mục lục">
+    <span class="toc-title">Các bước</span>
+    <a href="#b1">1. Tạo tài khoản</a>
+    <a href="#b2">2. Chơi thử để hiểu luật</a>
+    <a href="#b3">3. Cài Python & bộ công cụ</a>
+    <a href="#b4">4. Viết bot đầu tiên</a>
+    <a href="#b5">5. Thử & tự chấm điểm</a>
+    <a href="#b6">6. Nộp bot & thi đấu</a>
+    <a href="#loi">Lỗi thường gặp</a>
+    <a href="#faq">Câu hỏi thường gặp</a>
+  </nav>
+
+  <div class="prose">
+    <section id="b1">
+      <h2><span class="step-num">1</span>Tạo tài khoản</h2>
+      <p>Bấm <a href="/register">Đăng ký</a>, chọn tên đăng nhập (nên dùng tên nhóm hoặc mã sinh viên) và mật khẩu từ 6 ký tự. Sau đó <a href="/login">đăng nhập</a>.</p>
+      <div class="callout"><span class="callout-icon">i</span><p>Thi đấu trong phòng máy? Hỏi ban tổ chức địa chỉ server, ví dụ <code>http://192.168.1.15:8000</code>, rồi gõ vào trình duyệt. Mọi máy cùng Wi-Fi/LAN đều vào được.</p></div>
+    </section>
+
+    <section id="b2">
+      <h2><span class="step-num">2</span>Chơi thử để hiểu luật</h2>
+      <p>Game đang dùng để thi đấu là <strong>{{ active_game.name_vi }}</strong>.</p>
+      <table>
+        <thead><tr><th>Trò chơi</th><th>Độ khó</th><th>Chơi thử</th></tr></thead>
+        <tbody>
+          {% for g in games_list %}
+          <tr>
+            <td><a href="/games/{{ g.slug }}"><strong>{{ g.name_vi }}</strong></a><br><span class="text-muted">{{ g.tagline }}</span></td>
+            <td><span class="chip level-{{ g.level }}">{{ g.level_label }}</span></td>
+            <td><a class="btn btn-sm" href="/play/{{ g.slug }}">Chơi với máy</a></td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      <p>Thử vài ván để biết cách di chuyển, ăn quân và đi đến ô đích trước khi sửa bot.</p>
+    </section>
+
+    <section id="b3">
+      <h2><span class="step-num">3</span>Cài Python & tải bộ công cụ</h2>
+      <ol>
+        <li>Cài <strong>Python 3.10 trở lên</strong> (python.org). Trên Windows nhớ tích <em>Add Python to PATH</em>.</li>
+        <li>Tải <a href="/download/starter-kit.zip"><strong>bộ công cụ offline</strong></a> và giải nén. Không cần cài thêm thư viện nào.</li>
+        <li>Mở terminal (hoặc VS Code) trong thư mục <code>codeduel-kit</code> vừa giải nén, kiểm tra:
+          <pre class="code">python --version</pre></li>
+      </ol>
+      <div class="callout ok"><span class="callout-icon">✓</span><p>Từ bước này trở đi bạn có thể làm việc <strong>hoàn toàn không cần Internet</strong>: viết bot, cho bot đấu thử và tự chấm điểm đều chạy trên máy bạn.</p></div>
+    </section>
+
+    <section id="b4">
+      <h2><span class="step-num">4</span>Viết bot đầu tiên</h2>
+      <p>Sao chép <code>starter_kit/bot_template.py</code> thành <code>my_bot.py</code>. Mẫu này đã có hàm <code>get_move(board, my_player, history)</code> và cách tìm nước đi hợp lệ cho Oẳn Tù Tì 9×9.</p>
+      <p>Chạy mẫu trước, sau đó sửa cách chọn nước đi: ưu tiên tiến về đích hoặc ăn quân có lợi. Kết quả trả về có dạng <code>((from_row, from_col), (to_row, to_col))</code>. Xem <a href="/games/rps9x9">luật và cấu trúc bàn cờ RPS 9×9</a>.</p>
+      <h3>Quy tắc bắt buộc</h3>
+      <ul>
+        <li>Chỉ được <code>import</code>: <code>math</code>, <code>random</code>, <code>copy</code>, <code>collections</code>, <code>heapq</code>, <code>itertools</code>, <code>typing</code>, <code>dataclasses</code>.</li>
+        <li>Không dùng <code>open()</code>, <code>eval()</code>, <code>exec()</code>, không đọc/ghi file, không truy cập mạng.</li>
+        <li>Mỗi nước đi tối đa <strong>1 giây</strong>; file bot tối đa 1 MB.</li>
+        <li>Muốn in ra để debug? <code>print()</code> thoải mái — nó không làm hỏng bot.</li>
+      </ul>
+    </section>
+
+    <section id="b5">
+      <h2><span class="step-num">5</span>Thử & tự chấm điểm</h2>
+      <h3>Cho bot đấu với bot mẫu (xem từng nước với <code>-v</code>)</h3>
+      <pre class="code">python starter_kit/local_arena.py my_bot.py starter_kit/heuristic_bot.py --game rps9x9 --rounds 4 --swap-sides -v</pre>
+      <h3>Chấm điểm trên thang 10</h3>
+      <pre class="code">python starter_kit/grade.py my_bot.py --game rps9x9</pre>
+      <p>Hoặc dùng trang <a href="/grade"><strong>Tự chấm điểm</strong></a> trên web: chọn file, bấm chấm, xem kết quả từng đối thủ. Bot đấu với các đối thủ chuẩn Novice, Heuristic và Rusher để bạn theo dõi tiến bộ.</p>
+    </section>
+
+    <section id="b6">
+      <h2><span class="step-num">6</span>Nộp bot & thi đấu</h2>
+      <ol>
+        <li>Vào <a href="/profile">Hồ sơ</a>, chọn đúng trò chơi, kéo thả file <code>my_bot.py</code> và bấm <strong>Tải lên</strong>. Server kiểm tra bảo mật trước khi nhận.</li>
+        <li>Vào <a href="/leaderboard">Bảng xếp hạng</a>, bấm <strong>Thách đấu</strong> cạnh tên một người chơi khi cổng thi đấu đang mở.</li>
+        <li>Trận đấu chạy trên server trong vài giây. Bấm <strong>Replay</strong> để xem lại từng nước và tìm điểm yếu của bot.</li>
+        <li>Thắng được cộng Elo, thua bị trừ. Cuối giải, top người chơi vào vòng loại trực tiếp <a href="/bracket">Bracket</a>.</li>
+      </ol>
+    </section>
+
+    <section id="loi">
+      <h2>Lỗi thường gặp</h2>
+      <table>
+        <thead><tr><th>Thông báo</th><th>Nguyên nhân & cách sửa</th></tr></thead>
+        <tbody>
+          <tr><td><code>timeout</code></td><td>Bot nghĩ quá 1 giây. Giảm độ sâu tìm kiếm, tránh vòng lặp vô hạn.</td></tr>
+          <tr><td><code>invalid_move</code></td><td>Nước đi sai định dạng hoặc phạm luật (cột đã đầy, ô đã có quân…). In ra danh sách nước hợp lệ để kiểm tra.</td></tr>
+          <tr><td><code>error</code></td><td>Bot bị lỗi khi chạy (IndexError, KeyError…). Chạy <code>local_arena.py</code> để thấy dòng bị lỗi.</td></tr>
+          <tr><td><code>Bot validation failed</code></td><td>Bot dùng thư viện/hàm bị cấm (ví dụ <code>import os</code>). Xóa phần đó đi.</td></tr>
+          <tr><td>Không thách đấu được</td><td>Cổng đang đóng, hoặc bạn/đối thủ chưa có bot cho game đang thi đấu.</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section id="faq" class="faq">
+      <h2>Câu hỏi thường gặp</h2>
+      <details><summary>Người khác có xem được code của tôi không?</summary><p>Không. Code chỉ nằm trên server; đối thủ chỉ xem được replay (các nước đi), không xem được file.</p></details>
+      <details><summary>Tôi có thể nộp nhiều bot không?</summary><p>Có. Mỗi lần nộp, bot mới sẽ được kích hoạt cho trò chơi đó; bot cũ vẫn được giữ lại và bạn có thể kích hoạt lại bất cứ lúc nào trong trang Hồ sơ.</p></details>
+      <details><summary>Không có Internet thì có chơi được không?</summary><p>Được. Ban tổ chức chạy server trong mạng LAN của phòng máy; bạn chỉ cần vào đúng địa chỉ LAN. Việc viết bot, chạy thử và tự chấm điểm cũng chạy hoàn toàn offline bằng bộ công cụ.</p></details>
+      <details><summary>Ở nhà muốn vào server của lớp thì sao?</summary><p>Ban tổ chức có thể mở server ra Internet (xem cẩm nang tổ chức). Khi đó bạn dùng địa chỉ dạng <code>https://...trycloudflare.com</code> mà ban tổ chức gửi.</p></details>
+      <details><summary>Điểm Elo được tính thế nào?</summary><p>Thắng người có Elo cao hơn được cộng nhiều hơn; thua người yếu hơn bị trừ nhiều hơn. Mỗi ngày thi đấu có thể có hệ số nhân Elo khác nhau do ban tổ chức đặt.</p></details>
+    </section>
+  </div>
+</div>
+{% endblock %}

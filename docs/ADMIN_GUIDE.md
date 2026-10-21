@@ -156,17 +156,26 @@ On the concluding day of the tournament:
 
 Ví dụ PowerShell:
 
-ALLOWED_ORIGINS=https://<your-tunnel>.trycloudflare.com
-COOKIE_SECURE=true
 ADMIN_USERNAME=admin
 ADMIN_PASSWORD=<strong-demo-password>
 
-Sau đó chạy:
+Sau đó chạy (cần cài cloudflared):
 
-python main.py
+python main.py --tunnel
+
+Banner in thêm dòng Public WAN URL; trang chủ cũng hiển thị link này. COOKIE_SECURE để trống (auto) là đủ: cookie tự bật Secure khi truy cập qua HTTPS. ALLOWED_ORIGINS chỉ cần khi có trang ở domain khác gọi API.
 
 Lưu ý:
 - Không commit mật khẩu thật vào repository.
 - Quick Tunnel URL là tạm thời và có thể thay đổi sau mỗi lần khởi động lại cloudflared.
-- Nếu URL tunnel thay đổi, phải cập nhật lại ALLOWED_ORIGINS.
+- Nếu đã cấu hình ALLOWED_ORIGINS và URL tunnel thay đổi, phải cập nhật lại ALLOWED_ORIGINS.
+- Dùng máy chủ riêng hoặc reverse proxy: python main.py --public-url https://arena.example.com (khai báo FORWARDED_ALLOW_IPS nếu proxy ở máy khác).
 - Trước khi chạy pytest, cần xóa các biến môi trường WAN để test suite dùng cấu hình local mặc định.
+
+## 7. Multi-Game Events and Grading
+
+1. **Choose the active game** on `/admin` (field "Game đang thi đấu"): `connect4` is recommended for a first session, then `caro`, then `rps9x9`. FFA challenges and the bracket use each player's active bot for that game; switching games never deletes bots.
+2. **Open the portal** with portal mode `true` (Force Open) for the duration of a classroom session.
+3. **Grading**: students self-grade on `/grade`; teachers grade a folder of submissions offline with `python starter_kit/grade.py submissions/ --game connect4 --csv grades.csv`, and download the Elo ranking from `/api/leaderboard/export.csv`.
+4. **Offline toolkit**: `/download/starter-kit.zip` can be served from the LAN server itself or copied by USB; it needs only Python 3.10+.
+5. The full organiser playbook (LAN checklist, WAN options, 120-minute session plan, troubleshooting) is published on the website at `/guide/organizer`.

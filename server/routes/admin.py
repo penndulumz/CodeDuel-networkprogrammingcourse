@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Union
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
@@ -9,6 +10,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from engine.game import MAX_TURNS, RULE_VARIANT_CUSTOM, SUPPORTED_RULE_VARIANTS, create_initial_board
+from engine.games import GAMES, list_games
 from server.boss_manager import deploy_boss, get_all_bosses_status, retract_boss
 from server.bracket import (
     STATUS_RUNNING,
@@ -19,6 +21,7 @@ from server.bracket import (
     play_bracket_matches,
 )
 from server.database import get_db
+from server.games import get_catalog_games
 from server.models import Bot, BracketMatch, Match, TournamentSetting, User
 from server.queue import speed_up_bracket_round
 from server.routes.auth import get_current_admin
@@ -51,6 +54,8 @@ class UpdateSettingsRequest(BaseModel):
     max_turns: Optional[int] = Field(None, ge=10, le=MAX_TURNS)
     turn_timeout_seconds: Optional[float] = Field(None, ge=0.1, le=10.0)
     rule_variant: Optional[str] = None
+    game_type: Optional[str] = None
+    catalog_games: Optional[List[str]] = None
 
 
 def _get_setting_row(db: Session, key: str) -> TournamentSetting | None:
@@ -131,10 +136,17 @@ def _get_all_settings_dict(db: Session) -> Dict[str, Any]:
     else:
         timeout_seconds = float(rules_cfg.get("turn_timeout_seconds", 1.0))
 
+    game_type = settings_map.get("game_type", "rps9x9")
+    if game_type not in GAMES:
+        game_type = "rps9x9"
+
     return {
         "is_portal_open": portal_open,
         "portal_mode": portal_mode,
         "rule_variant": settings_map.get("rule_variant", "standard"),
+        "game_type": game_type,
+        "games": list_games(),
+        "catalog_games": [game["slug"] for game in get_catalog_games(db)],
         "start_time": start_time,
         "end_time": end_time,
         "daily_multiplier_x": multiplier_x,
@@ -210,6 +222,20 @@ def update_settings(
                     detail=f"Custom rules are invalid: {exc}",
                 ) from exc
         _upsert_setting(db, "rule_variant", candidate_variant)
+
+    if payload.game_type is not None:
+        candidate_game = payload.game_type.strip()
+        if candidate_game not in GAMES:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Unsupported game type.",
+            )
+        _upsert_setting(db, "game_type", candidate_game)
+
+    if payload.catalog_games is not None:
+        if "rps9x9" not in payload.catalog_games or any(slug not in GAMES for slug in payload.catalog_games):
+            raise HTTPException(status_code=400, detail="Catalog must include rps9x9 and supported games only.")
+        _upsert_setting(db, "catalog_games", json.dumps(list(dict.fromkeys(payload.catalog_games))))
 
     db.commit()
     return _get_all_settings_dict(db)

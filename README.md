@@ -1,6 +1,6 @@
-# Battlecode RPS Platform — 9x9 Rock-Paper-Scissors Algorithmic Arena
+# CodeDuel Arena — Multi-Game Bot Competition Platform
 
-> Autonomous bot competition platform modeled after MIT Battlecode. Students engineer algorithmic agents in Python to contest 1v1 duels on an expanded 9x9 board with cyclic Rock-Paper-Scissors combat, competing in daily Free-For-All (FFA) rating ladders and single-elimination tournament playoffs.
+> Bot competition platform for first-year students, modeled after MIT Battlecode. Students write one Python function, `get_move(board, my_player, history)`, and compete 1v1 in **Connect Four**, **Caro (Gomoku 15x15)** or **9x9 Rock-Paper-Scissors Chess**, through daily Free-For-All (FFA) rating ladders, an automatic grader and single-elimination playoffs. Runs fully offline on a LAN, or on the Internet through an HTTPS tunnel.
 >
 > **Notice on Single Source of Truth (SSOT)**:  
 > The file **[`docs/CONTEXT_RESUME.md`](docs/CONTEXT_RESUME.md)** serves as the authoritative single source of truth governing system architecture, game rules, bot interface specifications, database schemas, and developer workflows. Refer to `docs/CONTEXT_RESUME.md` for foundational specifications.
@@ -27,6 +27,24 @@ The boot routine outputs active network endpoints:
 - **Tournament Admin Dashboard**: [http://localhost:8000/admin](http://localhost:8000/admin) *(Default credentials: `admin` / `admin123`)*
 - **Interactive OpenAPI Documentation**: [http://localhost:8000/docs](http://localhost:8000/docs)
 
+### Website Map
+- `/` landing page, `/games` game list and rules, `/play/<game>` play against the computer in the browser
+- `/guide` step-by-step guide for new players, `/guide/organizer` handbook for organisers and teachers
+- `/grade` self-grading, `/leaderboard` rankings and FFA challenges, `/download/starter-kit.zip` offline toolkit
+
+### Internet (WAN) Access
+```bash
+python main.py --tunnel                                  # free Cloudflare quick tunnel (needs cloudflared)
+python main.py --public-url https://arena.example.com    # behind your own VPS / reverse proxy
+```
+
+### Multi-Game Offline Arena and Auto-Grader
+```bash
+python starter_kit/local_arena.py starter_kit/connect4_template.py starter_kit/connect4_bot.py --game connect4 --rounds 4 --swap-sides
+python starter_kit/grade.py starter_kit/caro_template.py --game caro          # score out of 10
+python starter_kit/grade.py submissions/ --game connect4 --csv grades.csv     # grade a whole class
+```
+
 ### Offline Arena & Dynamic Rule Variants
 Test bot implementations offline under standard or inverted combat rules:
 ```bash
@@ -50,6 +68,7 @@ To avoid information duplication and serve specific stakeholders, project docume
 | **Competitors & Students** | [`docs/BOT_GUIDE.md`](docs/BOT_GUIDE.md) | **Bot Development Manual**: `a1`-`i9` coordinates, combat matrix, goal/wipeout logic, Minimax/heuristic design, offline CLI testing. |
 | **Tournament Administrators** | [`docs/ADMIN_GUIDE.md`](docs/ADMIN_GUIDE.md) | **Operations Guide**: Single-Admin invariant, LAN setup, schedule windows (`start_time`/`end_time`), boss deployment, playoff brackets. |
 | **Evaluators & System Engineers** | [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) | **Technical Architecture**: Multi-tier engine, AST sandbox (74 patterns), isolated subprocess runner, SQLite WAL, CSS design tokens. |
+| **Cloud Hosts** | [`docs/DEPLOY.md`](docs/DEPLOY.md) | **Deployment**: Docker image, Render/Railway blueprints, persistent `DATA_DIR` volume, required environment variables. |
 | **Project Team Members** | [`TASKS.md`](TASKS.md) & [`GEMINI.md`](GEMINI.md) | High-level milestone tracking, Git worktree isolation rules, root repository preservation invariants. |
 
 ---

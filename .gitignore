@@ -31,3 +31,6 @@ resources/
 .DS_Store
 Thumbs.db
 .superpowers/
+
+# Local source backups
+/local_backups/

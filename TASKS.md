@@ -1,6 +1,6 @@
 # Kế Hoạch Thực Hiện & Theo Dõi Tiến Độ Dự Án (TASKS.md)
 
-> **Trạng thái**: Hoàn thành toàn diện và toàn bộ test pass (316/316 tests pass).
+> **Trạng thái**: Hoàn thành toàn diện và toàn bộ test pass (407/407 tests pass, Milestone 12).
 > - Quy tắc: Đã kiểm chứng tự động toàn diện qua Subagent-Driven Development, 6-domain Deep Testing Matrix, Boss Arena Benchmark Simulation, và Unit/Integration/E2E test suite.
 
 ---
@@ -203,4 +203,20 @@
 - Verification: Chưa chạy test.
 
 
+---
 
+---
+
+## Milestone 12: Đa Trò Chơi, Website Công Khai, Chấm Điểm Tự Động & Tối Ưu WAN (Cả Nhóm)
+- [x] **Task 12.1**: Multi-game engine registry (`engine/games/__init__.py`, `engine/games/grid.py`, `engine/runner.py`, `tests/test_multi_game.py`).
+  - Danh mục `GAMES` (connect4, caro, rps9x9), engine lưới dùng chung `GridGame` (Connect Four 6x7, Caro 15x15), runner `run_match(..., game_type=...)` với cùng cơ chế cô lập/timeout/xử thua.
+- [x] **Task 12.2**: Server multi-game (`server/models.py`, `server/database.py`, `server/games.py`, `server/routes/bots.py`, `server/routes/matches.py`, `server/bracket.py`, `server/queue.py`, `server/routes/admin.py`, `web/templates/admin.html`).
+  - Cột `game_type` cho Bot/Match + tự migrate CSDL cũ, game đang thi đấu chọn trên Admin, một bot kích hoạt cho mỗi game.
+- [x] **Task 12.3**: Starter kit & chấm điểm tự động (`starter_kit/connect4_*.py`, `starter_kit/caro_*.py`, `starter_kit/opponents/`, `starter_kit/local_arena.py --game`, `starter_kit/grade.py`, `engine/grader.py`, `server/routes/grade.py`).
+- [x] **Task 12.4**: Website công khai (`web/templates/home.html`, `games.html`, `game_detail.html`, `play.html`, `guide.html`, `organizer.html`, `grade.html`, `replay_grid.html`, `_game_cards.html`, `web/static/css/site.css`, `web/static/js/games.js`, `web/static/js/board_view.js`).
+  - Trang chủ mới, bảng xếp hạng chuyển sang `/leaderboard`, hướng dẫn người mới & ban tổ chức, chơi thử với máy trên trình duyệt, tải bộ công cụ offline, xuất CSV, giao diện responsive (không tràn ngang ở 375px).
+- [x] **Task 12.5**: Tối ưu WAN (`main.py --tunnel/--public-url`, `server/network.py`, GZip, cookie Secure tự động theo HTTPS).
+- [x] **Task 12.6**: An toàn dữ liệu dev khi chạy test (`tests/conftest.py`) và đồng bộ tài liệu (`docs/CONTEXT_RESUME.md` Mục 19-23, `README.md`, `docs/BOT_GUIDE.md`, `docs/ADMIN_GUIDE.md`, `docs/ARCHITECTURE.md`).
+- *Verification*: `pytest -q` -> toàn bộ test PASS (bao gồm `tests/test_multi_game.py`, `tests/test_site_pages.py`).
+
+- 2026-10-18: Applied the approved clubhouse UI from `.worktrees/midterm-review` to the original checkout at the user request. Includes local SVG pieces, club-room home, compact interior pages and admin-managed public catalog (RPS only by default). Previous affected source files backed up under `local_backups/`. Local databases and uploaded bots were not copied. No GitHub push.
