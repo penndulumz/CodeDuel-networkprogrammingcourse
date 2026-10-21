@@ -659,8 +659,8 @@ class Game:
                 if piece is None:
                     continue
                 goal_row, goal_col = goals[piece["player"]]
-                distance = max(abs(row - goal_row), abs(col - goal_col))
-                position_points[piece["player"]] += max(rows, cols) - distance
+                row_progress = (rows - 1) - abs(row - goal_row)
+                position_points[piece["player"]] += row_progress
                 if row in center_rows and col in center_cols:
                     position_points[piece["player"]] += 2
 
