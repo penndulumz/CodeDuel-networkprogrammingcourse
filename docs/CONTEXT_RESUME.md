@@ -459,4 +459,10 @@ Hệ thống hỗ trợ triển khai thử nghiệm qua WAN bằng mô hình HTT
 - Một số test xóa `app.db`, `bots/`, `replays/` trong thư mục làm việc. `tests/conftest.py` (fixture `preserve_dev_data`, scope session) di chuyển các dữ liệu này sang thư mục tạm trước khi chạy và khôi phục sau khi xong, nên chạy `pytest` không còn làm mất dữ liệu dev. Hãy tắt server dev (đang mở `app.db`) trước khi chạy test trên Windows.
 - Với Starlette 1.x, `fastapi.testclient` cần gói `httpx2` (`pip install httpx2`) để chạy test suite.
 
+## 27. Bộ Kỹ Năng Thiết Kế UI/UX Pro Max (Design Intelligence Toolkit)
+
+1. Tích hợp bộ kỹ năng thiết kế UI/UX ui-ux-pro-max-skill vào dự án tại .gemini/skills/ và .agents/skills/.
+2. Hỗ trợ 79 phong cách thiết kế, 192 bảng màu theo phân loại sản phẩm, 74 phối font chữ, 119 hướng dẫn UX, 105 icon, và công cụ tìm kiếm chuẩn BM25 không phụ thuộc thư viện ngoài (python .gemini/skills/ui-ux-pro-max/scripts/search.py).
+3. Cung cấp các sub-skill đi kèm: design-system, ui-styling, rand, design, anner-design, slides phục vụ việc nâng cấp và hoàn thiện giao diện cho nền tảng.
+
 - 2026-10-18: Applied the approved clubhouse UI from `.worktrees/midterm-review` to the original checkout at the user request. Includes local SVG pieces, club-room home, compact interior pages and admin-managed public catalog (RPS only by default). Previous affected source files backed up under `local_backups/`. Local databases and uploaded bots were not copied. No GitHub push.

@@ -217,6 +217,7 @@
   - Trang chủ mới, bảng xếp hạng chuyển sang `/leaderboard`, hướng dẫn người mới & ban tổ chức, chơi thử với máy trên trình duyệt, tải bộ công cụ offline, xuất CSV, giao diện responsive (không tràn ngang ở 375px).
 - [x] **Task 12.5**: Tối ưu WAN (`main.py --tunnel/--public-url`, `server/network.py`, GZip, cookie Secure tự động theo HTTPS).
 - [x] **Task 12.6**: An toàn dữ liệu dev khi chạy test (`tests/conftest.py`) và đồng bộ tài liệu (`docs/CONTEXT_RESUME.md` Mục 19-23, `README.md`, `docs/BOT_GUIDE.md`, `docs/ADMIN_GUIDE.md`, `docs/ARCHITECTURE.md`).
+- [x] **Task 12.7**: Tích hợp bộ kỹ năng thiết kế UI/UX Pro Max (ui-ux-pro-max-skill) vào .gemini/skills/ và .agents/skills/.
 - *Verification*: `pytest -q` -> toàn bộ test PASS (bao gồm `tests/test_multi_game.py`, `tests/test_site_pages.py`).
 
 - 2026-10-18: Applied the approved clubhouse UI from `.worktrees/midterm-review` to the original checkout at the user request. Includes local SVG pieces, club-room home, compact interior pages and admin-managed public catalog (RPS only by default). Previous affected source files backed up under `local_backups/`. Local databases and uploaded bots were not copied. No GitHub push.
