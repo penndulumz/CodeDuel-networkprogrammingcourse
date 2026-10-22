@@ -77,6 +77,23 @@ class User(Base):
         return verify_password_hash(plain, self.password_hash)
 
 
+class AuthSession(Base):
+    """Persistent login session; only a hash of the browser token is stored."""
+
+    __tablename__ = "auth_sessions"
+
+    token_hash: Mapped[str] = mapped_column(String(64), primary_key=True)
+    user_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("users.id", ondelete="CASCADE"), index=True, nullable=False
+    )
+    expires_at: Mapped[datetime] = mapped_column(DateTime, index=True, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime,
+        default=lambda: datetime.now(timezone.utc),
+        nullable=False,
+    )
+
+
 class Bot(Base):
     """Uploaded bot entity linked to a specific user."""
 
@@ -89,7 +106,10 @@ class Bot(Base):
     # Which game this bot plays (slug from engine.games.GAMES). A user keeps one
     # active bot per game, so switching the event's game never loses old bots.
     game_type: Mapped[str] = mapped_column(String(32), default="rps9x9", nullable=False)
+    # Client-generated ID makes offline package retries safe if the response is lost.
+    client_submission_id: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    is_deleted: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     uploaded_at: Mapped[datetime] = mapped_column(
         DateTime,
         default=lambda: datetime.now(timezone.utc),

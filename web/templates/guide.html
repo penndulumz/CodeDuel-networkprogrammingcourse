@@ -24,6 +24,7 @@
     <a href="#b4">4. Ba cấp độ chiến thuật</a>
     <a href="#b5">5. Đấu tập với <code>local_arena.py</code></a>
     <a href="#b6">6. Nộp bot & Chinh phục Bảng xếp hạng</a>
+    <a href="#nop-offline">Nộp bài khi mất kết nối</a>
     <a href="#loi">Xử lý sự cố thường gặp</a>
     <a href="#faq">Câu hỏi thường gặp (FAQ)</a>
   </nav>
@@ -140,11 +141,31 @@ python starter_kit/local_arena.py my_bot.py starter_kit/heuristic_bot.py --game 
     <section id="b6">
       <h2><span class="step-num">6</span>Nộp bot & Chinh phục Bảng xếp hạng</h2>
       <ol>
-        <li>Vào trang <a href="/profile"><strong>Hồ sơ cá nhân</strong></a>, kéo thả file <code>my_bot.py</code> vào ô tải lên. Hệ thống sẽ tự động biên dịch và kiểm tra an toàn trong 1-2 giây.</li>
+        <li>Khi có kết nối tới máy chủ, vào trang <a href="/profile"><strong>Hồ sơ cá nhân</strong></a>, chọn đúng trò chơi rồi tải <code>my_bot.py</code> hoặc gói <code>.cdsubmit.zip</code> lên. Máy chủ sẽ kiểm tra bot trước khi lưu.</li>
         <li>Truy cập <a href="/leaderboard"><strong>Bảng xếp hạng</strong></a>, tìm tên bạn bè cùng lớp và bấm <strong>Thách đấu</strong>!</li>
         <li>Sau khi trận đấu kết thúc, bấm vào nút <strong>Replay</strong> để xem lại từng nước cờ chuyển động trực quan, nhận biết điểm yếu và cải thiện thuật toán.</li>
         <li>Top các bot xuất sắc nhất trên bảng xếp hạng Elo sẽ được tiến cử vào vòng chung kết <a href="/bracket"><strong>Cây đấu loại trực tiếp (Bracket)</strong></a>.</li>
       </ol>
+
+      <div class="tile" id="nop-offline" style="margin: 18px 0; padding: 20px;">
+        <h3 style="margin-top: 0;">Nộp bài khi máy chủ không kết nối được</h3>
+        <h4>Dùng trang nộp offline trên web</h4>
+        <ol>
+          <li><strong>Chuẩn bị trước:</strong> đăng nhập đúng tài khoản thi, mở <a href="/static/offline-submit.html">trang Nộp bot offline</a> và chờ báo trang đã sẵn sàng offline. Nếu địa chỉ là HTTP qua IP LAN, hãy chạy <code>python main.py --tunnel</code> trên máy chủ khi có Internet, rồi mở URL HTTPS được in trong terminal và vào lại trang này. Dùng URL HTTPS đó trong suốt buổi thi.</li>
+          <li><strong>Khi mất mạng hoặc không tới được máy chủ:</strong> mở lại đúng URL HTTPS đã chuẩn bị, chọn file <code>.py</code> và trò chơi, rồi bấm <strong>Lưu bài và gửi nếu có mạng</strong>. Bản nộp được giữ trong bộ nhớ trình duyệt trên thiết bị này; F5 không xóa các bản đã lưu. File đang chọn nhưng chưa bấm lưu sẽ không được giữ.</li>
+          <li><strong>Khi kết nối tới máy chủ trở lại:</strong> trang đang mở sẽ tự thử gửi lại định kỳ; nếu đóng trang, mở lại đúng URL HTTPS để đồng bộ. Nếu phiên đăng nhập hết hạn, đăng nhập lại đúng tài khoản rồi quay lại trang nộp. Chỉ biên nhận mới xác nhận máy chủ đã nhận bài.</li>
+        </ol>
+        <p>Không xóa dữ liệu trình duyệt hoặc dùng chế độ ẩn danh trong lúc còn bài đang chờ. Nên giữ file bot gốc làm bản dự phòng.</p>
+
+        <h4>Tạo gói dự phòng bằng Starter Kit</h4>
+        <p>Nếu trang offline không được hỗ trợ trên thiết bị, hãy dùng terminal tại thư mục đã giải nén Starter Kit:</p>
+        <pre class="code">python starter_kit/pack_submission.py my_bot.py --game rps9x9</pre>
+        <ol>
+          <li>Lệnh kiểm tra bot và tạo gói <code>.cdsubmit.zip</code> trong thư mục <code>submissions</code>. Giữ nguyên gói này.</li>
+          <li>Khi có kết nối, tải gói lên từ <a href="/profile"><strong>Hồ sơ cá nhân</strong></a> và chờ mã biên nhận.</li>
+        </ol>
+        <p><strong>Lưu ý:</strong> thời gian lưu trên thiết bị không phải thời gian nộp chính thức. Thời gian biên nhận từ máy chủ mới xác nhận lúc bài được nhận. Nếu cả buổi thi không có kết nối tới máy chủ, bài sẽ chờ trên thiết bị và chỉ được nhận khi kết nối lại.</p>
+      </div>
     </section>
 
     <section id="loi">

@@ -61,6 +61,8 @@ def get_db() -> Generator[Session, None, None]:
 # Format: (table, column, SQL type and default).
 ADDED_COLUMNS: list[tuple[str, str, str]] = [
     ("bots", "game_type", "VARCHAR(32) NOT NULL DEFAULT 'rps9x9'"),
+    ("bots", "client_submission_id", "VARCHAR(64)"),
+    ("bots", "is_deleted", "BOOLEAN NOT NULL DEFAULT FALSE"),
     ("matches", "game_type", "VARCHAR(32) NOT NULL DEFAULT 'rps9x9'"),
     ("matches", "bracket_match_id", "INTEGER"),
     ("matches", "live_moves", "TEXT NOT NULL DEFAULT '[]'"),
@@ -84,6 +86,14 @@ def _add_missing_columns(eng) -> None:
                 text(
                     "CREATE INDEX IF NOT EXISTS ix_matches_bracket_match_id "
                     "ON matches (bracket_match_id)"
+                )
+            )
+        if "bots" in existing_tables:
+            conn.execute(
+                text(
+                    "CREATE UNIQUE INDEX IF NOT EXISTS ix_bots_user_client_submission "
+                    "ON bots (user_id, client_submission_id) "
+                    "WHERE client_submission_id IS NOT NULL"
                 )
             )
 
