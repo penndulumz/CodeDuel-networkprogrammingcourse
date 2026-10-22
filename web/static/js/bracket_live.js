@@ -55,20 +55,57 @@
     return board;
   }
 
-  function renderBoard(board) {
+  function renderBoard(board, lastMove) {
+    const layout = element('div', 'projection-board-layout');
+    const ranks = element('div', 'projection-ranks');
+    for (let row = 9; row >= 1; row -= 1) ranks.appendChild(element('span', '', String(row)));
     const grid = element('div', 'projection-board');
     for (let row = 8; row >= 0; row -= 1) {
       for (let col = 0; col < 9; col += 1) {
         const piece = board[row] && board[row][col];
-        const cell = element(
-          'span',
-          `projection-cell${piece ? ` player-${piece.player}` : ''}`,
-          piece ? piece.type : ''
-        );
+        const cell = element('span', `projection-cell ${(row + col) % 2 ? 'light' : 'dark'}`);
+        cell.appendChild(element('small', 'projection-coordinate', `${String.fromCharCode(97 + col)}${row + 1}`));
+        if (lastMove && lastMove.from[0] === row && lastMove.from[1] === col) cell.classList.add('last-from');
+        if (lastMove && lastMove.to[0] === row && lastMove.to[1] === col) cell.classList.add('last-to');
+        if ((row === 8 && col === 8) || (row === 0 && col === 0)) {
+          cell.classList.add(row === 8 ? 'goal-p1' : 'goal-p2');
+        }
+        if (piece) {
+          const token = element('span', `projection-piece player-${piece.player}`);
+          const symbols = { R: 'rps-rock.svg', P: 'rps-paper.svg?v=hand-2', S: 'rps-scissors.svg' };
+          const icon = document.createElement('img');
+          icon.className = 'rps-symbol';
+          icon.src = `/static/img/${symbols[piece.type] || symbols.R}`;
+          icon.alt = piece.type;
+          icon.draggable = false;
+          token.appendChild(icon);
+          cell.appendChild(token);
+        }
         grid.appendChild(cell);
       }
     }
-    return grid;
+    const files = element('div', 'projection-files');
+    for (let col = 0; col < 9; col += 1) files.appendChild(element('span', '', String.fromCharCode(97 + col)));
+    layout.append(ranks, grid, files);
+    return layout;
+  }
+
+  function renderCounts(board, player) {
+    const counts = { R: 0, P: 0, S: 0 };
+    board.forEach((row) => row.forEach((piece) => {
+      if (piece && piece.player === player && counts[piece.type] !== undefined) counts[piece.type] += 1;
+    }));
+    const wrap = element('div', 'projection-counts');
+    const symbols = { R: 'rps-rock.svg', P: 'rps-paper.svg?v=hand-2', S: 'rps-scissors.svg' };
+    Object.entries(counts).forEach(([type, count]) => {
+      const item = element('span', `projection-count${count ? '' : ' dead'}`);
+      const icon = document.createElement('img');
+      icon.src = `/static/img/${symbols[type]}`;
+      icon.alt = type;
+      item.append(icon, element('b', '', String(count)));
+      wrap.appendChild(item);
+    });
+    return wrap;
   }
 
   function renderPairing(pairing) {
@@ -91,8 +128,31 @@
       const shown = Math.min(displayedTurns.get(pairing.id) || 0, moves.length);
       const visibleMoves = moves.slice(0, shown);
       const board = buildBoard(pairing.initial_board, visibleMoves);
-      card.appendChild(renderBoard(board));
       const lastMove = visibleMoves.slice(-1)[0];
+      const sides = element('div', 'projection-players');
+      const p1 = element('section', 'projection-player p1');
+      p1.append(element('strong', '', pairing.player1), element('small', '', 'Đỏ · P1'), renderCounts(board, 1));
+      const p2 = element('section', 'projection-player p2');
+      p2.append(element('strong', '', pairing.player2), element('small', '', 'Xanh · P2'), renderCounts(board, 2));
+      sides.append(p1, p2);
+      card.appendChild(sides);
+      const boardSection = element('div', 'projection-board-wrap');
+      boardSection.appendChild(element('div', `projection-turn ${game.live ? 'running' : ''}`, game.live ? 'Đang thi đấu' : 'Ván đã kết thúc'));
+      const boardFrame = element('div', 'projection-board-frame');
+      boardFrame.appendChild(renderBoard(board, lastMove));
+      if (pairing.status === 'completed' && pairing.winner) {
+        const winnerPlayer = pairing.winner_player === 1 ? 1 : 2;
+        const victory = element('div', `projection-victory player-${winnerPlayer}`);
+        victory.setAttribute('role', 'status');
+        victory.append(
+          element('strong', '', 'CHIẾN THẮNG CHUNG CUỘC'),
+          element('span', '', `Player ${winnerPlayer}`),
+          element('b', '', pairing.winner)
+        );
+        boardFrame.appendChild(victory);
+      }
+      boardSection.appendChild(boardFrame);
+      card.appendChild(boardSection);
       const info = game.live
         ? `Đang trực tiếp · Đang xem lượt ${shown}/${game.turns}${lastMove ? ` · ${lastMove.san}` : ''}`
         : game.winner

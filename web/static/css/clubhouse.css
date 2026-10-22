@@ -215,6 +215,39 @@ body:not(.home-page) .board-stage { background:#fffdf6; border:1px solid #9aa68c
 .live-projections { background:#fdfaf0; border:2px solid var(--ink); border-radius:18px; padding:22px; margin-bottom:28px; box-shadow:var(--shadow-1); }
 .projection-grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(280px, 1fr)); gap:18px; margin-top:16px; }
 .projection-card { background:#fffdf6; border:2px solid var(--ink); border-radius:12px; box-shadow:var(--shadow-1); padding:12px; }
+.projection-players { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin:12px 0; }
+.projection-player { display:grid; grid-template-columns:1fr auto; gap:3px 8px; min-width:0; padding:9px 10px; border:1px solid #bfc5b2; border-radius:9px; background:#faf8ed; }
+.projection-player strong { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:13px; }
+.projection-player small { grid-column:1; color:var(--text-soft); font-size:10px; }
+.projection-player.p1 { border-left:4px solid #d86f5e; }.projection-player.p2 { border-left:4px solid #5487bd; }
+.projection-counts { grid-column:2; grid-row:1 / span 2; display:flex; align-items:center; gap:5px; }
+.projection-count { display:flex; align-items:center; gap:2px; font:700 10px var(--font-mono); }
+.projection-count img { width:18px; height:18px; object-fit:contain; }.projection-count.dead { opacity:.35; }
+.projection-board-wrap { display:flex; flex-direction:column; align-items:center; }
+.projection-board-frame { position:relative; width:min(100%, 440px); }
+.projection-turn { margin:4px 0 8px; padding:5px 12px; border:1px solid #bfc5b2; border-radius:999px; font-size:11px; font-weight:800; }
+.projection-turn.running { background:#e6efdc; }
+.projection-board-layout { display:grid; grid-template-columns:18px minmax(0,1fr); grid-template-rows:minmax(0,1fr) 18px; gap:3px; width:min(100%, 440px); }
+.projection-ranks { grid-column:1; grid-row:1; display:grid; grid-template-rows:repeat(9,1fr); align-items:center; justify-items:end; font:10px var(--font-mono); }
+.projection-board { display:grid; width:100%; max-width:440px; grid-template-columns:repeat(9,minmax(0,1fr)); grid-template-rows:repeat(9,minmax(0,1fr)); aspect-ratio:1; border:2px solid var(--ink); border-radius:6px; overflow:hidden; box-shadow:3px 4px 0 var(--ink); }
+.projection-cell { position:relative; display:grid; place-items:center; min-width:0; min-height:0; }
+.projection-cell.light { background:#faf5e9; }.projection-cell.dark { background:#e2e7d4; }
+.projection-cell.goal-p1 { box-shadow:inset 0 0 0 2px #d86f5e; }.projection-cell.goal-p2 { box-shadow:inset 0 0 0 2px #5487bd; }
+.projection-cell.last-from { background:#fff0bc; }.projection-cell.last-to { background:#c5e6cc; }
+.projection-coordinate { position:absolute; top:1px; left:2px; color:#58654e; font:7px var(--font-mono); opacity:.75; }
+.projection-piece { z-index:1; display:grid; place-items:center; width:76%; height:76%; padding:3px; border:1.5px solid var(--ink); border-radius:34%; box-shadow:0 2px 0 var(--ink); }
+.projection-piece.player-1 { background:#ef9c84; }.projection-piece.player-2 { background:#91b9e4; }
+.projection-files { grid-column:2; grid-row:2; display:grid; grid-template-columns:repeat(9,1fr); justify-items:center; font:10px var(--font-mono); }
+.projection-victory { position:absolute; z-index:3; top:50%; left:calc(50% + 9px); transform:translate(-50%,-50%) rotate(-2deg); display:flex; flex-direction:column; align-items:center; gap:4px; width:min(88%, 310px); padding:15px 18px; border:3px solid var(--ink); border-radius:16px; color:var(--ink); text-align:center; box-shadow:5px 6px 0 var(--ink); }
+.projection-victory.player-1 { background:#f4a08b; }.projection-victory.player-2 { background:#9fc6ed; }
+.projection-victory strong { font-size:clamp(11px,2vw,16px); letter-spacing:.05em; }
+.projection-victory span { font:800 11px var(--font-mono); }
+.projection-victory b { font-size:clamp(17px,3vw,24px); overflow-wrap:anywhere; }
+.live-projections:fullscreen .projection-grid { grid-template-columns:repeat(auto-fit,minmax(min(100%, 480px),1fr)); }
+.live-projections:fullscreen .projection-card { padding:18px; }
+.live-projections:fullscreen .projection-board-layout { width:min(100%, 620px); }
+.live-projections:fullscreen .projection-players { max-width:620px; width:100%; }
+@media(max-width:480px) { .projection-card { padding:9px; }.projection-player { padding:7px; }.projection-piece { padding:1px; }.projection-coordinate { font-size:6px; } }
 
 /* Mobile Overflow Prevention */
 @media(max-width:640px) {
