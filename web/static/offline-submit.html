@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#203a5e">
+  <title>Nộp bot offline · CodeDuel</title>
+  <style>
+    :root { color-scheme: light; font-family: system-ui, sans-serif; color: #202b3c; background: #f3f6fa; }
+    * { box-sizing: border-box; }
+    body { margin: 0; }
+    header { background: #203a5e; color: white; padding: 18px max(20px, calc((100vw - 900px) / 2)); }
+    header a { color: #ffe08a; }
+    main { max-width: 900px; margin: 28px auto; padding: 0 18px; }
+    h1 { margin: 0 0 8px; font-size: clamp(26px, 4vw, 36px); }
+    h2 { margin: 0 0 10px; font-size: 19px; }
+    p { line-height: 1.6; }
+    .card { background: white; border: 1px solid #d6deea; border-radius: 14px; padding: 20px; margin: 16px 0; box-shadow: 0 4px 16px #203a5e0d; }
+    .status { border-left: 4px solid #5b7ba6; background: #edf3fb; padding: 12px 14px; border-radius: 8px; }
+    .status.good { border-color: #16865b; background: #eaf8f1; }
+    .status.warn { border-color: #bc7b11; background: #fff7e6; }
+    .form-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(180px, 240px); gap: 14px; align-items: end; }
+    label { display: block; font-weight: 650; margin: 0 0 7px; }
+    input, select, button { font: inherit; }
+    input[type=file], select { width: 100%; padding: 11px; border: 1px solid #c5cfdd; border-radius: 8px; background: white; }
+    button, .button { display: inline-block; border: 0; border-radius: 8px; padding: 10px 14px; background: #203a5e; color: white; font-weight: 650; text-decoration: none; cursor: pointer; }
+    button.secondary, .button.secondary { background: #e8edf4; color: #203a5e; }
+    button.danger { background: #fff0ef; color: #a52c25; }
+    button:disabled { opacity: .55; cursor: wait; }
+    .actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 14px; }
+    .file-picker-row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+    .file-picker-row input[type=file] { flex: 1 1 260px; min-width: 0; }
+    .file-picker-hint { margin: 8px 0 0; }
+    .entry { border-top: 1px solid #e1e6ed; padding: 14px 0; }
+    .entry:first-child { border-top: 0; }
+    .entry-head { display: flex; gap: 12px; justify-content: space-between; align-items: start; }
+    .entry-title { font-weight: 700; overflow-wrap: anywhere; }
+    .muted { color: #5d6878; font-size: 13px; }
+    .badge { display: inline-block; border-radius: 20px; padding: 4px 9px; background: #fff2d5; color: #805300; font-size: 12px; font-weight: 700; white-space: nowrap; }
+    .badge.sent { background: #e5f6ed; color: #176540; }
+    .error { color: #a52c25; }
+    @media (max-width: 640px) { main { margin-top: 18px; } .form-grid { grid-template-columns: 1fr; } .card { padding: 16px; } }
+  </style>
+</head>
+<body>
+  <header>
+    <strong>CodeDuel · Offline Submit</strong>
+    <span style="float:right"><a href="/profile">Hồ sơ</a> · <a href="/guide#nop-offline">Hướng dẫn</a></span>
+  </header>
+  <main>
+    <h1>Nộp bot khi mất mạng</h1>
+    <p>Trang này lưu file bot trên thiết bị. Bản đã lưu vẫn còn sau khi tải lại trang (F5). Khi trang đang mở và kết nối tới máy chủ trở lại, hệ thống sẽ tự gửi bài và lấy biên nhận.</p>
+    <div id="offlineReady" class="status">Đang chuẩn bị chế độ offline…</div>
+    <p id="accountStatus" class="muted" aria-live="polite">Đang kiểm tra tài khoản…</p>
+
+    <section class="card">
+      <h2>Lưu bản nộp trên thiết bị</h2>
+      <form id="submissionForm">
+        <div class="form-grid">
+          <div>
+            <label for="botFile">File bot Python (.py)</label>
+            <div class="file-picker-row">
+              <button id="chooseFileButton" type="button" class="secondary">Chọn tệp bot .py</button>
+              <input id="botFile" type="file" accept=".py" required>
+            </div>
+            <p id="fileSelectionStatus" class="muted file-picker-hint" aria-live="polite">Chọn file .py đã lưu trên thiết bị này.</p>
+          </div>
+          <div>
+            <label for="gameType">Trò chơi</label>
+            <select id="gameType">
+              <option value="rps9x9">RPS Chess 9×9</option>
+              <option value="connect4">Connect Four</option>
+              <option value="caro">Caro 15×15</option>
+            </select>
+          </div>
+        </div>
+        <div class="actions">
+          <button id="saveButton" type="submit">Lưu bài và gửi nếu có mạng</button>
+          <button id="syncButton" type="button" class="secondary">Đồng bộ bài đang chờ</button>
+        </div>
+      </form>
+      <p id="formStatus" class="muted" aria-live="polite"></p>
+    </section>
+
+    <section class="card">
+      <h2>Các bản đã lưu trên thiết bị</h2>
+      <p class="muted">“Đang chờ gửi” chưa phải bài nộp chính thức. Chỉ biên nhận từ máy chủ mới xác nhận đã nhận bài.</p>
+      <div id="submissionList"><p class="muted">Đang tải…</p></div>
+    </section>
+  </main>
+  <script src="/static/js/offline-submit.js" defer></script>
+</body>
+</html>

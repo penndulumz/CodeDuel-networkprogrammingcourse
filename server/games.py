@@ -47,6 +47,7 @@ def get_active_bot(db: Session, user_id: int, game_type: str) -> Bot | None:
         .filter(
             Bot.user_id == user_id,
             Bot.is_active == True,  # noqa: E712
+            Bot.is_deleted == False,  # noqa: E712
             Bot.game_type == game_type,
         )
         .first()

@@ -59,7 +59,7 @@
     <div class="card-header">
       <div>
         <h2 class="card-title">Nộp bot mới</h2>
-        <div class="card-desc">Chọn file Python có hàm get_move(). Nếu file có lỗi, bạn sẽ nhận được thông báo sau khi nộp.</div>
+        <div class="card-desc">Chọn bot .py hoặc gói .cdsubmit.zip đã tạo offline. Bài chỉ được xác nhận khi máy chủ trả biên nhận. <a href="/static/offline-submit.html">Mở trang nộp offline (lưu được qua F5)</a> · <a href="/guide#nop-offline">Xem hướng dẫn</a>.</div>
       </div>
     </div>
 
@@ -74,12 +74,12 @@
       </div>
       <div class="drop-zone" id="dropZone" onclick="document.getElementById('botFileInput').click()">
         <div class="drop-icon">↑</div>
-        <div class="drop-text">Kéo thả file bot .py vào đây hoặc nhấp để chọn</div>
-        <div class="drop-sub">File mã nguồn Python chứa hàm <code>get_move(board, my_player, history)</code></div>
+        <div class="drop-text">Kéo thả bot .py hoặc gói nộp offline .zip vào đây</div>
+        <div class="drop-sub">Tạo gói offline bằng <code>python starter_kit/pack_submission.py bot.py --game rps9x9</code></div>
         <div id="selectedFileName" class="drop-file"></div>
       </div>
 
-      <input type="file" id="botFileInput" name="file" accept=".py" style="display: none;" onchange="handleFileSelect(event)">
+      <input type="file" id="botFileInput" name="file" accept=".py,.zip,.cdsubmit.zip" style="display: none;" onchange="handleFileSelect(event)">
 
       <div id="uploadStatus" style="margin-top: 12px; font-size: 13px; display: none;"></div>
 
@@ -95,6 +95,7 @@
   <div class="card card-flush">
     <div class="card-header" style="padding-bottom: 16px;">
       <h2 class="card-title">Các bản đã nộp</h2>
+      <button class="btn btn-sm" style="margin-left: auto;" onclick="deactivateAllBots()">Không kích hoạt bot nào cả</button>
     </div>
 
     <div class="table-wrap" style="max-height: 330px; overflow-y: auto;">
@@ -109,10 +110,11 @@
         </thead>
         <tbody id="botTableBody">
           {% for bot in user_bots %}
-          <tr>
+          <tr data-bot-row="{{ bot.id }}">
             <td>
               <strong class="mono">{{ bot.filename }}</strong>
               <div class="text-muted" style="font-size: 11px;">{{ bot.uploaded_at.strftime('%d/%m/%Y %H:%M') if bot.uploaded_at else '' }}</div>
+              <div class="text-muted" style="font-size: 11px;">Biên nhận: CD-{{ bot.id }}-{{ (bot.client_submission_id or 'ONLINE')[:8] }}</div>
             </td>
             <td><span class="chip">{{ games_map[bot.game_type].name if bot.game_type in games_map else bot.game_type }}</span></td>
             <td>
@@ -128,6 +130,7 @@
               {% else %}
                 <span class="text-muted" style="font-size: 12px;">Đang dùng</span>
               {% endif %}
+              <button type="button" class="btn btn-sm" style="color: #f87171;" data-delete-bot="{{ bot.id }}" data-bot-name="{{ bot.filename }}" data-bot-active="{{ 'true' if bot.is_active else 'false' }}">Xóa</button>
             </td>
           </tr>
           {% else %}
@@ -254,8 +257,8 @@
   }
 
   function setFile(file) {
-    if (!file.name.endsWith('.py')) {
-      alert('Vui lòng chọn file mã nguồn Python (.py)');
+    if (!/\.py$/i.test(file.name) && !/\.zip$/i.test(file.name)) {
+      alert('Vui lòng chọn bot .py hoặc gói nộp offline .zip');
       return;
     }
     selectedFile = file;
@@ -320,8 +323,8 @@
       }
 
       statusEl.style.color = '#34d399';
-      statusEl.textContent = `Tải lên thành công! Bot đã được kích hoạt. Đang tải lại...`;
-      setTimeout(() => window.location.reload(), 1000);
+      statusEl.textContent = `Máy chủ đã nhận bài. Biên nhận: ${data.receipt || `CD-${data.id}`} · ${data.received_at || data.uploaded_at}. Đang tải lại...`;
+      setTimeout(() => window.location.reload(), 1800);
     } catch (err) {
       statusEl.style.color = '#f87171';
       statusEl.textContent = `Lỗi mạng: ${err.message}`;
@@ -342,6 +345,62 @@
       }
     } catch (err) {
       alert(`Lỗi: ${err.message}`);
+    }
+  }
+
+  async function deactivateAllBots() {
+    if (!window.confirm('Tắt bot đang kích hoạt cho tất cả trò chơi? Bạn sẽ không thể tham gia trận cho đến khi kích hoạt lại một bot.')) return;
+    try {
+      const res = await fetch('/api/bots/deactivate', { method: 'POST' });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        alert(data.detail || 'Không thể tắt các bot.');
+        return;
+      }
+      window.location.reload();
+    } catch (err) {
+      alert(`Lỗi kết nối khi tắt bot: ${err.message}`);
+    }
+  }
+
+  document.querySelectorAll('[data-delete-bot]').forEach((button) => {
+    button.addEventListener('click', () => deleteBot(button));
+  });
+
+  async function deleteBot(button) {
+    const botId = button.dataset.deleteBot;
+    const filename = button.dataset.botName;
+    const isActive = button.dataset.botActive === 'true';
+    const warning = isActive
+      ? `Bot "${filename}" đang được dùng cho thi đấu. Xóa bot này sẽ khiến trò chơi đó không còn bot kích hoạt. Bạn có chắc muốn xóa?`
+      : `Bạn có chắc muốn xóa bot "${filename}"?`;
+    if (!window.confirm(warning)) return;
+
+    try {
+      button.disabled = true;
+      button.textContent = 'Đang xóa…';
+      const res = await fetch(`/api/bots/${botId}`, {
+        method: 'DELETE',
+        credentials: 'same-origin',
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        alert(data.detail || 'Không thể xóa bot.');
+        button.disabled = false;
+        button.textContent = 'Xóa';
+        return;
+      }
+      if (data.is_active !== false) {
+        alert('Máy chủ chưa xác nhận đã tắt bot. Hãy tải lại trang và thử lại.');
+        button.disabled = false;
+        button.textContent = 'Xóa';
+        return;
+      }
+      window.location.reload();
+    } catch (err) {
+      alert(`Lỗi kết nối khi xóa bot: ${err.message}`);
+      button.disabled = false;
+      button.textContent = 'Xóa';
     }
   }
 </script>

@@ -4,19 +4,54 @@ from __future__ import annotations
 
 import os
 import secrets
+import hashlib
+from datetime import datetime, timedelta, timezone
 from typing import Any, Dict
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from server.database import get_db
-from server.models import User
+from server.models import AuthSession, User
 from server.network import should_use_secure_cookie
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
 # In-memory session store mapping active token string to user ID
 ACTIVE_SESSIONS: Dict[str, int] = {}
+SESSION_TTL_SECONDS = 12 * 60 * 60
+
+
+def _token_hash(token: str) -> str:
+    return hashlib.sha256(token.encode("utf-8")).hexdigest()
+
+
+def get_user_for_token(token: str | None, db: Session) -> User | None:
+    """Resolve in-process test sessions and persistent browser sessions."""
+    if not token:
+        return None
+    session = db.query(AuthSession).filter(AuthSession.token_hash == _token_hash(token)).first()
+    if session:
+        expires_at = session.expires_at
+        if expires_at.tzinfo is None:
+            expires_at = expires_at.replace(tzinfo=timezone.utc)
+        if expires_at <= datetime.now(timezone.utc):
+            db.delete(session)
+            db.commit()
+            ACTIVE_SESSIONS.pop(token, None)
+            return None
+        user = db.query(User).filter(User.id == session.user_id).first()
+        if not user:
+            db.delete(session)
+            db.commit()
+            ACTIVE_SESSIONS.pop(token, None)
+            return None
+        return user
+
+    # Retain compatibility with tests and integrations that inject an
+    # in-process session directly instead of authenticating through /login.
+    user_id = ACTIVE_SESSIONS.get(token)
+    return db.query(User).filter(User.id == user_id).first() if user_id is not None else None
 
 
 class RegisterRequest(BaseModel):
@@ -38,23 +73,12 @@ def get_current_user(
     db: Session = Depends(get_db),
 ) -> User:
     """Dependency that resolves the authenticated User from the active session."""
-    token = get_token_from_request(request)
-    if not token or token not in ACTIVE_SESSIONS:
+    user = get_user_for_token(get_token_from_request(request), db)
+    if not user:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Authentication required",
         )
-
-    user_id = ACTIVE_SESSIONS[token]
-    user = db.query(User).filter(User.id == user_id).first()
-    if not user:
-        # Purge stale session mapping
-        ACTIVE_SESSIONS.pop(token, None)
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="User not found",
-        )
-
     return user
 
 
@@ -157,6 +181,13 @@ async def login(
         )
 
     token = secrets.token_hex(24)
+    expires_at = datetime.now(timezone.utc) + timedelta(seconds=SESSION_TTL_SECONDS)
+    db.add(AuthSession(
+        token_hash=_token_hash(token),
+        user_id=user.id,
+        expires_at=expires_at.replace(tzinfo=None),
+    ))
+    db.commit()
     ACTIVE_SESSIONS[token] = user.id
 
     # Secure flag follows COOKIE_SECURE, or the request scheme when unset (auto)
@@ -169,6 +200,7 @@ async def login(
         secure=secure_cookie,
         samesite="lax",
         path="/",
+        max_age=SESSION_TTL_SECONDS,
     )
     return {
         "token": token,
@@ -185,11 +217,16 @@ async def login(
 def logout(
     request: Request,
     response: Response,
+    db: Session = Depends(get_db),
 ) -> Dict[str, str]:
     """Terminate the active session and clear session cookie."""
     token = get_token_from_request(request)
-    if token and token in ACTIVE_SESSIONS:
-        del ACTIVE_SESSIONS[token]
+    if token:
+        ACTIVE_SESSIONS.pop(token, None)
+        session = db.query(AuthSession).filter(AuthSession.token_hash == _token_hash(token)).first()
+        if session:
+            db.delete(session)
+            db.commit()
 
     # Secure flag follows COOKIE_SECURE, or the request scheme when unset (auto)
     secure_cookie = should_use_secure_cookie(request)

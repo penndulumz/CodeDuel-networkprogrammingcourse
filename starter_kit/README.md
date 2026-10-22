@@ -213,3 +213,17 @@ options:
    Before moving into a square, check if an adjacent enemy piece beats your piece. Walking into a free enemy capture is the most common blunder for beginner bots.
 4. **Endgame Pieces Count:**
    If a match reaches the 100-move limit, compare remaining pieces, then the summed positional score for each side. Each piece scores 0–8 for progress toward the opponent's row by default; optional scoring components are configured in `engine/game.py` under `POSITION_SCORING`. A tie on both totals is a draw.
+
+## 7. Save a Submission While Offline
+
+If the tournament server is unreachable, create a portable package on your own computer:
+
+```bash
+python starter_kit/pack_submission.py path/to/my_bot.py --game rps9x9
+```
+
+The command checks the bot with the same AST sandbox rules and writes a `.cdsubmit.zip` package under `submissions/`. Keep the package; it contains the bot, game selection, a unique retry-safe submission ID, and a checksum. Its local creation time is informational and is not an official tournament timestamp.
+
+When you can reach CodeDuel again, sign in, open **Profile**, select the matching game, and upload the `.cdsubmit.zip` package. The server validates it again, saves it as a bot version, and shows a receipt code. A package saved on your computer is **not officially submitted** until the server returns that receipt. Uploading the same package again returns the existing receipt instead of creating a duplicate.
+
+If you cannot connect to the tournament laptop during the event, the package remains on your device until you can transfer or upload it. The server cannot receive an offline package without any connection path.

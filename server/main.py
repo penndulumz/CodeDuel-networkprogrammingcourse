@@ -31,7 +31,7 @@ from server.models import Bot, BracketMatch, Match, User
 from server.network import get_public_url
 from server.routes import admin, auth, bots, grade, leaderboard, matches
 from server.routes.admin import _get_all_settings_dict
-from server.routes.auth import ACTIVE_SESSIONS, get_token_from_request
+from server.routes.auth import get_token_from_request, get_user_for_token
 from server.routes.matches import _is_portal_open_now
 from engine.game import create_initial_board
 
@@ -114,11 +114,7 @@ def get_user_rating_history_alias(
 
 def _get_optional_user(request: Request, db: Session) -> User | None:
     """Retrieve authenticated User from session cookie/header without raising HTTP 401."""
-    token = get_token_from_request(request)
-    if token and token in ACTIVE_SESSIONS:
-        user_id = ACTIVE_SESSIONS[token]
-        return db.query(User).filter(User.id == user_id).first()
-    return None
+    return get_user_for_token(get_token_from_request(request), db)
 
 
 # ================== WEB UI HTML ROUTES ==================
@@ -244,7 +240,7 @@ def profile_page(
     if current_user:
         user_bots = (
             db.query(Bot)
-            .filter(Bot.user_id == current_user.id)
+            .filter(Bot.user_id == current_user.id, Bot.is_deleted == False)  # noqa: E712
             .order_by(Bot.uploaded_at.desc())
             .all()
         )
@@ -479,6 +475,12 @@ Yeu cau: Python 3.10+ (khong can cai them thu vien nao).
      python starter_kit/grade.py starter_kit/connect4_template.py --game connect4
 5. Giao vien cham ca lop (moi bot mot file .py trong thu muc bai_nop):
      python starter_kit/grade.py bai_nop --game connect4 --csv diem.csv
+6. Khi khong co mang, tao goi nop de luu tren may:
+     python starter_kit/pack_submission.py duong_dan/bot.py --game rps9x9
+   Giu file .cdsubmit.zip trong thu muc submissions. Khi co ket noi lai,
+   dang nhap CodeDuel, mo Ho so va tai goi nay len. Chi bien nhan tu may chu
+   moi xac nhan bai da duoc nop; thoi gian trong goi offline khong phai moc
+   thoi gian chinh thuc cua giai.
 """
 
 
