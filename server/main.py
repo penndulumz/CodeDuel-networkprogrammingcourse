@@ -557,6 +557,9 @@ def get_live_bracket(db: Session = Depends(get_db)) -> Dict[str, Any]:
                 "score_p2": pairing.score_p2,
                 "status": pairing.status,
                 "winner": pairing.winner.username if pairing.winner else None,
+                "winner_player": (
+                    1 if pairing.winner_id == pairing.player1_id else 2
+                ) if pairing.winner_id is not None else None,
                 "game_results": game_results,
                 "current_game": {
                     "match_id": game.id,

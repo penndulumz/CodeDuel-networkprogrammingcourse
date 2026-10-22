@@ -51,6 +51,9 @@ class ReplayVisualizer {
     this.timer = null;
     this.livePollTimer = null;
     this.livePlaybackTimer = null;
+    this.bracketSeriesTimer = null;
+    this.followLatestBracketGame = true;
+    this.latestBracketMatchId = Number(this.matchId) || null;
 
     this.historyStates = []; // Array of board snapshots at each turn index [0..totalTurns]
     this.moves = [];
@@ -174,6 +177,21 @@ class ReplayVisualizer {
       });
     }
 
+    const gameSelect = document.getElementById('bracketGameSelect');
+    if (gameSelect) {
+      gameSelect.addEventListener('change', () => {
+        const selectedId = Number(gameSelect.value);
+        if (!selectedId || selectedId === Number(this.matchId)) return;
+        this.followLatestBracketGame = selectedId === this.latestBracketMatchId;
+        this.matchId = selectedId;
+        this.currentTurn = 0;
+        this.pause();
+        if (this.livePlaybackTimer) window.clearInterval(this.livePlaybackTimer);
+        this.livePlaybackTimer = null;
+        this.fetchReplay(selectedId);
+      });
+    }
+
     // Speed toggles
     document.querySelectorAll('.speed-btn').forEach(btn => {
       btn.addEventListener('click', (e) => {
@@ -209,6 +227,7 @@ class ReplayVisualizer {
       }
       const data = await res.json();
       this.loadReplay(data);
+      this.pollBracketSeries();
       if (data.live && !this.livePollTimer) {
         this.livePollTimer = window.setInterval(() => this.fetchReplay(this.matchId), 1000);
       } else if (!data.live && this.livePollTimer) {
@@ -239,12 +258,20 @@ class ReplayVisualizer {
     this.replayData = data;
     this.moves = data.moves || [];
     this.totalTurns = this.moves.length;
+    const heading = document.getElementById('matchHeading');
+    const matchLabel = document.getElementById('matchIdLabel');
+    if (heading) heading.textContent = `Trận đấu #${data.match_id || this.matchId}`;
+    if (matchLabel) matchLabel.textContent = `#${data.match_id || this.matchId}`;
 
     // Match board dimensions and goals are part of replay metadata for custom games.
     const initialBoard = data.initial_board || this.createDefaultInitialBoard();
     this.boardRows = initialBoard.length;
     this.boardCols = initialBoard[0]?.length || 9;
     this.goals = data.goals || { 1: [8, 8], 2: [0, 0] };
+    const p1Name = document.getElementById('p1Name');
+    const p2Name = document.getElementById('p2Name');
+    if (p1Name && data.player1?.username) p1Name.textContent = data.player1.username;
+    if (p2Name && data.player2?.username) p2Name.textContent = data.player2.username;
     this.buildBoardGrid();
     this.historyStates = [cloneBoard(initialBoard)];
 
@@ -285,6 +312,86 @@ class ReplayVisualizer {
 
     this.populateMoveLog();
     this.goToTurn(visibleTurn);
+  }
+
+  /** Follow later games in the same bracket series and keep its score visible. */
+  pollBracketSeries() {
+    if (!this.matchId || this.bracketSeriesTimer) return;
+    const poll = async () => {
+      try {
+        const response = await fetch('/api/bracket/live', { cache: 'no-store' });
+        if (!response.ok) return;
+        const data = await response.json();
+        const pairing = (data.pairings || []).find((item) =>
+          (item.game_results || []).some((result) => Number(result.match_id) === Number(this.matchId)) ||
+          Number(item.current_game?.match_id) === Number(this.matchId)
+        );
+        if (!pairing) {
+          window.clearInterval(this.bracketSeriesTimer);
+          this.bracketSeriesTimer = null;
+          return;
+        }
+
+        const scoreRow = document.getElementById('bracketSeriesRow');
+        const score = document.getElementById('bracketSeriesScore');
+        if (scoreRow) scoreRow.style.display = '';
+        if (score) score.textContent = `${pairing.player1}: ${pairing.score_p1} – ${pairing.score_p2} : ${pairing.player2}`;
+
+        const nextGameId = Number(pairing.current_game?.match_id);
+        this.latestBracketMatchId = nextGameId || this.latestBracketMatchId;
+        this.renderBracketGameOptions(pairing);
+        if (pairing.status === 'completed') {
+          window.clearInterval(this.bracketSeriesTimer);
+          this.bracketSeriesTimer = null;
+        } else if (this.followLatestBracketGame && nextGameId && nextGameId !== Number(this.matchId) && pairing.current_game.live) {
+          this.matchId = nextGameId;
+          this.currentTurn = 0;
+          await this.fetchReplay(nextGameId);
+        }
+      } catch (error) {
+        console.warn('Could not update bracket series progress:', error);
+      }
+    };
+    this.bracketSeriesTimer = window.setInterval(poll, 1000);
+    poll();
+  }
+
+  /** Populate the replay selector from completed games and the current game. */
+  renderBracketGameOptions(pairing) {
+    const row = document.getElementById('bracketGameSelectRow');
+    const select = document.getElementById('bracketGameSelect');
+    if (!row || !select) return;
+
+    const games = new Map();
+    (pairing.game_results || []).forEach((result) => {
+      if (!result.match_id) return;
+      games.set(Number(result.match_id), {
+        number: Number(result.game_number),
+        label: result.winner_username ? `${result.winner_username} thắng` : 'Hòa',
+      });
+    });
+    const current = pairing.current_game;
+    if (current && current.match_id && !games.has(Number(current.match_id))) {
+      games.set(Number(current.match_id), {
+        number: games.size + 1,
+        label: current.live ? 'Đang đấu' : current.winner ? `${current.winner} thắng` : 'Hoàn tất',
+      });
+    }
+
+    const selectedId = String(this.matchId);
+    select.replaceChildren();
+    [...games.entries()]
+      .sort((a, b) => a[1].number - b[1].number)
+      .forEach(([matchId, game]) => {
+        const option = document.createElement('option');
+        option.value = String(matchId);
+        option.textContent = `Ván ${game.number} · ${game.label}`;
+        select.appendChild(option);
+      });
+    if (games.size) {
+      row.style.display = '';
+      select.value = games.has(Number(selectedId)) ? selectedId : String(this.latestBracketMatchId);
+    }
   }
 
   /** Generate standard default starting board if initial_board is missing */
@@ -553,8 +660,9 @@ class ReplayVisualizer {
               .map(([name, values]) => `${name}: ${values[player] ?? values[String(player)] ?? 0}`)
               .join(', ');
             this.dom.winnerDesc.textContent =
-              `Turn limit after ${this.totalTurns} moves. Remaining pieces — P1: ${pieces[1] ?? pieces['1'] ?? 0}, P2: ${pieces[2] ?? pieces['2'] ?? 0}. ` +
-              `Position points — P1: ${positions[1] ?? positions['1'] ?? 0} (${detail(1)}); ` +
+              `Turn limit after ${this.totalTurns} moves.\n` +
+              `Remaining pieces — P1: ${pieces[1] ?? pieces['1'] ?? 0}, P2: ${pieces[2] ?? pieces['2'] ?? 0}.\n` +
+              `Position points — P1: ${positions[1] ?? positions['1'] ?? 0} (${detail(1)});\n` +
               `P2: ${positions[2] ?? positions['2'] ?? 0} (${detail(2)}).`;
           } else {
             this.dom.winnerDesc.textContent = `Victory condition: ${reason} in ${this.totalTurns} moves.`;

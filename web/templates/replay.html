@@ -6,7 +6,7 @@
 <div class="page-header">
   <div>
     <div class="page-eyebrow">Xem lại trận</div>
-    <h1 class="page-title">Trận đấu #{{ match_id }}</h1>
+    <h1 class="page-title" id="matchHeading">Trận đấu #{{ match_id }}</h1>
     <div class="page-subtitle">Dùng nút phát hoặc phím mũi tên để xem từng nước đi.</div>
   </div>
 
@@ -31,7 +31,9 @@
     <div class="log-panel">
       <h3>Thông tin trận</h3>
       <div class="info-list">
-        <div class="row"><span>Mã trận</span><b>#{{ match_id }}</b></div>
+        <div class="row"><span>Mã trận</span><b id="matchIdLabel">#{{ match_id }}</b></div>
+        <div class="row" id="bracketSeriesRow" style="display: none;"><span>Số ván thắng</span><b id="bracketSeriesScore">Đang tải...</b></div>
+        <div class="row" id="bracketGameSelectRow" style="display: none;"><label for="bracketGameSelect">Chọn ván xem lại</label><select id="bracketGameSelect" class="form-control" aria-label="Chọn ván trong series"></select></div>
         <div class="row"><span>Lùi / Tiến</span><span><kbd>←</kbd> <kbd>→</kbd></span></div>
         <div class="row"><span>Phát / Dừng</span><kbd>Space</kbd></div>
         {% if match and match.rule_variant == 'inverted_rps' %}
@@ -115,7 +117,7 @@
 {% endblock %}
 
 {% block scripts %}
-<script src="/static/js/visualizer.js?v=club-pieces-3"></script>
+<script src="/static/js/visualizer.js?v=bracket-series-2"></script>
 <script>
   document.addEventListener('DOMContentLoaded', async () => {
     const matchId = {{ match_id }};
