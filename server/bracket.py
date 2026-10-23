@@ -1,9 +1,9 @@
 """Playoff bracket lifecycle: tree creation, series execution, advancement, and standings.
 
 This module drives the single-elimination bracket after seeding:
-1. Persists the full bracket tree (seeded first round plus empty later rounds).
+1. Persists the full bracket tree (random first round plus empty later rounds).
 2. Plays each pairing as a best-of-N series of bracket games with alternating sides.
-3. Eliminates series losers and randomly draws the winners into the next round
+3. Eliminates series losers and randomly pairs the winners into the next round
    once every pairing of a round is finished, until a champion is decided.
 4. Derives placement ranks and composite final tournament scores.
 """
@@ -15,6 +15,7 @@ import json
 import random
 import threading
 from concurrent.futures import ThreadPoolExecutor
+from types import SimpleNamespace
 from typing import Any, Callable
 
 from sqlalchemy.orm import Session
@@ -83,8 +84,8 @@ def parse_best_of(match_format: Any) -> int:
 def create_bracket(db: Session, matchups: list[dict[str, Any]]) -> list[BracketMatch]:
     """Replace the stored bracket with a fresh tree built from first-round matchups.
 
-    Later rounds are created as empty pending pairings that get filled by a
-    random draw of the winners once the previous round is finished.
+    Later rounds are created as empty pending pairings and seeded by Elo after
+    the previous round is finished.
 
     Args:
         db: Active database session.
@@ -97,12 +98,19 @@ def create_bracket(db: Session, matchups: list[dict[str, Any]]) -> list[BracketM
 
     created: list[BracketMatch] = []
     for m in matchups:
+        player1_id = m["player1_id"]
+        player2_id = m["player2_id"]
+        # A one-sided first-round pairing is a bye. Mark it complete so its
+        # entrant advances with the other winners after the played matches end.
+        bye_winner_id = player1_id or player2_id
+        is_bye = bool(player1_id) != bool(player2_id)
         bm = BracketMatch(
             round_name=m["round_name"],
             match_index=m["match_index"],
-            player1_id=m["player1_id"],
-            player2_id=m["player2_id"],
-            status=STATUS_PENDING,
+            player1_id=player1_id,
+            player2_id=player2_id,
+            winner_id=bye_winner_id if is_bye else None,
+            status=STATUS_COMPLETED if is_bye else STATUS_PENDING,
         )
         db.add(bm)
         created.append(bm)
@@ -128,7 +136,12 @@ def create_bracket(db: Session, matchups: list[dict[str, Any]]) -> list[BracketM
 def get_ready_matches(db: Session) -> list[BracketMatch]:
     """Return pending pairings of the earliest unfinished round that have both players."""
     matches = db.query(BracketMatch).order_by(BracketMatch.id.asc()).all()
-    for round_name in ROUND_ORDER:
+    round_names = sorted(
+        {m.round_name for m in matches},
+        key=get_round_size,
+        reverse=True,
+    )
+    for round_name in round_names:
         in_round = [m for m in matches if m.round_name == round_name]
         unfinished = [m for m in in_round if m.status != STATUS_COMPLETED]
         if unfinished:
@@ -199,7 +212,7 @@ def play_bracket_series(
     Sides alternate every game. Games are stored as Match rows flagged
     is_bracket so they never affect Elo. A player without an active bot
     forfeits the series; a level series goes to the better seed. When the last
-    pairing of a round finishes, the winners are randomly drawn into the next round.
+    pairing of a round finishes, the winners are randomly paired.
 
     Args:
         bracket_match_id: Primary key of the BracketMatch to play.
@@ -210,130 +223,145 @@ def play_bracket_series(
     """
     session_factory = db_factory or SessionLocal
     db = session_factory()
-
     try:
         bm = db.query(BracketMatch).filter(BracketMatch.id == bracket_match_id).first()
         if bm is None or bm.status == STATUS_COMPLETED:
             return bm.winner_id if bm else None
         if not bm.player1_id or not bm.player2_id:
             return None
-
         player1 = db.query(User).filter(User.id == bm.player1_id).first()
         player2 = db.query(User).filter(User.id == bm.player2_id).first()
         if player1 is None or player2 is None:
             return None
 
+        player1_id, player2_id = player1.id, player2.id
+        player1_name, player2_name = player1.username, player2.username
+        player1_elo, player2_elo = player1.elo, player2.elo
+        bot1, bot2 = _active_bot(db, player1_id), _active_bot(db, player2_id)
+        bot1_data = (bot1.id, bot1.filepath, bot1.game_type) if bot1 else None
+        bot2_data = (bot2.id, bot2.filepath, bot2.game_type) if bot2 else None
+        round_name = bm.round_name
         bm.status = STATUS_RUNNING
         bm.score_p1 = 0
         bm.score_p2 = 0
         db.commit()
 
-        bot1 = _active_bot(db, player1.id)
-        bot2 = _active_bot(db, player2.id)
-
-        if bot1 is not None and bot2 is not None:
-            bracket_cfg = load_tournament_config().get("tournament", {}).get("final_bracket", {})
-            best_of = parse_best_of(bracket_cfg.get("match_format"))
-            wins_needed = best_of // 2 + 1
-
-            setting = (
-                db.query(TournamentSetting)
-                .filter(TournamentSetting.key == "rule_variant")
-                .first()
-            )
-            rule_variant = setting.value if setting and setting.value else "standard"
-
-            for game_no in range(best_of):
-                # Alternate sides: bracket player 1 moves first in even games
-                swapped = game_no % 2 == 1
-                first, first_bot = (player2, bot2) if swapped else (player1, bot1)
-                second, second_bot = (player1, bot1) if swapped else (player2, bot2)
-
-                game = Match(
-                    player1_id=first.id,
-                    player2_id=second.id,
-                    bot1_id=first_bot.id,
-                    bot2_id=second_bot.id,
-                    p1_elo_before=first.elo,
-                    p2_elo_before=second.elo,
-                    is_bracket=True,
-                    bracket_match_id=bm.id,
-                    rule_variant=rule_variant,
-                    game_type=first_bot.game_type,
-                )
-                db.add(game)
-                db.commit()
-                db.refresh(game)
-
-                result = execute_match_job(
-                    game.id,
-                    first_bot.filepath,
-                    second_bot.filepath,
-                    db_factory=session_factory,
-                )
-                if result is None:
-                    raise RuntimeError(
-                        f"Bracket game {game.id} failed to execute; the series remains pending."
-                    )
-
-                winner_code = result.get("winner") if result else None
-                game_winner = None
-                if winner_code in (1, 2):
-                    game_winner = first if winner_code == 1 else second
-                    if game_winner.id == player1.id:
-                        bm.score_p1 += 1
-                    else:
-                        bm.score_p2 += 1
-                if result is not None:
-                    game_results = json.loads(bm.game_results or "[]")
-                    game_results.append(
-                        {
-                            "game_number": game_no + 1,
-                            "match_id": game.id,
-                            "winner_id": game_winner.id if game_winner else None,
-                            "winner_username": game_winner.username if game_winner else None,
-                        }
-                    )
-                    bm.game_results = json.dumps(game_results, ensure_ascii=False)
-                db.commit()
-
-                if bm.score_p1 >= wins_needed or bm.score_p2 >= wins_needed:
-                    break
-
-        db.refresh(player1)
-        db.refresh(player2)
-
-        if bot1 is None and bot2 is not None:
-            bm.winner_id = player2.id
-        elif bot2 is None and bot1 is not None:
-            bm.winner_id = player1.id
-        elif bm.score_p1 > bm.score_p2:
-            bm.winner_id = player1.id
-        elif bm.score_p2 > bm.score_p1:
-            bm.winner_id = player2.id
-        else:
-            bm.winner_id = _break_tie(player1, player2)
-
-        bm.status = STATUS_COMPLETED
-        with _ROUND_ADVANCE_LOCK:
-            db.flush()
-            _draw_next_round(db, bm.round_name)
-            db.commit()
-        return bm.winner_id
-
+        bracket_cfg = load_tournament_config().get("tournament", {}).get("final_bracket", {})
+        best_of = parse_best_of(bracket_cfg.get("match_format"))
+        wins_needed = best_of // 2 + 1
+        setting = db.query(TournamentSetting).filter(TournamentSetting.key == "rule_variant").first()
+        rule_variant = setting.value if setting and setting.value else "standard"
     except Exception as exc:
-        logger.exception("Error playing bracket match %d: %s", bracket_match_id, exc)
-        try:
-            db.rollback()
-            bm = db.query(BracketMatch).filter(BracketMatch.id == bracket_match_id).first()
-            if bm and bm.status == STATUS_RUNNING:
-                bm.status = STATUS_PENDING
-                db.commit()
-        except Exception:
-            pass
+        logger.exception("Could not prepare bracket match %d: %s", bracket_match_id, exc)
         return None
     finally:
         db.close()
+
+    score_p1 = score_p2 = 0
+    try:
+        if bot1_data is not None and bot2_data is not None:
+            for game_no in range(best_of):
+                swapped = game_no % 2 == 1
+                if swapped:
+                    first_id, first_name, first_elo, first_bot = player2_id, player2_name, player2_elo, bot2_data
+                    second_id, second_name, second_elo, second_bot = player1_id, player1_name, player1_elo, bot1_data
+                else:
+                    first_id, first_name, first_elo, first_bot = player1_id, player1_name, player1_elo, bot1_data
+                    second_id, second_name, second_elo, second_bot = player2_id, player2_name, player2_elo, bot2_data
+
+                game_db = session_factory()
+                try:
+                    game = Match(
+                        player1_id=first_id,
+                        player2_id=second_id,
+                        bot1_id=first_bot[0],
+                        bot2_id=second_bot[0],
+                        p1_elo_before=first_elo,
+                        p2_elo_before=second_elo,
+                        is_bracket=True,
+                        bracket_match_id=bracket_match_id,
+                        rule_variant=rule_variant,
+                        game_type=first_bot[2],
+                    )
+                    game_db.add(game)
+                    game_db.commit()
+                    game_id = game.id
+                finally:
+                    game_db.close()
+
+                result = execute_match_job(game_id, first_bot[1], second_bot[1], db_factory=session_factory)
+                if result is None:
+                    raise RuntimeError(f"Bracket game {game_id} failed to execute; the series remains pending.")
+
+                winner_code = result.get("winner")
+                winner_id = first_id if winner_code == 1 else second_id if winner_code == 2 else None
+                winner_name = first_name if winner_code == 1 else second_name if winner_code == 2 else None
+                if winner_id == player1_id:
+                    score_p1 += 1
+                elif winner_id == player2_id:
+                    score_p2 += 1
+
+                result_db = session_factory()
+                try:
+                    current = result_db.query(BracketMatch).filter(BracketMatch.id == bracket_match_id).first()
+                    if current is None:
+                        raise RuntimeError(f"Bracket pairing {bracket_match_id} disappeared during its series.")
+                    current.score_p1 = score_p1
+                    current.score_p2 = score_p2
+                    game_results = json.loads(current.game_results or "[]")
+                    game_results.append({
+                        "game_number": game_no + 1,
+                        "match_id": game_id,
+                        "winner_id": winner_id,
+                        "winner_username": winner_name,
+                    })
+                    current.game_results = json.dumps(game_results, ensure_ascii=False)
+                    result_db.commit()
+                finally:
+                    result_db.close()
+
+                if score_p1 >= wins_needed or score_p2 >= wins_needed:
+                    break
+
+        if bot1_data is None and bot2_data is not None:
+            winner_id = player2_id
+        elif bot2_data is None and bot1_data is not None:
+            winner_id = player1_id
+        elif score_p1 > score_p2:
+            winner_id = player1_id
+        elif score_p2 > score_p1:
+            winner_id = player2_id
+        else:
+            winner_id = player1_id if (player1_elo, -player1_id) >= (player2_elo, -player2_id) else player2_id
+
+        final_db = session_factory()
+        try:
+            current = final_db.query(BracketMatch).filter(BracketMatch.id == bracket_match_id).first()
+            if current is None:
+                return None
+            current.winner_id = winner_id
+            current.status = STATUS_COMPLETED
+            with _ROUND_ADVANCE_LOCK:
+                final_db.flush()
+                _draw_next_round(final_db, round_name)
+                final_db.commit()
+            return winner_id
+        finally:
+            final_db.close()
+
+    except Exception as exc:
+        logger.exception("Error playing bracket match %d: %s", bracket_match_id, exc)
+        error_db = session_factory()
+        try:
+            current = error_db.query(BracketMatch).filter(BracketMatch.id == bracket_match_id).first()
+            if current and current.status == STATUS_RUNNING:
+                current.status = STATUS_PENDING
+                error_db.commit()
+        except Exception:
+            logger.exception("Could not reset bracket pairing %d after failure", bracket_match_id)
+        finally:
+            error_db.close()
+        return None
 
 
 def play_bracket_matches(

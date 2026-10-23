@@ -2,7 +2,9 @@
 (function () {
   const container = document.getElementById('liveProjections');
   if (!container) return;
-  const projectionStage = document.querySelector('.live-projections');
+  const historyList = document.getElementById('bracketRoundHistoryList');
+  const historyDetails = document.getElementById('bracketRoundHistoryDetails');
+  const projectionStage = document.querySelector('.bracket-live-layout');
   const fullscreenButton = document.getElementById('projectionFullscreen');
   if (fullscreenButton && projectionStage) {
     fullscreenButton.addEventListener('click', async () => {
@@ -13,11 +15,14 @@
       }
     });
   }
-  const autoAdvanceToggle = document.getElementById('autoAdvanceRounds');
   const startRoundButton = document.getElementById('startNextBracketRound');
+  const finishRoundButton = document.getElementById('finishBracketRound');
   const controlMessage = document.getElementById('projectionControlMessage');
   let latestPairings = [];
+  let selectedHistoryRound = null;
+  let historySignature = null;
   let roundRequestInFlight = false;
+  let snapToLatest = false;
   const displayedTurns = new Map();
   const displayedGameIds = new Map();
   const progressKey = (matchId) => `bracketReplayProgress:${matchId}`;
@@ -26,14 +31,8 @@
     return Math.max(0, Number(localStorage.getItem(progressKey(matchId))) || 0);
   }
 
-  if (autoAdvanceToggle) {
-    autoAdvanceToggle.checked = sessionStorage.getItem('autoAdvanceBracketRounds') === 'true';
-    autoAdvanceToggle.addEventListener('change', () => {
-      sessionStorage.setItem('autoAdvanceBracketRounds', String(autoAdvanceToggle.checked));
-      if (autoAdvanceToggle.checked) maybeAutoAdvance();
-    });
-  }
   if (startRoundButton) startRoundButton.addEventListener('click', queueNextRound);
+  if (finishRoundButton) finishRoundButton.addEventListener('click', finishCurrentRound);
 
   function element(tag, className, text) {
     const node = document.createElement(tag);
@@ -166,7 +165,7 @@
       card.appendChild(element('p', 'projection-note', 'Đang khởi chạy trận trên bàn chiếu...'));
     }
 
-    if ((pairing.game_results || []).length) {
+    if ((pairing.game_results || []).length && !(pairing.games || []).length) {
       const results = element('ol', 'projection-results');
       pairing.game_results.forEach((result) => {
         results.appendChild(
@@ -181,10 +180,80 @@
       });
       card.appendChild(results);
     }
+    if ((pairing.games || []).length) {
+      const gameDetails = element('div', 'projection-game-details');
+      pairing.games.forEach((game) => {
+        const line = element('div', 'projection-game-detail');
+        const label = `Ván ${game.game_number}: ${game.winner || 'Hòa'}${game.win_reason ? ` · ${game.win_reason}` : ''} · ${game.turns} lượt`;
+        if (game.has_replay) {
+          const link = element('a', '', label);
+          link.href = `/replay/${game.match_id}`;
+          line.appendChild(link);
+        } else {
+          line.textContent = label;
+        }
+        gameDetails.appendChild(line);
+      });
+      card.appendChild(gameDetails);
+    }
     if (pairing.winner) {
       card.appendChild(element('strong', 'projection-winner', `Thắng vòng: ${pairing.winner}`));
     }
     return card;
+  }
+
+  function roundSize(name) {
+    if (name === 'Final') return 2;
+    if (name === 'Semi-Final') return 4;
+    if (name === 'Quarter-Final') return 8;
+    const match = /^Round of (\d+)$/.exec(name || '');
+    return match ? Number(match[1]) : 0;
+  }
+
+  function isByePairing(pairing) {
+    return pairing.is_bye === true || pairing.player1 === 'TBD' || pairing.player2 === 'TBD';
+  }
+
+  function renderRoundHistory() {
+    if (!historyList || !historyDetails) return;
+    const signature = JSON.stringify(latestPairings.map(pairing => [
+      pairing.id, pairing.status, pairing.winner,
+      (pairing.games || []).map(game => [game.match_id, game.has_replay, game.winner])
+    ]));
+    if (signature === historySignature) return;
+    historySignature = signature;
+    historyList.replaceChildren();
+    historyDetails.replaceChildren();
+    const groups = new Map();
+    latestPairings.forEach((pairing) => {
+      if (!groups.has(pairing.round_name)) groups.set(pairing.round_name, []);
+      groups.get(pairing.round_name).push(pairing);
+    });
+    const finishedRounds = Array.from(groups.entries())
+      .filter(([, pairings]) => pairings.length && pairings.every(pairing => pairing.status === 'completed'))
+      .sort(([a], [b]) => roundSize(b) - roundSize(a));
+    if (!finishedRounds.length) {
+      historyList.appendChild(element('p', 'projection-note', 'Chưa có vòng nào hoàn tất.'));
+      return;
+    }
+    finishedRounds.forEach(([roundName, pairings]) => {
+      const playedPairings = pairings.filter(pairing => !isByePairing(pairing));
+      const button = element('button', `btn btn-sm ${selectedHistoryRound === roundName ? 'btn-primary' : 'btn-secondary'}`, `${roundName} · ${playedPairings.length} trận`);
+      button.type = 'button';
+      button.addEventListener('click', () => {
+        selectedHistoryRound = selectedHistoryRound === roundName ? null : roundName;
+        historySignature = null;
+        renderRoundHistory();
+      });
+      historyList.appendChild(button);
+    });
+    const selected = finishedRounds.find(([name]) => name === selectedHistoryRound);
+    if (selected) {
+      historyDetails.appendChild(element('h4', '', `Kết quả ${selected[0]}`));
+      const grid = element('div', 'projection-grid');
+      selected[1].filter(pairing => !isByePairing(pairing)).forEach(pairing => grid.appendChild(renderPairing(pairing)));
+      historyDetails.appendChild(grid);
+    }
   }
 
   function paintPairings() {
@@ -193,7 +262,37 @@
       container.appendChild(element('p', 'projection-note', 'Chưa có bracket nào được tạo.'));
       return;
     }
-    latestPairings.forEach((pairing) => container.appendChild(renderPairing(pairing)));
+    const groups = new Map();
+    latestPairings.forEach((pairing) => {
+      if (!groups.has(pairing.round_name)) groups.set(pairing.round_name, []);
+      groups.get(pairing.round_name).push(pairing);
+    });
+    const orderedRounds = Array.from(groups.entries())
+      .sort(([a], [b]) => roundSize(b) - roundSize(a));
+    const runningRound = orderedRounds.find(([, pairings]) =>
+      pairings.some(pairing => pairing.status === 'running')
+    );
+    const lastCompletedRound = orderedRounds
+      .filter(([, pairings]) =>
+        pairings.length > 0 &&
+        pairings.every(pairing => pairing.status === 'completed') &&
+        pairings.some(pairing => !isByePairing(pairing))
+      )
+      .sort(([a], [b]) => roundSize(a) - roundSize(b))[0];
+    const nextUnfinishedRound = orderedRounds.find(([, pairings]) =>
+      pairings.some(pairing => pairing.status !== 'completed')
+    );
+    const currentRound = runningRound || lastCompletedRound || nextUnfinishedRound;
+    if (!currentRound) {
+      container.appendChild(element('p', 'projection-note', 'Giải đấu đã kết thúc. Vòng chung kết vẫn được giữ trên màn chiếu; chọn một vòng bên cạnh để xem lại.'));
+      return;
+    }
+    const playedPairings = currentRound[1].filter(pairing => !isByePairing(pairing));
+    if (!playedPairings.length) {
+      container.appendChild(element('p', 'projection-note', 'Các người chơi được miễn đấu đã vào vòng tiếp theo.'));
+      return;
+    }
+    playedPairings.forEach((pairing) => container.appendChild(renderPairing(pairing)));
   }
 
   async function queueNextRound() {
@@ -215,13 +314,28 @@
     }
   }
 
-  function maybeAutoAdvance() {
-    if (!autoAdvanceToggle || !autoAdvanceToggle.checked || roundRequestInFlight) return;
-    if (latestPairings.some((pairing) => pairing.status === 'running')) return;
-    const hasReadyPairing = latestPairings.some(
-      (pairing) => pairing.status === 'pending' && pairing.player1 !== 'TBD' && pairing.player2 !== 'TBD'
-    );
-    if (hasReadyPairing) queueNextRound();
+  async function finishCurrentRound() {
+    if (!finishRoundButton) return;
+    finishRoundButton.disabled = true;
+    if (controlMessage) controlMessage.textContent = 'Đang bỏ hoạt ảnh và chạy nhanh tới kết quả vòng này...';
+    try {
+      const response = await fetch('/api/admin/bracket/finish', { method: 'POST' });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.detail || 'Không thể kết thúc vòng hiện tại.');
+      snapToLatest = true;
+      latestPairings.forEach((pairing) => {
+        const game = pairing.current_game;
+        if (!game) return;
+        displayedTurns.set(pairing.id, (game.moves || []).length);
+        localStorage.setItem(progressKey(game.match_id), String((game.moves || []).length));
+      });
+      paintPairings();
+      if (controlMessage) controlMessage.textContent = 'Đã bỏ hoạt ảnh. Bàn cờ sẽ theo sát trạng thái cuối khi các trận hoàn tất.';
+    } catch (error) {
+      if (controlMessage) controlMessage.textContent = error.message;
+    } finally {
+      finishRoundButton.disabled = false;
+    }
   }
 
   async function refresh() {
@@ -230,6 +344,8 @@
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
       const data = await response.json();
       latestPairings = data.pairings || [];
+      const hasRunningGame = latestPairings.some(pairing => pairing.status === 'running');
+      if (finishRoundButton) finishRoundButton.disabled = false;
       latestPairings.forEach((pairing) => {
         if (!pairing.current_game) return;
         const oldGameId = displayedGameIds.get(pairing.id);
@@ -238,11 +354,14 @@
         }
         displayedTurns.set(
           pairing.id,
-          Math.min(getSavedProgress(pairing.current_game.match_id), pairing.current_game.moves.length)
+          snapToLatest || pairing.status === 'completed'
+            ? pairing.current_game.moves.length
+            : Math.min(getSavedProgress(pairing.current_game.match_id), pairing.current_game.moves.length)
         );
       });
       paintPairings();
-      maybeAutoAdvance();
+      renderRoundHistory();
+      if (snapToLatest && !hasRunningGame) snapToLatest = false;
     } catch (error) {
       container.replaceChildren(element('p', 'projection-note', `Không thể tải diễn biến: ${error.message}`));
     }

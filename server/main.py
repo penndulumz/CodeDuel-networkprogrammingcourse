@@ -21,11 +21,11 @@ from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from sqlalchemy import or_
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 
 from engine.games import GAMES, is_grid_game, list_games
 from server.database import get_db, init_db
-from server.bracket import ROUND_ORDER, get_final_results, is_bracket_finished
+from server.bracket import get_final_results, get_round_size, is_bracket_finished
 from server.games import get_active_game, get_catalog_games
 from server.models import Bot, BracketMatch, Match, User
 from server.network import get_public_url
@@ -347,7 +347,7 @@ def bracket_page(
     )
 
     present_rounds = {bm.round_name for bm in bracket_matches}
-    bracket_rounds = [name for name in ROUND_ORDER if name in present_rounds]
+    bracket_rounds = sorted(present_rounds, key=get_round_size, reverse=True)
     final_results = (
         get_final_results(db) if is_bracket_finished(bracket_matches) else []
     )
@@ -520,15 +520,33 @@ def health_check() -> dict[str, str]:
 @app.get("/api/bracket/live", tags=["tournament"])
 def get_live_bracket(db: Session = Depends(get_db)) -> Dict[str, Any]:
     """Return bracket pairings and their current boards for public scoreboards."""
-    pairings = db.query(BracketMatch).order_by(BracketMatch.id.asc()).all()
+    pairings = (
+        db.query(BracketMatch)
+        .options(
+            selectinload(BracketMatch.player1),
+            selectinload(BracketMatch.player2),
+            selectinload(BracketMatch.winner),
+        )
+        .order_by(BracketMatch.id.asc())
+        .all()
+    )
+    pairing_ids = [pairing.id for pairing in pairings]
+    games_by_pairing: Dict[int, list[Match]] = {}
+    if pairing_ids:
+        games = (
+            db.query(Match)
+            .options(selectinload(Match.player1), selectinload(Match.player2))
+            .filter(Match.bracket_match_id.in_(pairing_ids))
+            .order_by(Match.id.asc())
+            .all()
+        )
+        for game in games:
+            if game.bracket_match_id is not None:
+                games_by_pairing.setdefault(game.bracket_match_id, []).append(game)
     payload: list[dict[str, Any]] = []
     for pairing in pairings:
-        game = (
-            db.query(Match)
-            .filter(Match.bracket_match_id == pairing.id)
-            .order_by(Match.id.desc())
-            .first()
-        )
+        series_games = games_by_pairing.get(pairing.id, [])
+        game = series_games[-1] if series_games else None
         moves: list[dict[str, Any]] = []
         if game is not None:
             try:
@@ -555,6 +573,7 @@ def get_live_bracket(db: Session = Depends(get_db)) -> Dict[str, Any]:
                 "match_index": pairing.match_index + 1,
                 "player1": pairing.player1.username if pairing.player1 else "TBD",
                 "player2": pairing.player2.username if pairing.player2 else "TBD",
+                "is_bye": pairing.player1_id is None or pairing.player2_id is None,
                 "score_p1": pairing.score_p1,
                 "score_p2": pairing.score_p2,
                 "status": pairing.status,
@@ -563,6 +582,23 @@ def get_live_bracket(db: Session = Depends(get_db)) -> Dict[str, Any]:
                     1 if pairing.winner_id == pairing.player1_id else 2
                 ) if pairing.winner_id is not None else None,
                 "game_results": game_results,
+                "games": [
+                    {
+                        "match_id": series_game.id,
+                        "game_number": game_number,
+                        "winner": (
+                            pairing.player1.username
+                            if series_game.winner_id == pairing.player1_id and pairing.player1
+                            else pairing.player2.username
+                            if series_game.winner_id == pairing.player2_id and pairing.player2
+                            else None
+                        ),
+                        "win_reason": series_game.win_reason,
+                        "turns": series_game.total_turns,
+                        "has_replay": bool(series_game.replay_path),
+                    }
+                    for game_number, series_game in enumerate(series_games, start=1)
+                ],
                 "current_game": {
                     "match_id": game.id,
                     "player1": game.player1.username,

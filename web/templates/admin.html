@@ -132,7 +132,7 @@
     </div>
 
     <ol class="steps">
-      <li><span><b>Tạo nhánh đấu.</b> Lấy Top {{ settings.top_players_count }} người chơi có Elo cao nhất đã nộp bot hoạt động và ghép cặp vòng đầu theo hạt giống (Seed 1 vs 8, 2 vs 7, v.v.).</span></li>
+      <li><span><b>Tạo nhánh đấu.</b> Chọn người đã nộp bot hoạt động; các cặp vòng đầu được bốc thăm ngẫu nhiên.</span></li>
       <li><span><b>Chạy từng vòng.</b> Mỗi cặp đấu theo series, đội thua bị loại.</span></li>
       <li><span><b>Bốc thăm vòng sau.</b> Khi cả vòng đấu xong, các đội thắng được ghép cặp ngẫu nhiên.</span></li>
     </ol>
@@ -143,15 +143,32 @@
       <small class="form-hint">Mỗi bàn là một cặp đấu; tối đa 8 bàn.</small>
     </div>
 
+    <div class="form-group">
+      <label class="form-label"><b>Chọn người tham gia</b></label>
+      <div style="display:flex; gap:8px; margin-bottom:8px;">
+        <button class="btn btn-sm btn-secondary" type="button" onclick="selectBracketParticipants(true)">Chọn tất cả</button>
+        <button class="btn btn-sm btn-secondary" type="button" onclick="selectBracketParticipants(false)">Bỏ chọn</button>
+        <span id="bracketParticipantCount" class="form-hint"></span>
+      </div>
+      <div id="bracketParticipants" style="max-height:260px; overflow:auto; border:1px solid var(--border-subtle); border-radius:8px; padding:8px;">
+        <span class="form-hint">Đang tải danh sách tài khoản...</span>
+      </div>
+    </div>
+    <div class="form-group">
+      <label class="form-label" for="bracketPairingMode"><b>Cách xếp trận vòng đầu</b></label>
+      <select id="bracketPairingMode" class="form-control" onchange="renderManualBracketPairs()">
+        <option value="random">Xếp ngẫu nhiên</option>
+        <option value="manual">Tự sắp cặp thủ công</option>
+      </select>
+      <div id="manualBracketPairs" style="display:none; margin-top:10px;"></div>
+    </div>
+
     <div class="stack" style="gap: 10px; margin-bottom: 14px;">
       <button class="btn btn-primary btn-lg btn-block" onclick="playNextBracketRound()">
         ▶ Chạy vòng đấu tiếp theo
       </button>
       <button class="btn btn-danger btn-lg btn-block" onclick="triggerBracketGeneration()">
         ⚡ Tạo / Khởi tạo lại Nhánh đấu Bracket
-      </button>
-      <button class="btn btn-secondary btn-lg btn-block" onclick="speedUpBracketRound()">
-        ⚡ Tăng tốc vòng đang chạy
       </button>
       <button class="btn btn-danger btn-lg btn-block" onclick="endTournament()">
         Kết thúc giải đấu và xóa trận cũ
@@ -314,6 +331,93 @@
     }
   }
 
+  let bracketParticipants = [];
+
+  function selectedBracketParticipantIds() {
+    return Array.from(document.querySelectorAll('#bracketParticipants input:checked')).map(input => Number(input.value));
+  }
+
+  function updateBracketParticipantCount() {
+    document.getElementById('bracketParticipantCount').textContent = `${selectedBracketParticipantIds().length} người được chọn`;
+  }
+
+  function renderBracketParticipants(defaultActiveOnly = false) {
+    const container = document.getElementById('bracketParticipants');
+    const maximum = Number({{ settings.top_players_count }});
+    container.replaceChildren();
+    let activeSelected = 0;
+    bracketParticipants.forEach(participant => {
+      const row = document.createElement('label');
+      row.style.cssText = 'display:flex; align-items:center; gap:8px; padding:6px;';
+      const checkbox = document.createElement('input');
+      checkbox.type = 'checkbox';
+      checkbox.value = participant.id;
+      checkbox.checked = defaultActiveOnly && participant.has_active_bot && activeSelected < maximum;
+      if (checkbox.checked) activeSelected += 1;
+      checkbox.addEventListener('change', () => { updateBracketParticipantCount(); renderManualBracketPairs(); });
+      const name = document.createElement('span');
+      name.textContent = `${participant.username} · Elo ${participant.elo}${participant.has_active_bot ? '' : ' · chưa có bot cho game hiện tại'}`;
+      row.append(checkbox, name);
+      container.appendChild(row);
+    });
+    updateBracketParticipantCount();
+  }
+
+  function selectBracketParticipants(selected) {
+    document.querySelectorAll('#bracketParticipants input').forEach(input => { input.checked = selected; });
+    updateBracketParticipantCount();
+    renderManualBracketPairs();
+  }
+
+  function renderManualBracketPairs() {
+    const panel = document.getElementById('manualBracketPairs');
+    const manual = document.getElementById('bracketPairingMode').value === 'manual';
+    panel.style.display = manual ? 'block' : 'none';
+    panel.replaceChildren();
+    if (!manual) return;
+    const ids = selectedBracketParticipantIds();
+    let bracketSize = 2;
+    while (bracketSize < ids.length) bracketSize *= 2;
+    const hint = document.createElement('p');
+    hint.className = 'form-hint';
+    hint.textContent = 'Mỗi người phải xuất hiện đúng một lần. Để trống một ô để tạo lượt miễn đấu.';
+    panel.appendChild(hint);
+    for (let index = 0; index < Math.max(1, bracketSize / 2); index += 1) {
+      const row = document.createElement('div');
+      row.style.cssText = 'display:flex; gap:8px; margin:6px 0;';
+      for (let side = 0; side < 2; side += 1) {
+        const select = document.createElement('select');
+        select.className = 'form-control manual-bracket-player';
+        const empty = document.createElement('option');
+        empty.value = '';
+        empty.textContent = '— Lượt miễn đấu / chọn người —';
+        select.appendChild(empty);
+        bracketParticipants.filter(player => ids.includes(player.id)).forEach(player => {
+          const option = document.createElement('option');
+          option.value = player.id;
+          option.textContent = player.username;
+          select.appendChild(option);
+        });
+        row.appendChild(select);
+      }
+      panel.appendChild(row);
+    }
+  }
+
+  async function loadBracketParticipants() {
+    const container = document.getElementById('bracketParticipants');
+    try {
+      const response = await fetch('/api/admin/bracket/participants');
+      if (!response.ok) throw new Error('Không tải được danh sách người chơi');
+      bracketParticipants = await response.json();
+      renderBracketParticipants(true);
+    } catch (error) {
+      container.textContent = error.message;
+    }
+  }
+
+  loadBracketParticipants();
+
   async function triggerBracketGeneration() {
     if (!confirm('Bạn có chắc muốn tạo mới nhánh đấu? Toàn bộ nhánh đấu và kết quả bracket trước đó sẽ bị thay thế.')) {
       return;
@@ -322,13 +426,27 @@
     const msgEl = document.getElementById('bracketMsg');
     msgEl.style.display = 'block';
     msgEl.style.color = 'var(--muted)';
-    msgEl.textContent = 'Đang xếp hạt giống và tạo nhánh đấu...';
+    msgEl.textContent = 'Đang bốc thăm và tạo nhánh đấu...';
 
     try {
+      const participantIds = selectedBracketParticipantIds();
+      const requestBody = {
+        concurrent_boards: Number(document.getElementById('concurrentBoards').value),
+        participant_ids: participantIds
+      };
+      if (document.getElementById('bracketPairingMode').value === 'manual') {
+        requestBody.manual_pairs = Array.from(document.querySelectorAll('#manualBracketPairs .manual-bracket-player'))
+          .reduce((pairs, select, index) => {
+            const pairIndex = Math.floor(index / 2);
+            if (!pairs[pairIndex]) pairs[pairIndex] = [];
+            pairs[pairIndex].push(select.value ? Number(select.value) : null);
+            return pairs;
+          }, []);
+      }
       const res = await fetch('/api/admin/bracket/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ concurrent_boards: Number(document.getElementById('concurrentBoards').value) })
+        body: JSON.stringify(requestBody)
       });
 
       const data = await res.json();
@@ -396,22 +514,6 @@
     }
   }
 
-  async function speedUpBracketRound() {
-    const msgEl = document.getElementById('bracketMsg');
-    msgEl.style.display = 'block';
-    msgEl.style.color = 'var(--muted)';
-    msgEl.textContent = 'Enabling faster bracket playback...';
-    try {
-      const response = await fetch('/api/admin/bracket/speed-up', { method: 'POST' });
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.detail || 'Could not speed up the bracket round.');
-      msgEl.style.color = '#34d399';
-      msgEl.textContent = 'Display delays are skipped. Running games will finish under the current rules.';
-    } catch (error) {
-      msgEl.style.color = '#f87171';
-      msgEl.textContent = error.message;
-    }
-  }
 
   async function toggleBoss(bossSlug, action) {
     const btn = document.getElementById(`btn-${bossSlug}`);

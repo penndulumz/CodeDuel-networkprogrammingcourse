@@ -67,67 +67,46 @@ def execute_match_job(
     """
     session_factory = db_factory or SessionLocal
     db = session_factory()
-
     try:
         match = db.query(Match).filter(Match.id == match_id).first()
-        if not match:
+        if match is None:
             logger.error("Match with id %d not found in database.", match_id)
             return None
-
         player1 = db.query(User).filter(User.id == match.player1_id).first()
         player2 = db.query(User).filter(User.id == match.player2_id).first()
-
-        if not player1 or not player2:
+        if player1 is None or player2 is None:
             logger.error("Players for match %d not found.", match_id)
             return None
 
-        # Load configuration parameters and database overrides
+        # Copy the values needed by the runner, then release this connection.
+        player1_id, player2_id = player1.id, player2.id
+        player1_name, player2_name = player1.username, player2.username
+        is_bracket = match.is_bracket
+        match_variant = match.rule_variant
+        game_type = normalize_game_type(match.game_type)
         config = load_tournament_config()
         t_cfg = config.get("tournament", {})
         elo_cfg = t_cfg.get("elo", {})
         rules_cfg = t_cfg.get("match_rules", {})
-
-        multiplier_x = _get_setting_value(
-            db, "daily_multiplier_x", elo_cfg.get("daily_multiplier_x", 1.5), float
-        )
-        k_factor = _get_setting_value(
-            db, "k_factor", elo_cfg.get("k_factor", 32), int
-        )
-        max_turns = _get_setting_value(
-            db, "max_turns", rules_cfg.get("max_turns", MAX_TURNS), int
-        )
-        max_turns = max(10, min(MAX_TURNS, max_turns))
-        timeout_seconds = _get_setting_value(
-            db, "turn_timeout_seconds", rules_cfg.get("turn_timeout_seconds", 1.0), float
-        )
-
-        # Determine active rule variant
+        multiplier_x = _get_setting_value(db, "daily_multiplier_x", elo_cfg.get("daily_multiplier_x", 1.5), float)
+        k_factor = _get_setting_value(db, "k_factor", elo_cfg.get("k_factor", 32), int)
+        max_turns = max(10, min(MAX_TURNS, _get_setting_value(db, "max_turns", rules_cfg.get("max_turns", MAX_TURNS), int)))
+        timeout_seconds = _get_setting_value(db, "turn_timeout_seconds", rules_cfg.get("turn_timeout_seconds", 1.0), float)
         db_variant = _get_setting_value(db, "rule_variant", None, str)
-        match_variant = getattr(match, "rule_variant", None)
         if match_variant and match_variant != "standard":
             rule_variant = match_variant
-        elif db_variant:
-            rule_variant = db_variant
         else:
-            rule_variant = match_variant or "standard"
+            rule_variant = db_variant or match_variant or "standard"
+    except Exception as exc:
+        logger.exception("Could not prepare match %d: %s", match_id, exc)
+        return None
+    finally:
+        db.close()
 
-        if not rule_variant:
-            rule_variant = "standard"
+    try:
+        p1_meta = {"id": player1_id, "username": player1_name, "match_id": match_id}
+        p2_meta = {"id": player2_id, "username": player2_name, "match_id": match_id}
 
-        game_type = normalize_game_type(getattr(match, "game_type", None))
-
-        p1_meta = {
-            "id": player1.id,
-            "username": player1.username,
-            "match_id": match_id,
-        }
-        p2_meta = {
-            "id": player2.id,
-            "username": player2.username,
-            "match_id": match_id,
-        }
-
-        # Persist each accepted move so bracket projections can follow an active game.
         def save_live_progress(moves: list[dict[str, Any]]) -> None:
             progress_db = session_factory()
             try:
@@ -143,7 +122,6 @@ def execute_match_job(
             if not _bracket_fast_mode.is_set():
                 time.sleep(BRACKET_MOVE_DISPLAY_DELAY_SECONDS)
 
-        # Run match in isolated worker processes
         match_result = run_match(
             bot1_path=bot1_path,
             bot2_path=bot2_path,
@@ -153,85 +131,63 @@ def execute_match_job(
             player2_info=p2_meta,
             variant=rule_variant,
             game_type=game_type,
-            progress_callback=save_live_progress if match.is_bracket else None,
+            progress_callback=save_live_progress if is_bracket else None,
         )
 
-        # Save replay JSON
         replays_dir = (DATA_DIR / "replays").resolve()
         replays_dir.mkdir(parents=True, exist_ok=True)
         replay_filepath = str(replays_dir / f"match_{match_id}.json")
         save_replay(match_result, replay_filepath)
 
-        # Update Match record
-        winner_code = match_result.get("winner")  # 1, 2, or None
-        win_reason = match_result.get("win_reason")
-        total_turns = match_result.get("total_turns", 0)
+        winner_code = match_result.get("winner")
+        result_db = session_factory()
+        try:
+            match = result_db.query(Match).filter(Match.id == match_id).first()
+            player1 = result_db.query(User).filter(User.id == player1_id).first()
+            player2 = result_db.query(User).filter(User.id == player2_id).first()
+            if match is None or player1 is None or player2 is None:
+                logger.error("Match or players disappeared while match %d was running.", match_id)
+                return None
 
-        match.replay_path = replay_filepath
-        match.win_reason = win_reason
-        match.total_turns = total_turns
-        match.live_moves = json.dumps(match_result.get("moves", []), ensure_ascii=False)
-        match.rule_variant = rule_variant
+            match.replay_path = replay_filepath
+            match.win_reason = match_result.get("win_reason")
+            match.total_turns = match_result.get("total_turns", 0)
+            match.live_moves = json.dumps(match_result.get("moves", []), ensure_ascii=False)
+            match.rule_variant = rule_variant
+            match.winner_id = player1_id if winner_code == 1 else player2_id if winner_code == 2 else None
+            r1, r2 = player1.elo, player2.elo
+            match.p1_elo_before, match.p2_elo_before = r1, r2
 
-        if winner_code == 1:
-            match.winner_id = player1.id
-        elif winner_code == 2:
-            match.winner_id = player2.id
-        else:
-            match.winner_id = None
+            if not is_bracket:
+                score_1 = 1.0 if winner_code == 1 else 0.0 if winner_code == 2 else 0.5
+                delta_1, delta_2 = calculate_elo_delta(r1, r2, score=score_1, multiplier=multiplier_x, k=k_factor)
+                player1.elo = apply_elo_change(r1, delta_1)
+                player2.elo = apply_elo_change(r2, delta_2)
+            match.p1_elo_after, match.p2_elo_after = player1.elo, player2.elo
 
-        # Record pre-match Elo ratings
-        r1 = player1.elo
-        r2 = player2.elo
-        match.p1_elo_before = r1
-        match.p2_elo_before = r2
-
-        # Update Elo ratings for non-bracket matches
-        if not match.is_bracket:
             if winner_code == 1:
-                score_1 = 1.0
+                player1.wins += 1
+                player2.losses += 1
             elif winner_code == 2:
-                score_1 = 0.0
+                player2.wins += 1
+                player1.losses += 1
             else:
-                score_1 = 0.5
-
-            delta_1, delta_2 = calculate_elo_delta(
-                r1, r2, score=score_1, multiplier=multiplier_x, k=k_factor
-            )
-            new_r1 = apply_elo_change(r1, delta_1)
-            new_r2 = apply_elo_change(r2, delta_2)
-
-            player1.elo = new_r1
-            player2.elo = new_r2
-            match.p1_elo_after = new_r1
-            match.p2_elo_after = new_r2
-        else:
-            match.p1_elo_after = r1
-            match.p2_elo_after = r2
-
-        # Update player win/loss/draw records
-        if winner_code == 1:
-            player1.wins += 1
-            player2.losses += 1
-        elif winner_code == 2:
-            player2.wins += 1
-            player1.losses += 1
-        else:
-            player1.draws += 1
-            player2.draws += 1
-
-        db.commit()
+                player1.draws += 1
+                player2.draws += 1
+            result_db.commit()
+        finally:
+            result_db.close()
         return match_result
-
     except Exception as exc:
         logger.exception("Error executing match %d: %s", match_id, exc)
+        error_db = session_factory()
         try:
-            match = db.query(Match).filter(Match.id == match_id).first()
+            match = error_db.query(Match).filter(Match.id == match_id).first()
             if match:
                 match.win_reason = f"Execution error: {exc}"
-                db.commit()
+                error_db.commit()
         except Exception:
-            pass
+            logger.exception("Could not persist failure for match %d", match_id)
+        finally:
+            error_db.close()
         return None
-    finally:
-        db.close()

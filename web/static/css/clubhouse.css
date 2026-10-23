@@ -243,10 +243,10 @@ body:not(.home-page) .board-stage { background:#fffdf6; border:1px solid #9aa68c
 .projection-victory strong { font-size:clamp(11px,2vw,16px); letter-spacing:.05em; }
 .projection-victory span { font:800 11px var(--font-mono); }
 .projection-victory b { font-size:clamp(17px,3vw,24px); overflow-wrap:anywhere; }
-.live-projections:fullscreen .projection-grid { grid-template-columns:repeat(auto-fit,minmax(min(100%, 480px),1fr)); }
-.live-projections:fullscreen .projection-card { padding:18px; }
-.live-projections:fullscreen .projection-board-layout { width:min(100%, 620px); }
-.live-projections:fullscreen .projection-players { max-width:620px; width:100%; }
+.bracket-live-layout:fullscreen .projection-grid { grid-template-columns:repeat(auto-fit,minmax(min(100%, 480px),1fr)); }
+.bracket-live-layout:fullscreen .projection-card { padding:18px; }
+.bracket-live-layout:fullscreen .projection-board-layout { width:min(100%, 620px); }
+.bracket-live-layout:fullscreen .projection-players { max-width:620px; width:100%; }
 @media(max-width:480px) { .projection-card { padding:9px; }.projection-player { padding:7px; }.projection-piece { padding:1px; }.projection-coordinate { font-size:6px; } }
 
 /* Mobile Overflow Prevention */
