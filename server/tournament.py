@@ -8,6 +8,7 @@ This module provides the competitive engine for the Battlecode RPS 9x9 tournamen
 """
 
 from datetime import datetime
+import random
 from typing import Any, Dict, List, Optional, Tuple
 
 ROUND_NAMES: Dict[int, str] = {
@@ -225,34 +226,29 @@ def generate_bracket(top_users: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     if not top_users or len(top_users) < 2:
         return []
 
-    # Sort players: prefer explicit 'seed', fallback to descending 'elo'
-    if any("seed" in u for u in top_users):
-        sorted_users = sorted(top_users, key=lambda u: u.get("seed", float("inf")))
-    elif any("elo" in u for u in top_users):
-        sorted_users = sorted(top_users, key=lambda u: u.get("elo", 0), reverse=True)
-    else:
-        sorted_users = list(top_users)
+    # Elo must not affect pairings; draw all selected entrants at random.
+    sorted_users = list(top_users)
+    random.shuffle(sorted_users)
 
-    # Determine largest power of 2 participant count <= len(sorted_users)
-    n = 1 << (len(sorted_users).bit_length() - 1)
-    if n < 2:
-        return []
-
-    seeded_players = sorted_users[:n]
+    # Build the next power-of-two bracket and use empty seeds as byes. This
+    # keeps every entrant in the draw; e.g. 10 entrants occupy a 16-player
+    # bracket, where seeds 1-6 receive byes and seeds 7-10 play in.
+    n = 1 << (len(sorted_users) - 1).bit_length()
+    seeded_players = sorted_users
     pairs = _get_bracket_seed_pairs(n)
     round_name = ROUND_NAMES.get(n, f"Round of {n}")
 
     matchups: List[Dict[str, Any]] = []
     for idx, (s1, s2) in enumerate(pairs):
-        p1 = seeded_players[s1 - 1]
-        p2 = seeded_players[s2 - 1]
+        p1 = seeded_players[s1 - 1] if s1 <= len(seeded_players) else None
+        p2 = seeded_players[s2 - 1] if s2 <= len(seeded_players) else None
         matchups.append({
             "match_index": idx,
             "round_name": round_name,
             "player1": p1,
             "player2": p2,
-            "player1_id": p1.get("id"),
-            "player2_id": p2.get("id"),
+            "player1_id": p1.get("id") if p1 else None,
+            "player2_id": p2.get("id") if p2 else None,
             "seed1": s1,
             "seed2": s2,
         })

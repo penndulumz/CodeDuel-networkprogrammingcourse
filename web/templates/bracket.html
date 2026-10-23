@@ -36,6 +36,7 @@
     <h2 class="card-title">Các cặp đấu</h2>
   </div>
 
+  <div class="bracket-live-layout">
   <section class="live-projections" aria-live="polite">
     <div class="projection-heading">
       <h3 class="card-title">Màn chiếu trực tiếp</h3>
@@ -45,15 +46,18 @@
     {% if current_user and current_user.is_admin %}
     <div class="projection-controls">
       <button id="startNextBracketRound" class="btn btn-primary btn-sm" type="button">Chạy vòng tiếp theo</button>
-      <label class="projection-auto-control">
-        <input id="autoAdvanceRounds" type="checkbox">
-        Tự chạy vòng kế tiếp khi vòng hiện tại hoàn tất
-      </label>
+      <button id="finishBracketRound" class="btn btn-secondary btn-sm" type="button" title="Bỏ hoạt ảnh và chạy nhanh các trận còn lại đến kết quả">Kết thúc vòng luôn</button>
       <span id="projectionControlMessage" class="projection-note" role="status"></span>
     </div>
     {% endif %}
     <div id="liveProjections" class="projection-grid"><p class="projection-note">Đang tải trạng thái giải đấu...</p></div>
   </section>
+  <aside id="bracketRoundHistory" class="bracket-round-history bracket-history-sidebar" aria-label="Lịch sử các vòng đấu">
+    <h3>Lịch sử vòng đấu</h3>
+    <div id="bracketRoundHistoryList" class="bracket-round-history-list"></div>
+    <div id="bracketRoundHistoryDetails" class="bracket-round-history-details"></div>
+  </aside>
+  </div>
 
   {% if bracket_rounds %}
   <div class="bracket-tree">
@@ -62,7 +66,7 @@
         <h4>{{ r_name }}</h4>
         <div class="bracket-round-body">
         {% for m in bracket_matches %}
-          {% if m.round_name == r_name %}
+          {% if m.round_name == r_name and m.player1_id and m.player2_id %}
             {% set done = m.status == 'completed' and m.winner_id %}
             <div class="bracket-match {% if m.status == 'running' %}is-running{% endif %}">
               <div class="match-meta">
@@ -196,5 +200,5 @@
 {% endblock %}
 
 {% block scripts %}
-<script src="/static/js/bracket_live.js?v=projection-board-3"></script>
+<script src="/static/js/bracket_live.js?v=hold-round-until-next-5"></script>
 {% endblock %}

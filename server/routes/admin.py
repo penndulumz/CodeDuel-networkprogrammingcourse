@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional, Union, Tuple
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
@@ -21,7 +21,7 @@ from server.bracket import (
     play_bracket_matches,
 )
 from server.database import get_db
-from server.games import get_catalog_games
+from server.games import get_active_bot, get_active_game, get_catalog_games
 from server.models import Bot, BracketMatch, Match, TournamentSetting, User
 from server.queue import speed_up_bracket_round
 from server.routes.auth import get_current_admin
@@ -40,6 +40,8 @@ class BossDeployRequest(BaseModel):
 class BracketGenerationRequest(BaseModel):
     """Options selected when the organizer creates a bracket tournament."""
     concurrent_boards: int = Field(1, ge=1, le=8)
+    participant_ids: Optional[List[int]] = None
+    manual_pairs: List[Tuple[Optional[int], Optional[int]]] = Field(default_factory=list)
 
 
 class UpdateSettingsRequest(BaseModel):
@@ -241,46 +243,59 @@ def update_settings(
     return _get_all_settings_dict(db)
 
 
+@router.get("/bracket/participants")
+def list_bracket_participants(
+    current_admin: User = Depends(get_current_admin),
+    db: Session = Depends(get_db),
+) -> List[Dict[str, Any]]:
+    """List non-admin accounts and whether they have a bot for the active game."""
+    game_type = get_active_game(db)
+    users = db.query(User).filter(User.is_admin.is_(False)).order_by(User.elo.desc(), User.id.asc()).all()
+    return [
+        {
+            "id": user.id,
+            "username": user.username,
+            "elo": user.elo,
+            "has_active_bot": get_active_bot(db, user.id, game_type) is not None,
+        }
+        for user in users
+        if get_active_bot(db, user.id, game_type) is not None
+    ]
+
+
 @router.post("/bracket/generate")
 def trigger_bracket_generation(
     payload: BracketGenerationRequest = BracketGenerationRequest(),
     current_admin: User = Depends(get_current_admin),
     db: Session = Depends(get_db),
 ) -> List[Dict[str, Any]]:
-    """Seed and generate single-elimination tournament bracket for top participants."""
+    """Generate a bracket from selected non-admin participants."""
     settings = _get_all_settings_dict(db)
     top_n = settings.get("top_players_count", 8)
 
-    # Select top users with active bots
-    users = (
-        db.query(User)
-        .order_by(User.elo.desc(), User.id.asc())
-        .all()
-    )
+    users = db.query(User).filter(User.is_admin.is_(False)).order_by(User.elo.desc(), User.id.asc()).all()
+    users_by_id = {user.id: user for user in users}
 
-    eligible_users: List[Dict[str, Any]] = []
-    for u in users:
-        has_active = any(b.is_active for b in u.bots)
-        if has_active:
-            eligible_users.append({
-                "id": u.id,
-                "username": u.username,
-                "elo": u.elo,
-            })
-            if len(eligible_users) >= top_n:
-                break
+    if payload.participant_ids is not None:
+        if len(set(payload.participant_ids)) != len(payload.participant_ids):
+            raise HTTPException(status_code=400, detail="Participant list contains duplicates.")
+        unknown_ids = set(payload.participant_ids) - users_by_id.keys()
+        if unknown_ids:
+            raise HTTPException(status_code=400, detail="Participants must be existing non-admin accounts.")
+        selected_users = [users_by_id[user_id] for user_id in payload.participant_ids]
+        active_game = get_active_game(db)
+        missing_bot = [user.username for user in selected_users if get_active_bot(db, user.id, active_game) is None]
+        if missing_bot:
+            raise HTTPException(status_code=400, detail="Every participant must have an active bot for the selected game.")
+        selected_users.sort(key=lambda user: (-user.elo, user.id))
+    else:
+        active_game = get_active_game(db)
+        selected_users = [user for user in users if get_active_bot(db, user.id, active_game) is not None][:top_n]
 
-    # If fewer eligible users with active bots, take top users generally
-    if len(eligible_users) < 2:
-        for u in users:
-            if not any(eu["id"] == u.id for eu in eligible_users):
-                eligible_users.append({
-                    "id": u.id,
-                    "username": u.username,
-                    "elo": u.elo,
-                })
-                if len(eligible_users) >= top_n:
-                    break
+    eligible_users = [
+        {"id": user.id, "username": user.username, "elo": user.elo}
+        for user in selected_users
+    ]
 
     if len(eligible_users) < 2:
         raise HTTPException(
@@ -294,7 +309,33 @@ def trigger_bracket_generation(
             detail="Bracket matches are currently being played. Wait for them to finish.",
         )
 
-    matchups = generate_bracket(eligible_users)
+    if payload.manual_pairs:
+        participant_ids = {user["id"] for user in eligible_users}
+        paired_ids = [player_id for pair in payload.manual_pairs for player_id in pair if player_id is not None]
+        if len(paired_ids) != len(set(paired_ids)) or set(paired_ids) != participant_ids:
+            raise HTTPException(status_code=400, detail="Manual pairings must include every selected participant exactly once.")
+        if any(player1 is None and player2 is None for player1, player2 in payload.manual_pairs):
+            raise HTTPException(status_code=400, detail="A manual pairing cannot have two empty slots.")
+        if len(eligible_users) < 2:
+            raise HTTPException(status_code=400, detail="At least 2 participants are required to generate a tournament bracket.")
+        bracket_size = 1 << (len(eligible_users) - 1).bit_length()
+        round_name = {2: "Final", 4: "Semi-Final", 8: "Quarter-Final", 16: "Round of 16", 32: "Round of 32", 64: "Round of 64"}.get(bracket_size, f"Round of {bracket_size}")
+        users_by_id_payload = {user["id"]: user for user in eligible_users}
+        matchups = [
+            {
+                "match_index": index,
+                "round_name": round_name,
+                "player1_id": player1,
+                "player2_id": player2,
+                "player1": users_by_id_payload.get(player1),
+                "player2": users_by_id_payload.get(player2),
+            }
+            for index, (player1, player2) in enumerate(payload.manual_pairs)
+        ]
+        if len(matchups) != bracket_size // 2:
+            raise HTTPException(status_code=400, detail=f"Manual bracket needs {bracket_size // 2} first-round pairings, including byes.")
+    else:
+        matchups = generate_bracket(eligible_users)
 
     # Replace the previous bracket with a fresh tree (first round + empty later rounds)
     create_bracket(db, matchups)
@@ -368,19 +409,20 @@ def play_next_bracket_round(
     }
 
 
-@router.post("/bracket/speed-up")
-def speed_up_running_bracket_round(
+@router.post("/bracket/speed-up", include_in_schema=False)
+@router.post("/bracket/finish")
+def finish_running_bracket_round(
     current_admin: User = Depends(get_current_admin),
     db: Session = Depends(get_db),
 ) -> Dict[str, str]:
-    """Skip spectator delays for the running bracket round."""
+    """Finish the visible playback and remove pacing delays from running games."""
     if not db.query(BracketMatch).filter(BracketMatch.status == STATUS_RUNNING).first():
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="There is no running bracket round to speed up.",
         )
     speed_up_bracket_round()
-    return {"status": "speeding_up"}
+    return {"status": "finishing"}
 
 
 @router.post("/tournament/end")
@@ -394,14 +436,6 @@ def end_tournament(
             status_code=status.HTTP_409_CONFLICT,
             detail="Wait for the running bracket round to finish before ending the tournament.",
         )
-    if db.query(Match).filter(
-        Match.replay_path.is_(None), Match.win_reason.is_(None)
-    ).first():
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="Wait for queued or running matches to finish before ending the tournament.",
-        )
-
     replays_dir = Path(__file__).resolve().parents[2] / "replays"
     replay_files = list(replays_dir.glob("match_*.json")) if replays_dir.is_dir() else []
     match_count = db.query(Match).count()
