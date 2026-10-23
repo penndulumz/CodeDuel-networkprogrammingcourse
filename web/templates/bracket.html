@@ -2,6 +2,14 @@
 
 {% block title %}Vòng loại trực tiếp — CodeDuel{% endblock %}
 
+{% block extra_head %}
+<style>
+  #qualifierStandingsBody > tr.qualifier-advancing > td {
+    font-weight: 700;
+  }
+</style>
+{% endblock %}
+
 {% block content %}
 {% set ns = namespace(champion=none, done=0) %}
 {% for m in bracket_matches %}
@@ -59,6 +67,44 @@
   </aside>
   </div>
 
+  {% if qualifier_tournament %}
+  <section class="card section" id="qualifierHistoryPanel">
+    <div class="card-header">
+      <div>
+        <h2 class="card-title">Vòng loại · {{ qualifier_tournament.participant_count }} thí sinh</h2>
+        <div class="card-desc" id="qualifierProgressText">
+          {{ qualifier_tournament.status }} · {{ qualifier_tournament.round_count }} trận mỗi thí sinh · top {{ qualifier_tournament.cutoff }} vào loại trực tiếp
+        </div>
+      </div>
+    </div>
+    <h3>Bảng xếp hạng vòng loại</h3>
+    <div class="table-wrap">
+      <table class="table-dark">
+        <thead><tr><th>Hạng</th><th>Thí sinh</th><th>Điểm</th><th>Play-off</th><th>Thắng</th><th>Đã đấu</th></tr></thead>
+        <tbody id="qualifierStandingsBody">
+          {% for row in qualifier_standings %}
+          <tr class="{% if loop.index <= qualifier_tournament.cutoff %}qualifier-advancing{% endif %}"><td>{{ loop.index }}</td><td>{{ row.username }}</td><td>{{ row.points }}</td><td>{{ row.playoff_points }}</td><td>{{ row.wins }}</td><td>{{ row.played }}</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <small class="form-hint">Viền vàng đánh dấu các vị trí top {{ qualifier_tournament.cutoff }} hiện tại; thứ hạng có thể đổi trước khi Play-off chốt suất.</small>
+    <details style="margin-top:14px;">
+      <summary><strong>Lịch sử các trận vòng loại</strong></summary>
+      <div class="table-wrap" style="margin-top:10px;">
+        <table class="table-dark">
+          <thead><tr><th>Vòng</th><th>Trận</th><th>Thí sinh 1</th><th>Thí sinh 2</th><th>Kết quả</th><th>Replay</th></tr></thead>
+          <tbody id="qualifierMatchesBody">
+            {% for item in qualifier_matches %}
+            <tr><td>{% if item.stage != 'qualifying' %}Play-off{% else %}Vòng {{ item.round_number }}{% endif %}</td><td>{{ item.match_index + 1 }}</td><td>{{ item.player1.username if item.player1 else '—' }}</td><td>{{ item.player2.username if item.player2 else 'Bye' }}</td><td>{% if item.is_bye %}Bye{% elif item.status == 'completed' %}{{ item.winner.username if item.winner else 'Hòa' }}{% elif item.status == 'running' %}Đang đấu{% else %}Chờ{% endif %}</td><td>{% if item.match_id %}<a href="/replay/{{ item.match_id }}">Xem</a>{% else %}—{% endif %}</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </details>
+  </section>
+  {% endif %}
+
   {% if bracket_rounds %}
   <div class="bracket-tree">
     {% for r_name in bracket_rounds %}
@@ -108,7 +154,7 @@
   <div class="card-header" style="padding-bottom: 16px;">
     <div>
       <h2 class="card-title">Kết quả chung cuộc</h2>
-      <div class="card-desc">Điểm tổng kết = Elo chuẩn hóa và điểm Bracket theo trọng số của giải.</div>
+      <div class="card-desc">Chỉ xếp theo kết quả thi đấu trong giải; Elo không được tính.</div>
     </div>
   </div>
 
@@ -118,11 +164,8 @@
         <tr>
           <th class="center" style="width: 70px;">Hạng</th>
           <th>Người chơi</th>
-          <th>Elo</th>
-          <th>Điểm Elo (chuẩn hóa)</th>
-          <th>Hạng Bracket</th>
-          <th>Điểm Bracket</th>
-          <th class="right">Điểm tổng kết</th>
+          <th>Kết quả</th>
+          <th class="right">Điểm giải</th>
         </tr>
       </thead>
       <tbody>
@@ -132,11 +175,8 @@
             <span class="rank-pill {% if r.rank == 1 %}rank-1{% elif r.rank == 2 %}rank-2{% elif r.rank == 3 %}rank-3{% endif %}">{{ r.rank }}</span>
           </td>
           <td><strong>{{ r.username }}</strong></td>
-          <td><span class="elo-badge">{{ r.elo }}</span></td>
-          <td class="num">{{ '%.1f'|format(r.normalized_elo) }}</td>
-          <td class="num">{{ r.bracket_rank if r.bracket_rank else '—' }}</td>
-          <td class="num">{{ '%.0f'|format(r.bracket_score) }}</td>
-          <td class="num right"><strong style="color: var(--accent);">{{ '%.1f'|format(r.final_score) }}</strong></td>
+          <td>{{ r.result_label }}</td>
+          <td class="num right"><strong style="color: var(--accent);">{{ '%.0f'|format(r.final_score) }}</strong></td>
         </tr>
         {% endfor %}
       </tbody>

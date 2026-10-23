@@ -22,9 +22,9 @@ from sqlalchemy.orm import Session
 
 from server.database import SessionLocal
 from server.games import get_active_bot, get_active_game
-from server.models import Bot, BracketMatch, Match, TournamentSetting, User
+from server.models import Bot, BracketMatch, Match, QualifierMatch, QualifierTournament, TournamentSetting, User
 from server.queue import execute_match_job, reset_bracket_speed
-from server.tournament import ROUND_NAMES, calculate_final_scores
+from server.tournament import DEFAULT_BRACKET_PLACEMENT_POINTS, ROUND_NAMES
 from server.tournament_config import load_tournament_config
 
 logger = logging.getLogger(__name__)
@@ -40,6 +40,329 @@ ROUND_ORDER: list[str] = [
 
 _ROUND_SIZES: dict[str, int] = {name: size for size, name in ROUND_NAMES.items()}
 _ROUND_ADVANCE_LOCK = threading.Lock()
+_QUALIFIER_LOCK = threading.Lock()
+
+
+def create_qualifier_schedule(db: Session, participant_ids: list[int]) -> tuple[QualifierTournament, list[QualifierMatch]]:
+    """Create a balanced schedule with four games per entrant where possible."""
+    if len(participant_ids) < 4:
+        raise ValueError("At least 4 participants are required for qualification games.")
+    cutoff = 16 if len(participant_ids) >= 16 else 8
+    round_count = 4
+    tournament = QualifierTournament(
+        participant_count=len(participant_ids), cutoff=cutoff, round_count=round_count,
+    )
+    db.add(tournament)
+    db.flush()
+
+    players = list(participant_ids)
+    random.shuffle(players)
+    # Offsets 1 and 2 form a 4-regular circle graph for fields of at least five.
+    edges: set[tuple[int, int]] = set()
+    count = len(players)
+    for index, player_id in enumerate(players):
+        for offset in (1, 2):
+            opponent_id = players[(index + offset) % count]
+            edges.add(tuple(sorted((player_id, opponent_id))))
+    scheduled_edges = sorted(edges)
+    if count == 4:
+        # Four players have only three distinct opponents; repeat one game per entrant.
+        scheduled_edges.extend((tuple(sorted((players[0], players[2]))),
+                                tuple(sorted((players[1], players[3])))))
+
+    # Projection batches are fixed at eight scheduled games. A participant can
+    # appear on more than one board in a batch; every scheduled pairing still
+    # counts as one of that participant's four qualification games.
+    schedule = [
+        (index // 8 + 1, 1, first, second)
+        for index, (first, second) in enumerate(scheduled_edges)
+    ]
+
+    created: list[QualifierMatch] = []
+    for match_index, (round_number, batch_number, player1_id, player2_id) in enumerate(schedule):
+        pairing = QualifierMatch(
+            tournament_id=tournament.id,
+            round_number=round_number,
+            batch_number=batch_number,
+            match_index=match_index,
+            player1_id=player1_id,
+            player2_id=player2_id,
+            status=STATUS_PENDING,
+        )
+        db.add(pairing)
+        created.append(pairing)
+
+    db.commit()
+    db.refresh(tournament)
+    for pairing in created:
+        db.refresh(pairing)
+    return tournament, created
+
+
+def get_qualifier_standings(db: Session, tournament_id: int) -> list[dict[str, Any]]:
+    """Rank qualification entrants by points, head-to-head, wins, then Elo."""
+    pairings = db.query(QualifierMatch).filter(QualifierMatch.tournament_id == tournament_id).all()
+    tournament = db.query(QualifierTournament).filter(QualifierTournament.id == tournament_id).first()
+    has_playoff = any(item.stage == "playoff" for item in pairings)
+    users = {
+        user.id: user
+        for user in db.query(User).filter(User.is_admin.is_(False)).all()
+        if any(user.id in (item.player1_id, item.player2_id) for item in pairings)
+    }
+    points = {user_id: 0 for user_id in users}
+    playoff_points = {user_id: 0 for user_id in users}
+    wins = {user_id: 0 for user_id in users}
+    played = {user_id: 0 for user_id in users}
+    for pairing in pairings:
+        if pairing.status != STATUS_COMPLETED:
+            continue
+        if pairing.is_bye:
+            if pairing.stage == "qualifying":
+                points[pairing.player1_id] += 1
+            continue
+        first, second = pairing.player1_id, pairing.player2_id
+        if first not in users or second not in users:
+            continue
+        if pairing.stage == "qualifying":
+            played[first] += 1
+            played[second] += 1
+        elif pairing.stage == "playoff_decider":
+            # Extra head-to-head rounds resolve only their two entrants. They
+            # must not increase the shared playoff score or reorder qualifiers.
+            continue
+        point_table = points if pairing.stage == "qualifying" else playoff_points
+        if pairing.winner_id == first:
+            point_table[first] += 3
+            if pairing.stage == "qualifying":
+                wins[first] += 1
+        elif pairing.winner_id == second:
+            point_table[second] += 3
+            if pairing.stage == "qualifying":
+                wins[second] += 1
+        else:
+            point_table[first] += 1
+            point_table[second] += 1
+
+    rows = []
+    for user_id, user in users.items():
+        rows.append({
+            "id": user_id,
+            "username": user.username,
+            "elo": user.elo,
+            "points": points[user_id],
+            "playoff_points": playoff_points[user_id],
+            "wins": wins[user_id],
+            "played": played[user_id],
+        })
+
+    # Resolve tied point groups by their mini-table before final seeds.
+    rows.sort(key=lambda row: (
+        -row["points"],
+        -row["playoff_points"] if has_playoff else 0,
+    ))
+    ordered: list[dict[str, Any]] = []
+    index = 0
+    while index < len(rows):
+        group_key = rows[index]["points"]
+        tied = []
+        while index < len(rows) and rows[index]["points"] == group_key:
+            tied.append(rows[index])
+            index += 1
+        tied_ids = {row["id"] for row in tied}
+        mini_points = {user_id: 0 for user_id in tied_ids}
+        for pairing in pairings:
+            if (pairing.status != STATUS_COMPLETED or pairing.is_bye or pairing.stage != "qualifying"
+                    or pairing.player1_id not in tied_ids or pairing.player2_id not in tied_ids):
+                continue
+            if pairing.winner_id in mini_points:
+                mini_points[pairing.winner_id] += 3
+            else:
+                mini_points[pairing.player1_id] += 1
+                mini_points[pairing.player2_id] += 1
+        for row in tied:
+            row["head_to_head"] = mini_points[row["id"]]
+        ordered.extend(sorted(tied, key=lambda row: (
+            -row["playoff_points"], -row["head_to_head"], -row["wins"], -row["elo"], row["id"],
+        )))
+    return ordered
+
+
+def _finalize_qualifier_bracket(db: Session, tournament_id: int) -> bool:
+    """Create the seeded playoff bracket once every qualification pairing is done."""
+    pairings = db.query(QualifierMatch).filter(QualifierMatch.tournament_id == tournament_id).all()
+    if not pairings or any(item.status != STATUS_COMPLETED for item in pairings):
+        return False
+    tournament = db.query(QualifierTournament).filter(QualifierTournament.id == tournament_id).first()
+    if tournament is None:
+        return False
+    if tournament.status == "completed":
+        return True
+    standings = get_qualifier_standings(db, tournament_id)
+    if len(standings) < 2:
+        return False
+    tie_matches = [item for item in pairings if item.stage in ("playoff", "playoff_decider")]
+    if tournament.status == "active" and not tie_matches:
+        boundary_points = standings[min(tournament.cutoff, len(standings)) - 1]["points"]
+        above_boundary = sum(row["points"] > boundary_points for row in standings)
+        tied_at_boundary = [row for row in standings if row["points"] == boundary_points]
+        if above_boundary < tournament.cutoff < above_boundary + len(tied_at_boundary):
+            entrants = [row["id"] for row in tied_at_boundary]
+            edges: list[tuple[int, int]] = []
+            if len(entrants) <= 12:
+                edges = [(entrants[i], entrants[j]) for i in range(len(entrants)) for j in range(i + 1, len(entrants))]
+            else:
+                # Keep large tie playoffs bounded while giving everyone distinct opponents.
+                players = list(entrants)
+                random.shuffle(players)
+                edge_set = set()
+                for index, player_id in enumerate(players):
+                    for offset in (1, 2):
+                        edge_set.add(tuple(sorted((player_id, players[(index + offset) % len(players)]))))
+                if len(players) % 2 == 0:
+                    half = len(players) // 2
+                    for index in range(half):
+                        edge_set.add(tuple(sorted((players[index], players[index + half]))))
+                edges = sorted(edge_set)
+            last_qualifying_batch = max(item.round_number for item in pairings if item.stage == "qualifying")
+            for batch_index, batch_start in enumerate(range(0, len(edges), 8), start=1):
+                round_number = last_qualifying_batch + batch_index
+                for match_index, (first, second) in enumerate(edges[batch_start:batch_start + 8]):
+                    db.add(QualifierMatch(
+                        tournament_id=tournament_id,
+                        round_number=round_number,
+                        batch_number=1,
+                        match_index=match_index,
+                        stage="playoff",
+                        player1_id=first,
+                        player2_id=second,
+                        status=STATUS_PENDING,
+                    ))
+            tournament.status = "tiebreak"
+            db.commit()
+            return False
+
+    if tournament.status == "tiebreak" and tie_matches:
+        # If the cutoff is still tied after a playoff, schedule a direct
+        # decider. Decider rounds do not add playoff points, so their winner
+        # cannot overtake entrants whose positions were already settled.
+        boundary = standings[min(tournament.cutoff, len(standings)) - 1]
+        boundary_key = (boundary["points"], boundary["playoff_points"])
+        tied_at_boundary = [
+            row for row in standings
+            if (row["points"], row["playoff_points"]) == boundary_key
+        ]
+        above_boundary = sum(
+            (row["points"], row["playoff_points"]) > boundary_key
+            for row in standings
+        )
+        if above_boundary < tournament.cutoff < above_boundary + len(tied_at_boundary) \
+                and len(tied_at_boundary) == 2:
+            tied_ids = {row["id"] for row in tied_at_boundary}
+            deciders = [
+                item for item in pairings
+                if item.stage == "playoff_decider"
+                and {item.player1_id, item.player2_id} == tied_ids
+            ]
+            latest_decider = max(deciders, key=lambda item: item.round_number, default=None)
+            if latest_decider is not None and latest_decider.winner_id in tied_ids:
+                winner_index = next(i for i, row in enumerate(standings)
+                                    if row["id"] == latest_decider.winner_id)
+                loser_id = next(iter(tied_ids - {latest_decider.winner_id}))
+                loser_index = next(i for i, row in enumerate(standings) if row["id"] == loser_id)
+                if winner_index > loser_index:
+                    standings[winner_index], standings[loser_index] = standings[loser_index], standings[winner_index]
+            else:
+                next_round = max(item.round_number for item in pairings) + 1
+                db.add(QualifierMatch(
+                    tournament_id=tournament_id,
+                    round_number=next_round,
+                    batch_number=1,
+                    match_index=0,
+                    stage="playoff_decider",
+                    player1_id=tied_at_boundary[0]["id"],
+                    player2_id=tied_at_boundary[1]["id"],
+                    status=STATUS_PENDING,
+                ))
+                db.commit()
+                return False
+
+    selected = standings[:tournament.cutoff]
+    size = tournament.cutoff
+    first_round_name = get_round_name(size)
+    from server.tournament import _get_bracket_seed_pairs
+    matchups = []
+    for index, (seed1, seed2) in enumerate(_get_bracket_seed_pairs(size)):
+        first = selected[seed1 - 1] if seed1 <= len(selected) else None
+        second = selected[seed2 - 1] if seed2 <= len(selected) else None
+        matchups.append({
+            "round_name": first_round_name,
+            "match_index": index,
+            "player1_id": first["id"] if first else None,
+            "player2_id": second["id"] if second else None,
+        })
+    create_bracket(db, matchups)
+    tournament.status = "completed"
+    db.commit()
+    return True
+
+
+def play_qualifier_match(
+    qualifier_match_id: int,
+    db_factory: Callable[[], Any] | None = None,
+) -> None:
+    """Run one prepared qualification game and persist its result."""
+    session_factory = db_factory or SessionLocal
+    db = session_factory()
+    try:
+        pairing = db.query(QualifierMatch).filter(QualifierMatch.id == qualifier_match_id).first()
+        if pairing is None or pairing.status != STATUS_RUNNING or pairing.match_id is None:
+            return
+        match = db.query(Match).filter(Match.id == pairing.match_id).first()
+        if match is None:
+            pairing.status = STATUS_PENDING
+            db.commit()
+            return
+        bot1, bot2 = match.bot1, match.bot2
+        if bot1 is None or bot2 is None:
+            pairing.status = STATUS_PENDING
+            db.commit()
+            return
+        match_id, path1, path2 = match.id, bot1.filepath, bot2.filepath
+    finally:
+        db.close()
+
+    result = execute_match_job(match_id, path1, path2, db_factory=session_factory)
+    db = session_factory()
+    try:
+        pairing = db.query(QualifierMatch).filter(QualifierMatch.id == qualifier_match_id).first()
+        if pairing is None:
+            return
+        tournament_id = pairing.tournament_id
+        if result is None:
+            pairing.status = STATUS_PENDING
+        else:
+            match = db.query(Match).filter(Match.id == match_id).first()
+            pairing.winner_id = match.winner_id if match else None
+            pairing.status = STATUS_COMPLETED
+        db.commit()
+        with _QUALIFIER_LOCK:
+            _finalize_qualifier_bracket(db, tournament_id)
+    finally:
+        db.close()
+
+
+def play_qualifier_batch(
+    qualifier_match_ids: list[int],
+    db_factory: Callable[[], Any] | None = None,
+) -> None:
+    """Run one visible batch of up to eight independent qualification games."""
+    try:
+        with ThreadPoolExecutor(max_workers=min(8, max(1, len(qualifier_match_ids)))) as executor:
+            futures = [executor.submit(play_qualifier_match, item, db_factory) for item in qualifier_match_ids]
+            for future in futures:
+                future.result()
+    finally:
+        reset_bracket_speed()
 
 
 def get_round_size(round_name: str) -> int:
@@ -419,31 +742,63 @@ def is_bracket_finished(matches: list[BracketMatch]) -> bool:
 
 
 def get_final_results(db: Session) -> list[dict[str, Any]]:
-    """Compute composite final scores (normalized Elo + bracket placement) for all players.
+    """Rank only this tournament's entrants by bracket and qualification results.
 
     Args:
         db: Active database session.
 
     Returns:
-        Ranked score dictionaries from calculate_final_scores, or an empty list
-        while no bracket pairing has been completed.
+        Tournament-only result rows with no Elo fields, or an empty list while
+        no bracket placement is available.
     """
     matches = db.query(BracketMatch).all()
     standings = compute_bracket_standings(matches)
     if not standings:
         return []
 
-    bracket_cfg = load_tournament_config().get("tournament", {}).get("final_bracket", {})
-    users = [
-        {"id": u.id, "username": u.username, "elo": u.elo}
-        for u in db.query(User).filter(User.is_admin == False).all()  # noqa: E712
-    ]
-    results = calculate_final_scores(
-        users,
-        standings,
-        weight_elo=float(bracket_cfg.get("weight_elo", 0.5)),
-        weight_bracket=float(bracket_cfg.get("weight_bracket", 0.5)),
-    )
-    for item in results:
-        item["bracket_rank"] = standings.get(item["id"])
+    qualifier = db.query(QualifierTournament).order_by(QualifierTournament.id.desc()).first()
+    qualifier_rows: list[dict[str, Any]] = []
+    participant_ids = set(standings)
+    if qualifier is not None:
+        qualifier_matches = db.query(QualifierMatch).filter(
+            QualifierMatch.tournament_id == qualifier.id
+        ).all()
+        participant_ids.update(
+            player_id
+            for pairing in qualifier_matches
+            for player_id in (pairing.player1_id, pairing.player2_id)
+            if player_id is not None
+        )
+        qualifier_rows = get_qualifier_standings(db, qualifier.id)
+
+    users = db.query(User).filter(
+        User.is_admin.is_(False), User.id.in_(participant_ids)
+    ).all()
+    users_by_id = {user.id: user for user in users}
+    qualifier_order = sorted(qualifier_rows, key=lambda row: (
+        -row["points"], -row["playoff_points"], -row["head_to_head"],
+        -row["wins"], row["id"],
+    ))
+    non_bracket_ids = [row["id"] for row in qualifier_order if row["id"] not in standings]
+    non_bracket_rank = {
+        user_id: (qualifier.cutoff if qualifier else len(standings)) + index
+        for index, user_id in enumerate(non_bracket_ids, start=1)
+    }
+
+    results = []
+    for user_id, user in users_by_id.items():
+        bracket_rank = standings.get(user_id)
+        rank = bracket_rank if bracket_rank is not None else non_bracket_rank.get(user_id)
+        if rank is None:
+            continue
+        results.append({
+            "id": user_id,
+            "username": user.username,
+            "rank": rank,
+            "bracket_rank": bracket_rank,
+            "result_label": f"Bracket · hạng {bracket_rank}" if bracket_rank is not None else "Vòng loại",
+            "bracket_score": DEFAULT_BRACKET_PLACEMENT_POINTS.get(bracket_rank, 0.0),
+            "final_score": DEFAULT_BRACKET_PLACEMENT_POINTS.get(bracket_rank, 0.0),
+        })
+    results.sort(key=lambda item: (item["rank"], item["id"]))
     return results

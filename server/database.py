@@ -1,6 +1,7 @@
 """Database connection, SQLite engine configuration, and session management."""
 
 import os
+import logging
 from pathlib import Path
 from typing import Generator
 from sqlalchemy import create_engine, event, inspect, text
@@ -45,6 +46,7 @@ def set_sqlite_pragma(dbapi_connection, connection_record):
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
+logger = logging.getLogger(__name__)
 
 
 def get_db() -> Generator[Session, None, None]:
@@ -98,9 +100,53 @@ def _add_missing_columns(eng) -> None:
             )
 
 
+def _archive_incompatible_tables(eng) -> None:
+    """Preserve malformed legacy tables so create_all can build the current schema.
+
+    ``create_all`` intentionally leaves existing tables untouched. If an older
+    release created a partial table with a current table's name, ORM queries
+    fail with missing-column errors. Renaming retains its rows for recovery.
+    """
+    inspector = inspect(eng)
+    existing_tables = set(inspector.get_table_names())
+    expected_tables = Base.metadata.tables
+    incompatible = {}
+    for table_name in ("qualifier_tournaments", "qualifier_matches"):
+        if table_name not in existing_tables or table_name not in expected_tables:
+            continue
+        actual = {column["name"] for column in inspector.get_columns(table_name)}
+        missing = set(expected_tables[table_name].columns.keys()) - actual
+        if missing:
+            incompatible[table_name] = missing
+    if not incompatible:
+        return
+
+    # These two tables reference each other. Archive the pair together so a
+    # surviving child table cannot retain a foreign key to an archived parent.
+    with eng.begin() as conn:
+        for table_name in ("qualifier_tournaments", "qualifier_matches"):
+            if table_name not in existing_tables or table_name not in expected_tables:
+                continue
+            suffix = 1
+            archive_name = f"{table_name}_legacy"
+            while archive_name in existing_tables:
+                suffix += 1
+                archive_name = f"{table_name}_legacy_{suffix}"
+            conn.execute(text(f'ALTER TABLE "{table_name}" RENAME TO "{archive_name}"'))
+            existing_tables.add(archive_name)
+            existing_tables.remove(table_name)
+            logger.warning(
+                "Archived incompatible database table %s as %s; missing columns: %s",
+                table_name,
+                archive_name,
+                ", ".join(sorted(incompatible.get(table_name, set()))),
+            )
+
+
 def init_db(target_engine=None) -> None:
-    """Create all database tables and upgrade older schemas in place."""
+    """Create current tables and upgrade or preserve incompatible old schemas."""
     from server import models  # noqa: F401
     eng = target_engine or engine
+    _archive_incompatible_tables(eng)
     Base.metadata.create_all(bind=eng)
     _add_missing_columns(eng)

@@ -13,16 +13,20 @@ from engine.game import MAX_TURNS, RULE_VARIANT_CUSTOM, SUPPORTED_RULE_VARIANTS,
 from engine.games import GAMES, list_games
 from server.boss_manager import deploy_boss, get_all_bosses_status, retract_boss
 from server.bracket import (
+    STATUS_PENDING,
     STATUS_RUNNING,
     create_bracket,
     get_final_results,
     get_ready_matches,
     is_bracket_finished,
     play_bracket_matches,
+    create_qualifier_schedule,
+    get_qualifier_standings,
+    play_qualifier_batch,
 )
 from server.database import get_db
 from server.games import get_active_bot, get_active_game, get_catalog_games
-from server.models import Bot, BracketMatch, Match, TournamentSetting, User
+from server.models import Bot, BracketMatch, Match, QualifierMatch, QualifierTournament, TournamentSetting, User
 from server.queue import speed_up_bracket_round
 from server.routes.auth import get_current_admin
 from server.tournament import generate_bracket, is_ffa_portal_open
@@ -42,6 +46,11 @@ class BracketGenerationRequest(BaseModel):
     concurrent_boards: int = Field(1, ge=1, le=8)
     participant_ids: Optional[List[int]] = None
     manual_pairs: List[Tuple[Optional[int], Optional[int]]] = Field(default_factory=list)
+
+
+class QualifierGenerationRequest(BaseModel):
+    """Optional explicit entrant list for a qualification stage."""
+    participant_ids: Optional[List[int]] = None
 
 
 class UpdateSettingsRequest(BaseModel):
@@ -263,6 +272,133 @@ def list_bracket_participants(
     ]
 
 
+@router.post("/qualifier/generate")
+def generate_qualifier_stage(
+    payload: QualifierGenerationRequest = QualifierGenerationRequest(),
+    current_admin: User = Depends(get_current_admin),
+    db: Session = Depends(get_db),
+) -> Dict[str, Any]:
+    """Create and retain a balanced schedule for the selected active bots."""
+    active_game = get_active_game(db)
+    users = db.query(User).filter(User.is_admin.is_(False)).order_by(User.elo.desc(), User.id.asc()).all()
+    users_by_id = {user.id: user for user in users}
+    participant_ids = payload.participant_ids
+    if participant_ids is None:
+        participant_ids = [user.id for user in users if get_active_bot(db, user.id, active_game)]
+    if len(set(participant_ids)) != len(participant_ids):
+        raise HTTPException(status_code=400, detail="Participant list contains duplicates.")
+    if len(participant_ids) < 4:
+        raise HTTPException(status_code=400, detail="At least 4 participants are required for qualification games.")
+    if set(participant_ids) - users_by_id.keys():
+        raise HTTPException(status_code=400, detail="Participants must be existing non-admin accounts.")
+    missing_bot = [users_by_id[user_id].username for user_id in participant_ids if not get_active_bot(db, user_id, active_game)]
+    if missing_bot:
+        raise HTTPException(status_code=400, detail="Every qualification participant must have an active bot for the selected game.")
+    if db.query(QualifierMatch).filter(QualifierMatch.status == STATUS_RUNNING).first():
+        raise HTTPException(status_code=409, detail="A qualification batch is already running.")
+    if db.query(BracketMatch).filter(BracketMatch.status == STATUS_RUNNING).first():
+        raise HTTPException(status_code=409, detail="A playoff bracket is currently running.")
+    if db.query(BracketMatch).filter(BracketMatch.status == STATUS_PENDING).first():
+        raise HTTPException(status_code=409, detail="Finish the current playoff bracket before starting a new qualifier.")
+    if db.query(BracketMatch).first():
+        raise HTTPException(status_code=409, detail="End the previous tournament before starting a new qualifier so its bracket history can be cleared safely.")
+    active_tournament = db.query(QualifierTournament).filter(QualifierTournament.status.in_(("active", "tiebreak"))).first()
+    if active_tournament:
+        raise HTTPException(status_code=409, detail="Finish the active qualification stage before creating another.")
+    variant_row = _get_setting_row(db, "rule_variant")
+    variant = variant_row.value if variant_row and variant_row.value else "standard"
+    if variant == RULE_VARIANT_CUSTOM:
+        try:
+            create_initial_board(variant=variant)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=f"Custom rules are invalid: {exc}") from exc
+
+    tournament, pairings = create_qualifier_schedule(db, participant_ids)
+    db.commit()
+    return {
+        "tournament_id": tournament.id,
+        "participant_count": tournament.participant_count,
+        "rounds": tournament.round_count,
+        "games_per_participant": tournament.round_count,
+        "matches": sum(not pairing.is_bye for pairing in pairings),
+        "byes": sum(pairing.is_bye for pairing in pairings),
+        "cutoff": tournament.cutoff,
+    }
+
+
+@router.post("/qualifier/play")
+def play_next_qualifier_batch(
+    background_tasks: BackgroundTasks,
+    current_admin: User = Depends(get_current_admin),
+    db: Session = Depends(get_db),
+) -> Dict[str, Any]:
+    """Start the next eight qualification games, or the smaller final batch."""
+    tournament = db.query(QualifierTournament).filter(QualifierTournament.status.in_(("active", "tiebreak"))).order_by(QualifierTournament.id.desc()).first()
+    if tournament is None:
+        raise HTTPException(status_code=400, detail="No active qualification stage exists.")
+    if db.query(QualifierMatch).filter(
+        QualifierMatch.tournament_id == tournament.id,
+        QualifierMatch.status == STATUS_RUNNING,
+    ).first():
+        raise HTTPException(status_code=409, detail="Wait for the current batch to finish.")
+    next_pending = (
+        db.query(QualifierMatch)
+        .filter(QualifierMatch.tournament_id == tournament.id, QualifierMatch.status == STATUS_PENDING)
+        .order_by(QualifierMatch.round_number.asc(), QualifierMatch.batch_number.asc(), QualifierMatch.match_index.asc())
+        .first()
+    )
+    if not next_pending:
+        raise HTTPException(status_code=409, detail="All qualification matches are complete; the playoff bracket is being prepared.")
+    pending = (
+        db.query(QualifierMatch)
+        .filter(
+            QualifierMatch.tournament_id == tournament.id,
+            QualifierMatch.status == STATUS_PENDING,
+            QualifierMatch.round_number == next_pending.round_number,
+            QualifierMatch.batch_number == next_pending.batch_number,
+        )
+        .order_by(QualifierMatch.match_index.asc())
+        .limit(8)
+        .all()
+    )
+
+    game_type = get_active_game(db)
+    player_ids = {pairing.player1_id for pairing in pending} | {pairing.player2_id for pairing in pending}
+    players = {user.id: user for user in db.query(User).filter(User.id.in_(player_ids)).all()}
+    variant_row = _get_setting_row(db, "rule_variant")
+    variant = variant_row.value if variant_row and variant_row.value else "standard"
+    if variant == RULE_VARIANT_CUSTOM:
+        try:
+            create_initial_board(variant=variant)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=f"Custom rules are invalid: {exc}") from exc
+    for pairing in pending:
+        bot1 = get_active_bot(db, pairing.player1_id, game_type)
+        bot2 = get_active_bot(db, pairing.player2_id, game_type)
+        if bot1 is None or bot2 is None:
+            raise HTTPException(status_code=400, detail="A qualification participant no longer has an active bot.")
+        game = Match(
+            player1_id=pairing.player1_id,
+            player2_id=pairing.player2_id,
+            bot1_id=bot1.id,
+            bot2_id=bot2.id,
+            p1_elo_before=players[pairing.player1_id].elo,
+            p2_elo_before=players[pairing.player2_id].elo,
+            is_bracket=True,
+            game_type=game_type,
+            rule_variant=variant,
+        )
+        db.add(game)
+        db.flush()
+        pairing.match_id = game.id
+        pairing.status = STATUS_RUNNING
+    db.commit()
+    match_ids = [pairing.id for pairing in pending]
+    round_number = pending[0].round_number
+    background_tasks.add_task(play_qualifier_batch, match_ids)
+    return {"status": "queued", "round": round_number, "match_count": len(match_ids), "match_ids": match_ids}
+
+
 @router.post("/bracket/generate")
 def trigger_bracket_generation(
     payload: BracketGenerationRequest = BracketGenerationRequest(),
@@ -270,6 +406,8 @@ def trigger_bracket_generation(
     db: Session = Depends(get_db),
 ) -> List[Dict[str, Any]]:
     """Generate a bracket from selected non-admin participants."""
+    if db.query(QualifierTournament).filter(QualifierTournament.status.in_(("active", "tiebreak"))).first():
+        raise HTTPException(status_code=409, detail="Complete the qualification and any cutoff playoff before generating a bracket.")
     settings = _get_all_settings_dict(db)
     top_n = settings.get("top_players_count", 8)
 
@@ -415,14 +553,20 @@ def finish_running_bracket_round(
     current_admin: User = Depends(get_current_admin),
     db: Session = Depends(get_db),
 ) -> Dict[str, str]:
-    """Finish the visible playback and remove pacing delays from running games."""
-    if not db.query(BracketMatch).filter(BracketMatch.status == STATUS_RUNNING).first():
+    """Skip playback pacing for the currently running qualifier batch or bracket round."""
+    qualifier_running = db.query(QualifierMatch).filter(
+        QualifierMatch.status == STATUS_RUNNING
+    ).first()
+    bracket_running = db.query(BracketMatch).filter(
+        BracketMatch.status == STATUS_RUNNING
+    ).first()
+    if not qualifier_running and not bracket_running:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail="There is no running bracket round to speed up.",
+            detail="There is no running qualification batch or bracket round to speed up.",
         )
     speed_up_bracket_round()
-    return {"status": "finishing"}
+    return {"status": "finishing", "stage": "qualifier" if qualifier_running else "bracket"}
 
 
 @router.post("/tournament/end")
@@ -438,9 +582,18 @@ def end_tournament(
         )
     replays_dir = Path(__file__).resolve().parents[2] / "replays"
     replay_files = list(replays_dir.glob("match_*.json")) if replays_dir.is_dir() else []
+    if db.query(QualifierMatch).filter(QualifierMatch.status == STATUS_RUNNING).first():
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT,
+                            detail="Wait for the running qualification batch to finish before ending the tournament.")
     match_count = db.query(Match).count()
     bracket_count = db.query(BracketMatch).count()
+    qualifier_match_count = db.query(QualifierMatch).count()
+    qualifier_tournament_count = db.query(QualifierTournament).count()
 
+    db.query(QualifierMatch).delete(synchronize_session=False)
+    db.query(QualifierTournament).delete(synchronize_session=False)
+    # Match rows point to bracket pairings; clear that FK before deleting either side.
+    db.query(Match).update({Match.bracket_match_id: None}, synchronize_session=False)
     db.query(Match).delete(synchronize_session=False)
     db.query(BracketMatch).delete(synchronize_session=False)
     _upsert_setting(db, "portal_mode", "false")
@@ -466,6 +619,8 @@ def end_tournament(
         "status": "ended",
         "deleted_matches": match_count,
         "deleted_bracket_pairings": bracket_count,
+        "deleted_qualifier_matches": qualifier_match_count,
+        "deleted_qualifier_tournaments": qualifier_tournament_count,
         "deleted_replays": deleted_replays,
         "portal_mode": "false",
     }
@@ -476,7 +631,7 @@ def get_bracket_standings(
     current_admin: User = Depends(get_current_admin),
     db: Session = Depends(get_db),
 ) -> List[Dict[str, Any]]:
-    """Retrieve composite final scores combining normalized Elo and bracket placement."""
+    """Retrieve final tournament placements for actual entrants, without Elo scoring."""
     return get_final_results(db)
 
 

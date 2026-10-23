@@ -197,3 +197,49 @@ class BracketMatch(Base):
     player1: Mapped[Optional["User"]] = relationship("User", foreign_keys=[player1_id])
     player2: Mapped[Optional["User"]] = relationship("User", foreign_keys=[player2_id])
     winner: Mapped[Optional["User"]] = relationship("User", foreign_keys=[winner_id])
+
+
+class QualifierTournament(Base):
+    """One persisted qualification event, retained after later events start."""
+
+    __tablename__ = "qualifier_tournaments"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    status: Mapped[str] = mapped_column(String(32), default="active", nullable=False)
+    participant_count: Mapped[int] = mapped_column(Integer, nullable=False)
+    cutoff: Mapped[int] = mapped_column(Integer, nullable=False)
+    round_count: Mapped[int] = mapped_column(Integer, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime,
+        default=lambda: datetime.now(timezone.utc),
+        nullable=False,
+    )
+
+
+class QualifierMatch(Base):
+    """Persist one game in the round-robin qualification stage."""
+
+    __tablename__ = "qualifier_matches"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    tournament_id: Mapped[int] = mapped_column(Integer, ForeignKey("qualifier_tournaments.id"), nullable=False, index=True)
+    round_number: Mapped[int] = mapped_column(Integer, nullable=False)
+    match_index: Mapped[int] = mapped_column(Integer, nullable=False)
+    batch_number: Mapped[int] = mapped_column(Integer, nullable=False)
+    stage: Mapped[str] = mapped_column(String(32), default="qualifying", nullable=False)
+    player1_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id"), nullable=False)
+    player2_id: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("users.id"), nullable=True)
+    match_id: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("matches.id"), nullable=True)
+    winner_id: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("users.id"), nullable=True)
+    status: Mapped[str] = mapped_column(String(32), default="pending", nullable=False)
+    is_bye: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime,
+        default=lambda: datetime.now(timezone.utc),
+        nullable=False,
+    )
+
+    player1: Mapped["User"] = relationship("User", foreign_keys=[player1_id])
+    player2: Mapped[Optional["User"]] = relationship("User", foreign_keys=[player2_id])
+    winner: Mapped[Optional["User"]] = relationship("User", foreign_keys=[winner_id])
+    match: Mapped[Optional["Match"]] = relationship("Match", foreign_keys=[match_id])

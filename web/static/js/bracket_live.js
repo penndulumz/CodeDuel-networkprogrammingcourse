@@ -31,6 +31,55 @@
     return Math.max(0, Number(localStorage.getItem(progressKey(matchId))) || 0);
   }
 
+  function renderQualifierData(data) {
+    const panel = document.getElementById('qualifierHistoryPanel');
+    if (!panel || !data.tournament) return;
+    const summary = document.getElementById('qualifierProgressText');
+    if (summary) {
+      summary.textContent = `${data.tournament.status} · ${data.tournament.completed_matches}/${data.tournament.total_matches} trận · top ${data.tournament.cutoff} vào loại trực tiếp`;
+    }
+    const standingsBody = document.getElementById('qualifierStandingsBody');
+    if (standingsBody) {
+      standingsBody.replaceChildren();
+      (data.standings || []).forEach((row, index) => {
+        const tr = document.createElement('tr');
+        if (index < data.tournament.cutoff) tr.classList.add('qualifier-advancing');
+        [index + 1, row.username, row.points, row.playoff_points, row.wins, row.played]
+          .forEach(value => {
+            const td = document.createElement('td');
+            td.textContent = String(value);
+            tr.appendChild(td);
+          });
+        standingsBody.appendChild(tr);
+      });
+    }
+    const historyBody = document.getElementById('qualifierMatchesBody');
+    if (historyBody) {
+      historyBody.replaceChildren();
+      (data.history || []).forEach(round => (round.matches || []).forEach((match, index) => {
+        const tr = document.createElement('tr');
+        const result = match.is_bye ? 'Bye' : match.status === 'completed' ? (match.winner || 'Hòa') : match.status === 'running' ? 'Đang đấu' : 'Chờ';
+        const roundLabel = round.stage === 'playoff' ? 'Play-off' : `Vòng ${round.round}`;
+        [roundLabel, index + 1, match.player1, match.player2, result].forEach(value => {
+          const td = document.createElement('td');
+          td.textContent = String(value);
+          tr.appendChild(td);
+        });
+        const replayCell = document.createElement('td');
+        if (match.match_id) {
+          const replayLink = document.createElement('a');
+          replayLink.href = `/replay/${match.match_id}`;
+          replayLink.textContent = 'Xem';
+          replayCell.appendChild(replayLink);
+        } else {
+          replayCell.textContent = '—';
+        }
+        tr.appendChild(replayCell);
+        historyBody.appendChild(tr);
+      }));
+    }
+  }
+
   if (startRoundButton) startRoundButton.addEventListener('click', queueNextRound);
   if (finishRoundButton) finishRoundButton.addEventListener('click', finishCurrentRound);
 
@@ -299,18 +348,28 @@
     if (roundRequestInFlight) return;
     roundRequestInFlight = true;
     if (startRoundButton) startRoundButton.disabled = true;
-    if (controlMessage) controlMessage.textContent = 'Đang đưa vòng kế tiếp vào hàng chờ...';
+    if (controlMessage) controlMessage.textContent = 'Đang đưa bước đấu kế tiếp vào hàng chờ...';
     try {
-      const response = await fetch('/api/admin/bracket/play', { method: 'POST' });
+      const qualifierResponse = await fetch('/api/qualifier/live', { cache: 'no-store' });
+      const qualifierData = qualifierResponse.ok ? await qualifierResponse.json() : null;
+      const qualifierActive = qualifierData?.tournament
+        && ['active', 'tiebreak'].includes(qualifierData.tournament.status);
+      const stage = qualifierActive ? 'qualifier' : 'bracket';
+      const endpoint = qualifierActive ? '/api/admin/qualifier/play' : '/api/admin/bracket/play';
+      const response = await fetch(endpoint, { method: 'POST' });
       const data = await response.json();
       if (!response.ok) throw new Error(data.detail || 'Không thể bắt đầu vòng tiếp theo');
-      if (controlMessage) controlMessage.textContent = `Đã bắt đầu ${data.round_name} trên ${data.concurrent_boards} bàn.`;
+      if (controlMessage) {
+        controlMessage.textContent = stage === 'qualifier'
+          ? `Đã bắt đầu lô vòng loại gồm ${data.match_count} trận (vòng ${data.round}).`
+          : `Đã bắt đầu ${data.round_name} trên ${data.concurrent_boards} bàn.`;
+      }
       await refresh();
     } catch (error) {
       if (controlMessage) controlMessage.textContent = error.message;
     } finally {
       roundRequestInFlight = false;
-      if (startRoundButton) startRoundButton.disabled = false;
+      await refresh();
     }
   }
 
@@ -330,7 +389,11 @@
         localStorage.setItem(progressKey(game.match_id), String((game.moves || []).length));
       });
       paintPairings();
-      if (controlMessage) controlMessage.textContent = 'Đã bỏ hoạt ảnh. Bàn cờ sẽ theo sát trạng thái cuối khi các trận hoàn tất.';
+      if (controlMessage) {
+        controlMessage.textContent = data.stage === 'qualifier'
+          ? 'Đã tăng tốc các trận vòng loại đang chạy; chúng sẽ hoàn tất sớm hơn.'
+          : 'Đã bỏ hoạt ảnh. Bàn cờ sẽ theo sát trạng thái cuối khi các trận hoàn tất.';
+      }
     } catch (error) {
       if (controlMessage) controlMessage.textContent = error.message;
     } finally {
@@ -340,12 +403,42 @@
 
   async function refresh() {
     try {
+      const qualifierResponse = await fetch('/api/qualifier/live', { cache: 'no-store' });
+      const qualifierData = qualifierResponse.ok ? await qualifierResponse.json() : null;
+      if (qualifierData && qualifierData.tournament && ['active', 'tiebreak'].includes(qualifierData.tournament.status)) {
+        renderQualifierData(qualifierData);
+        latestPairings = qualifierData.pairings || [];
+        const hasRunningGame = latestPairings.some(pairing => pairing.status === 'running');
+        if (finishRoundButton) finishRoundButton.disabled = !hasRunningGame;
+        if (startRoundButton && !roundRequestInFlight) startRoundButton.disabled = hasRunningGame;
+        if (!hasRunningGame && latestPairings.length
+            && latestPairings.every(pairing => pairing.status === 'completed')
+            && controlMessage) {
+          controlMessage.textContent = 'Lô vừa hoàn tất. Đang dừng để quan sát; nhấn “Chạy vòng tiếp theo” khi sẵn sàng.';
+        }
+        latestPairings.forEach((pairing) => {
+          if (!pairing.current_game) return;
+          displayedGameIds.set(pairing.id, pairing.current_game.match_id);
+          displayedTurns.set(
+            pairing.id,
+            snapToLatest || pairing.status === 'completed'
+              ? pairing.current_game.moves.length
+              : Math.min(getSavedProgress(pairing.current_game.match_id), pairing.current_game.moves.length)
+          );
+        });
+        paintPairings();
+        renderRoundHistory();
+        if (snapToLatest && !hasRunningGame) snapToLatest = false;
+        return;
+      }
+      if (qualifierData && qualifierData.tournament) renderQualifierData(qualifierData);
       const response = await fetch('/api/bracket/live', { cache: 'no-store' });
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
       const data = await response.json();
       latestPairings = data.pairings || [];
       const hasRunningGame = latestPairings.some(pairing => pairing.status === 'running');
-      if (finishRoundButton) finishRoundButton.disabled = false;
+      if (finishRoundButton) finishRoundButton.disabled = !hasRunningGame;
+      if (startRoundButton && !roundRequestInFlight) startRoundButton.disabled = hasRunningGame;
       latestPairings.forEach((pairing) => {
         if (!pairing.current_game) return;
         const oldGameId = displayedGameIds.get(pairing.id);
