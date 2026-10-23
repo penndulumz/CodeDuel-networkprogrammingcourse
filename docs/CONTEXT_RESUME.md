@@ -473,3 +473,30 @@ Hệ thống hỗ trợ triển khai thử nghiệm qua WAN bằng mô hình HTT
 2. **Hợp nhất Design Tokens Clubhouse**: Đưa toàn bộ các trang chuyên biệt như Cây đấu loại trực tiếp (/bracket), Khung Replay ván đấu (/replay/<id>) và Bảng quản trị (/admin) về cùng một ngôn ngữ thiết kế: Nền giấy kem #faf5e9, thẻ trắng ấm #fffdf6, viền mực #29352d, bóng cứng đổ nhẹ 3px 4px 0 #29352d và điểm nhấn hổ phách #ffcf56.
 3. **Cải tiến Trải nghiệm Hướng dẫn cho Sinh viên (/guide)**: Thiết kế lại toàn diện trang hướng dẫn với ngôn ngữ thân thiện, dễ hiểu, lộ trình 6 bước rõ ràng từ luật chơi 60 giây, cấu trúc hàm get_move(), 3 cấp độ chiến thuật bot, đến kiểm tra cục bộ bằng local_arena.py.
 4. **Tối ưu Mobile & Khả năng Tiếp cận (A11y)**: Loại bỏ các góc nghiêng gây tràn khung ngang trên màn hình nhỏ (< 640px), đảm bảo kích thước vùng bấm (touch target) tối thiểu 42-44px.
+
+## 29. Vòng Loại Top 16/8 & Trình Chiếu
+
+1. Admin tạo một `QualifierTournament` mới từ những tài khoản không phải admin có bot đang hoạt động cho game đã chọn. Mỗi thí sinh đấu 4 trận trong lịch vòng loại. Lịch được lưu trong `QualifierMatch`, các trận chiếu theo từng lô tối đa 8 trận và không trộn lô. Nếu chỉ có 4 thí sinh thì một cặp gặp lại nhau vì mỗi người chỉ có 3 đối thủ khác.
+2. Mỗi trận vòng loại chấm thắng 3, hòa 1, thua 0. Xếp hạng dùng điểm, điểm playoff, đối đầu, số thắng, Elo rồi ID để ổn định thứ tự; không dùng Buchholz. Nếu nhóm bằng điểm nằm qua ranh top 16 (từ 16 người) hoặc top 8 (dưới 16 người), nhóm đó đánh playoff. Nếu sau playoff vẫn còn đúng hai người bằng cả điểm vòng loại lẫn điểm playoff tại ranh suất, tạo thêm trận playoff đối đầu; nếu trận đó hòa thì lặp lại cho đến khi phân định được suất. Vòng loại và playoff không thay đổi Elo.
+3. Sau khi xác định suất, hệ thống tạo cây bracket bắt đầu ở Round of 16 hoặc Round of 8. Trang `/bracket` lưu và hiển thị lịch sử vòng loại, nhưng sơ đồ bracket chỉ chứa các vòng loại trực tiếp. Replay từng trận vòng loại mở từ liên kết trong lịch sử.
+4. `POST /api/admin/tournament/end` xóa các bản ghi `QualifierMatch` và `QualifierTournament` cùng lịch sử Match/Bracket và replay, sau khi xác nhận không còn trận vòng loại hay bracket đang chạy. Trước khi xóa Match, đặt `Match.bracket_match_id` về NULL vì khóa ngoại trỏ từ Match sang BracketMatch; sau đó mới xóa Match và BracketMatch. `init_db` tạo hai bảng mới khi khởi động trên SQLite hiện có.
+5. Admin dùng nút `Khởi tạo giải đấu và nhánh bracket` để tạo lịch vòng loại. Nút `Chạy bước / lô đấu tiếp theo` tự chọn chạy lô vòng loại/playoff hoặc trận bracket tùy trạng thái; bracket được tạo tự động sau khi vòng loại hoàn tất.
+
+## Lỗi schema SQLite qualifier (2026-10-24)
+- Khi bảng qualifier_matches hoặc qualifier_tournaments tồn tại nhưng thiếu cột, create_all() không tự sửa bảng cũ. init_db() hiện kiểm tra schema; nếu không tương thích thì đổi tên cả cặp bảng qualifier sang tên *_legacy để giữ dữ liệu, sau đó tạo schema hiện hành. Khởi động lại server để áp dụng.
+- Log ngày 2026-10-24 xác nhận migration đã archive schema lỗi và API 	ournament/end trả 200. Lỗi tiếp theo là NameError: STATUS_PENDING trong route qualifier; import hằng từ server.bracket đã được bổ sung vào server/routes/admin.py.
+- The live bracket projection uses the next-round and finish-now controls for both qualifier and bracket stages. JavaScript selects the stage through /api/qualifier/live; the finish API accepts a running qualifier batch and bracket round; qualifier batch completion resets the shared fast-playback flag.
+- Qualification projection batch generation now chunks scheduled games into groups of at most eight; only the final group can be smaller. The live qualifier endpoint keeps the most recently completed batch visible while pending games remain, and starting the next batch still requires an explicit organizer button press. This also applies to tie-break playoff batches.
+- Bảng kết quả chung cuộc lọc đúng người tham gia (từ lịch vòng loại mới nhất hoặc các cặp bracket), không đưa tài khoản ngoài giải vào kết quả. Xếp hạng/ điểm chung cuộc không dùng Elo; người bị loại ở vòng loại được xếp sau bracket theo điểm và các chỉ số vòng loại (ID làm tiêu chí cuối).
+- Vòng loại không còn hiển thị hay dùng Buchholz (điểm đối thủ) để xếp hạng; các tiêu chí còn lại là điểm, playoff, đối đầu và số trận thắng. Các trận phân định suất top 16/8 hiển thị nhãn Play-off cả trên bảng lịch sử và màn trình chiếu.
+- Cột Play-off trong bảng vòng loại hiển thị playoff_points (tổng điểm từ các trận play-off); không hiển thị điểm đối đầu mini-table.
+
+- Khi playoff cutoff kết thúc mà đúng hai thí sinh còn đồng điểm và cùng nằm qua ranh top16/top8, hệ thống tạo thêm một trận Play-off trực tiếp cho hai người. Trận hòa sẽ lặp lại; mỗi lần phải được admin bấm chạy, không tự khởi động.
+- Trận phân định bổ sung sau playoff được lưu stage=playoff_decider, không cộng vào playoff_points. Kết quả trận này chỉ phân định thứ tự giữa hai người còn hòa ở ranh top16/top8, nên không thể vượt người đã được phân định trước đó. Nếu hòa, thêm lượt decider tiếp.
+- Bảng xếp hạng vòng loại viền vàng các hàng đang nằm trong cutoff top 16/8; áp dụng cho cả HTML ban đầu và cập nhật JavaScript. Đây là vị trí tạm thời khi Play-off chưa chốt.
+- Viền vàng top 16/8 dùng inset box-shadow có selector ID trong racket.html để không bị các theme stylesheet ghi đè; URL style.css có query version để bust cache.
+- The top-16/top-8 qualifier highlight now uses a thin 1px muted gold (#c9b777) in both the template and main stylesheet.
+
+- The bracket live projection now spans the full content width, with the match history sidebar below the projection. This gives the 8-match projection grid room for wider rows.
+
+- Top-16/top-8 qualifier rows are now identified with bold text only; the gold outline has been removed in both initial and live-updated standings.

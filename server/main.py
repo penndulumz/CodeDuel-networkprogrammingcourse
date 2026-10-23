@@ -25,9 +25,9 @@ from sqlalchemy.orm import Session, selectinload
 
 from engine.games import GAMES, is_grid_game, list_games
 from server.database import get_db, init_db
-from server.bracket import get_final_results, get_round_size, is_bracket_finished
+from server.bracket import get_final_results, get_qualifier_standings, get_round_size, is_bracket_finished
 from server.games import get_active_game, get_catalog_games
-from server.models import Bot, BracketMatch, Match, User
+from server.models import Bot, BracketMatch, Match, QualifierMatch, QualifierTournament, User
 from server.network import get_public_url
 from server.routes import admin, auth, bots, grade, leaderboard, matches
 from server.routes.admin import _get_all_settings_dict
@@ -340,11 +340,26 @@ def bracket_page(
 ) -> HTMLResponse:
     """Render the tournament bracket elimination tree and match pairings."""
     current_user = _get_optional_user(request, db)
+    qualifier_tournament = db.query(QualifierTournament).order_by(QualifierTournament.id.desc()).first()
+    qualifier_matches = []
+    qualifier_standings = []
+    if qualifier_tournament:
+        qualifier_matches = (
+            db.query(QualifierMatch)
+            .options(selectinload(QualifierMatch.player1), selectinload(QualifierMatch.player2),
+                     selectinload(QualifierMatch.winner))
+            .filter(QualifierMatch.tournament_id == qualifier_tournament.id)
+            .order_by(QualifierMatch.round_number.asc(), QualifierMatch.match_index.asc())
+            .all()
+        )
+        qualifier_standings = get_qualifier_standings(db, qualifier_tournament.id)
     bracket_matches = (
         db.query(BracketMatch)
         .order_by(BracketMatch.id.asc())
         .all()
     )
+    if qualifier_tournament and qualifier_tournament.status in ("active", "tiebreak"):
+        bracket_matches = []
 
     present_rounds = {bm.round_name for bm in bracket_matches}
     bracket_rounds = sorted(present_rounds, key=get_round_size, reverse=True)
@@ -359,6 +374,9 @@ def bracket_page(
             "bracket_matches": bracket_matches,
             "bracket_rounds": bracket_rounds,
             "final_results": final_results,
+            "qualifier_tournament": qualifier_tournament,
+            "qualifier_matches": qualifier_matches,
+            "qualifier_standings": qualifier_standings,
             "games_list": get_catalog_games(db), "current_user": current_user,
         },
     )
@@ -616,6 +634,126 @@ def get_live_bracket(db: Session = Depends(get_db)) -> Dict[str, Any]:
         )
 
     return {"pairings": payload}
+
+
+@app.get("/api/qualifier/live", tags=["tournament"])
+def get_live_qualifier(db: Session = Depends(get_db)) -> Dict[str, Any]:
+    """Return qualification progress, live boards, standings and retained match history."""
+    from server.bracket import get_qualifier_standings
+
+    tournament = db.query(QualifierTournament).order_by(QualifierTournament.id.desc()).first()
+    if tournament is None:
+        return {"tournament": None, "pairings": [], "standings": []}
+    pairings = (
+        db.query(QualifierMatch)
+        .options(selectinload(QualifierMatch.player1), selectinload(QualifierMatch.player2),
+                 selectinload(QualifierMatch.winner), selectinload(QualifierMatch.match))
+        .filter(QualifierMatch.tournament_id == tournament.id)
+        .order_by(QualifierMatch.round_number.asc(), QualifierMatch.match_index.asc())
+        .all()
+    )
+    current_batch = [item for item in pairings if item.status == "running"]
+    if current_batch:
+        active_round, active_batch = current_batch[0].round_number, current_batch[0].batch_number
+        current_batch = [item for item in pairings
+                         if item.round_number == active_round and item.batch_number == active_batch]
+    else:
+        next_pairing = next((item for item in pairings if item.status == "pending"), None)
+        completed_batches = {}
+        for item in pairings:
+            key = (item.round_number, item.batch_number)
+            completed_batches.setdefault(key, []).append(item)
+        latest_completed_key = next((key for key in sorted(completed_batches, reverse=True)
+                                     if all(item.status == "completed" for item in completed_batches[key])), None)
+        # Hold the just-finished batch on screen until the organizer starts the
+        # next one. On a fresh tournament, show the first pending batch instead.
+        if latest_completed_key is not None and next_pairing is not None:
+            active_round, active_batch = latest_completed_key
+        elif next_pairing is not None:
+            active_round, active_batch = next_pairing.round_number, next_pairing.batch_number
+        else:
+            active_round = active_batch = None
+        current_batch = ([item for item in pairings
+                          if item.round_number == active_round and item.batch_number == active_batch]
+                         if active_round is not None else [])
+    payload = []
+    for index, pairing in enumerate(current_batch):
+        match = pairing.match
+        try:
+            moves = json.loads(match.live_moves or "[]") if match else []
+        except (TypeError, json.JSONDecodeError):
+            moves = []
+        payload.append({
+            "id": pairing.id,
+            "round_name": (
+                f"Play-off · Lượt {pairing.round_number}"
+                if pairing.stage != "qualifying"
+                else f"Vòng loại · Lượt {pairing.round_number}"
+            ),
+            "match_index": pairing.match_index + 1,
+            "player1": pairing.player1.username if pairing.player1 else "TBD",
+            "player2": pairing.player2.username if pairing.player2 else "Bye",
+            "score_p1": 1 if pairing.winner_id == pairing.player1_id else 0,
+            "score_p2": 1 if pairing.winner_id == pairing.player2_id else 0,
+            "status": pairing.status,
+            "winner": pairing.winner.username if pairing.winner else None,
+            "winner_player": (1 if match.winner_id == pairing.player1_id else 2)
+                if match and match.winner_id in (pairing.player1_id, pairing.player2_id) else None,
+            "is_bye": pairing.is_bye,
+            "game_results": [],
+            "games": ([{
+                "match_id": match.id,
+                "game_number": 1,
+                "winner": match.player1.username if match.winner_id == match.player1_id and match.winner_id else
+                          match.player2.username if match.winner_id == match.player2_id and match.winner_id else None,
+                "win_reason": match.win_reason,
+                "turns": match.total_turns,
+                "has_replay": bool(match.replay_path),
+            }] if match and is_grid_game(match.game_type) else []),
+            "current_game": {
+                "match_id": match.id,
+                "moves": moves,
+                "winner": match.player1.username if match.winner_id == match.player1_id and match.winner_id else
+                          match.player2.username if match.winner_id == match.player2_id and match.winner_id else None,
+                "live": pairing.status == "running" and match.replay_path is None and match.win_reason is None,
+                "turns": len(moves),
+            } if match and not is_grid_game(match.game_type) else None,
+            "initial_board": create_initial_board(variant=match.rule_variant or "standard")
+                if match and not is_grid_game(match.game_type) else None,
+        })
+    return {
+        "tournament": {
+            "id": tournament.id,
+            "status": tournament.status,
+            "participant_count": tournament.participant_count,
+            "cutoff": tournament.cutoff,
+            "rounds": tournament.round_count,
+            "completed_matches": sum(item.status == "completed" and not item.is_bye for item in pairings),
+            "total_matches": sum(not item.is_bye for item in pairings),
+        },
+        "pairings": payload,
+        "history": [
+            {
+                "round": round_number,
+                "stage": "playoff" if any(
+                    item.round_number == round_number and item.stage != "qualifying" for item in pairings
+                ) else "qualifying",
+                "matches": [
+                    {
+                        "player1": item.player1.username if item.player1 else "TBD",
+                        "player2": item.player2.username if item.player2 else "Bye",
+                        "winner": item.winner.username if item.winner else None,
+                        "match_id": item.match_id,
+                        "is_bye": item.is_bye,
+                        "status": item.status,
+                    }
+                    for item in pairings if item.round_number == round_number
+                ],
+            }
+            for round_number in sorted({item.round_number for item in pairings})
+        ],
+        "standings": get_qualifier_standings(db, tournament.id),
+    }
 
 
 if __name__ == "__main__":

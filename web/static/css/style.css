@@ -725,6 +725,10 @@ code {
   border-color: #b0703a;
 }
 
+.table-dark tr.qualifier-advancing > td {
+  font-weight: 700;
+}
+
 .elo-badge {
   font-family: var(--font-mono);
   font-weight: 600;

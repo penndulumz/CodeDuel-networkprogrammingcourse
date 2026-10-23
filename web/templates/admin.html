@@ -132,15 +132,15 @@
     </div>
 
     <ol class="steps">
-      <li><span><b>Tạo nhánh đấu.</b> Chọn người đã nộp bot hoạt động; các cặp vòng đầu được bốc thăm ngẫu nhiên.</span></li>
-      <li><span><b>Chạy từng vòng.</b> Mỗi cặp đấu theo series, đội thua bị loại.</span></li>
-      <li><span><b>Bốc thăm vòng sau.</b> Khi cả vòng đấu xong, các đội thắng được ghép cặp ngẫu nhiên.</span></li>
+      <li><span><b>Khởi tạo giải.</b> Các thí sinh đã chọn đấu vòng loại; mỗi người có 4 trận, tối đa 8 trận được chiếu cùng lúc.</span></li>
+      <li><span><b>Chạy vòng loại.</b> Hòa điểm ở ranh top 16/8 được phân định bằng playoff.</span></li>
+      <li><span><b>Vào bracket.</b> Hệ thống tự tạo nhánh Round of 16 hoặc Round of 8 sau khi chốt danh sách đi tiếp.</span></li>
     </ol>
 
     <div class="form-group" style="max-width: 280px;">
       <label class="form-label" for="concurrentBoards"><b>Số bàn chiếu chạy đồng thời</b></label>
       <input id="concurrentBoards" type="number" min="1" max="8" value="{{ settings.concurrent_boards }}" class="form-control">
-      <small class="form-hint">Mỗi bàn là một cặp đấu; tối đa 8 bàn.</small>
+      <small class="form-hint">Dùng cho các vòng bracket sau vòng loại; tối đa 8 bàn. Vòng loại luôn chiếu tối đa 8 trận mỗi lô.</small>
     </div>
 
     <div class="form-group">
@@ -154,27 +154,21 @@
         <span class="form-hint">Đang tải danh sách tài khoản...</span>
       </div>
     </div>
-    <div class="form-group">
-      <label class="form-label" for="bracketPairingMode"><b>Cách xếp trận vòng đầu</b></label>
-      <select id="bracketPairingMode" class="form-control" onchange="renderManualBracketPairs()">
-        <option value="random">Xếp ngẫu nhiên</option>
-        <option value="manual">Tự sắp cặp thủ công</option>
-      </select>
-      <div id="manualBracketPairs" style="display:none; margin-top:10px;"></div>
-    </div>
-
     <div class="stack" style="gap: 10px; margin-bottom: 14px;">
-      <button class="btn btn-primary btn-lg btn-block" onclick="playNextBracketRound()">
-        ▶ Chạy vòng đấu tiếp theo
+      <button class="btn btn-primary btn-lg btn-block" onclick="triggerBracketGeneration()">
+        Khởi tạo giải đấu và nhánh bracket
       </button>
-      <button class="btn btn-danger btn-lg btn-block" onclick="triggerBracketGeneration()">
-        ⚡ Tạo / Khởi tạo lại Nhánh đấu Bracket
+      <small class="form-hint" style="display: block; margin-top: 8px;">
+        Mặc định chọn tất cả người có bot cho game hiện tại; có thể bỏ chọn để giới hạn danh sách. Lịch sử vòng loại được lưu và trình chiếu từng lô tối đa 8 trận. Với đúng 4 thí sinh sẽ có một cặp gặp lại nhau.
+      </small>
+      <button class="btn btn-secondary btn-lg btn-block" onclick="playNextTournamentStage()">
+        ▶ Chạy bước / lô đấu tiếp theo
       </button>
       <button class="btn btn-danger btn-lg btn-block" onclick="endTournament()">
         Kết thúc giải đấu và xóa trận cũ
       </button>
       <small class="form-hint" style="display: block; margin-top: 8px;">
-        Đóng cổng FFA và xóa lịch sử trận, cây bracket cùng replay. Tài khoản, Elo và thống kê người chơi được giữ lại.
+        Đóng cổng FFA và xóa lịch sử vòng loại, trận bracket cùng replay. Tài khoản, Elo và thống kê người chơi được giữ lại.
       </small>
     </div>
 
@@ -343,18 +337,15 @@
 
   function renderBracketParticipants(defaultActiveOnly = false) {
     const container = document.getElementById('bracketParticipants');
-    const maximum = Number({{ settings.top_players_count }});
     container.replaceChildren();
-    let activeSelected = 0;
     bracketParticipants.forEach(participant => {
       const row = document.createElement('label');
       row.style.cssText = 'display:flex; align-items:center; gap:8px; padding:6px;';
       const checkbox = document.createElement('input');
       checkbox.type = 'checkbox';
       checkbox.value = participant.id;
-      checkbox.checked = defaultActiveOnly && participant.has_active_bot && activeSelected < maximum;
-      if (checkbox.checked) activeSelected += 1;
-      checkbox.addEventListener('change', () => { updateBracketParticipantCount(); renderManualBracketPairs(); });
+      checkbox.checked = defaultActiveOnly && participant.has_active_bot;
+      checkbox.addEventListener('change', updateBracketParticipantCount);
       const name = document.createElement('span');
       name.textContent = `${participant.username} · Elo ${participant.elo}${participant.has_active_bot ? '' : ' · chưa có bot cho game hiện tại'}`;
       row.append(checkbox, name);
@@ -366,42 +357,6 @@
   function selectBracketParticipants(selected) {
     document.querySelectorAll('#bracketParticipants input').forEach(input => { input.checked = selected; });
     updateBracketParticipantCount();
-    renderManualBracketPairs();
-  }
-
-  function renderManualBracketPairs() {
-    const panel = document.getElementById('manualBracketPairs');
-    const manual = document.getElementById('bracketPairingMode').value === 'manual';
-    panel.style.display = manual ? 'block' : 'none';
-    panel.replaceChildren();
-    if (!manual) return;
-    const ids = selectedBracketParticipantIds();
-    let bracketSize = 2;
-    while (bracketSize < ids.length) bracketSize *= 2;
-    const hint = document.createElement('p');
-    hint.className = 'form-hint';
-    hint.textContent = 'Mỗi người phải xuất hiện đúng một lần. Để trống một ô để tạo lượt miễn đấu.';
-    panel.appendChild(hint);
-    for (let index = 0; index < Math.max(1, bracketSize / 2); index += 1) {
-      const row = document.createElement('div');
-      row.style.cssText = 'display:flex; gap:8px; margin:6px 0;';
-      for (let side = 0; side < 2; side += 1) {
-        const select = document.createElement('select');
-        select.className = 'form-control manual-bracket-player';
-        const empty = document.createElement('option');
-        empty.value = '';
-        empty.textContent = '— Lượt miễn đấu / chọn người —';
-        select.appendChild(empty);
-        bracketParticipants.filter(player => ids.includes(player.id)).forEach(player => {
-          const option = document.createElement('option');
-          option.value = player.id;
-          option.textContent = player.username;
-          select.appendChild(option);
-        });
-        row.appendChild(select);
-      }
-      panel.appendChild(row);
-    }
   }
 
   async function loadBracketParticipants() {
@@ -419,49 +374,84 @@
   loadBracketParticipants();
 
   async function triggerBracketGeneration() {
-    if (!confirm('Bạn có chắc muốn tạo mới nhánh đấu? Toàn bộ nhánh đấu và kết quả bracket trước đó sẽ bị thay thế.')) {
+    const participantIds = selectedBracketParticipantIds();
+    if (participantIds.length < 4) {
+      alert('Cần chọn ít nhất 4 thí sinh có bot cho game hiện tại.');
       return;
     }
+    if (!confirm(`Khởi tạo vòng loại cho ${participantIds.length} thí sinh đã chọn? Hệ thống sẽ tự tạo bracket top 16/8 sau vòng loại và playoff nếu có. Hãy kết thúc giải cũ trước nếu còn bracket từ giải trước.`)) return;
 
     const msgEl = document.getElementById('bracketMsg');
     msgEl.style.display = 'block';
     msgEl.style.color = 'var(--muted)';
-    msgEl.textContent = 'Đang bốc thăm và tạo nhánh đấu...';
+    msgEl.textContent = 'Đang tạo lịch vòng loại...';
 
     try {
-      const participantIds = selectedBracketParticipantIds();
-      const requestBody = {
-        concurrent_boards: Number(document.getElementById('concurrentBoards').value),
-        participant_ids: participantIds
-      };
-      if (document.getElementById('bracketPairingMode').value === 'manual') {
-        requestBody.manual_pairs = Array.from(document.querySelectorAll('#manualBracketPairs .manual-bracket-player'))
-          .reduce((pairs, select, index) => {
-            const pairIndex = Math.floor(index / 2);
-            if (!pairs[pairIndex]) pairs[pairIndex] = [];
-            pairs[pairIndex].push(select.value ? Number(select.value) : null);
-            return pairs;
-          }, []);
-      }
-      const res = await fetch('/api/admin/bracket/generate', {
+      const res = await fetch('/api/admin/qualifier/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(requestBody)
+        body: JSON.stringify({ participant_ids: participantIds })
       });
 
       const data = await res.json();
       if (!res.ok) {
         msgEl.style.color = '#f87171';
-        msgEl.textContent = `Lỗi: ${data.detail || 'Không thể tạo bracket'}`;
+        msgEl.textContent = `Lỗi: ${data.detail || 'Không thể khởi tạo giải đấu'}`;
         return;
       }
 
       msgEl.style.color = '#34d399';
-      msgEl.textContent = `Đã tạo ${data.length} cặp đấu, chạy đồng thời tối đa ${document.getElementById('concurrentBoards').value} bàn. Đang tải lại...`;
+      msgEl.textContent = `Đã khởi tạo ${data.matches} trận vòng loại cho ${data.participant_count} thí sinh. Chọn “Chạy bước / lô đấu tiếp theo” để bắt đầu.`;
       setTimeout(() => window.location.reload(), 1000);
     } catch (err) {
       msgEl.style.color = '#f87171';
       msgEl.textContent = `Lỗi mạng: ${err.message}`;
+    }
+  }
+
+  async function triggerQualifierGeneration() {
+    if (!confirm('Tạo lịch vòng loại cho tất cả thí sinh có bot ở game hiện tại? Vòng loại và bracket hiện tại phải hoàn tất trước khi tạo giải mới.')) return;
+    const msgEl = document.getElementById('bracketMsg');
+    msgEl.style.display = 'block';
+    msgEl.style.color = 'var(--muted)';
+    msgEl.textContent = 'Đang tạo lịch vòng loại...';
+    try {
+      const response = await fetch('/api/admin/qualifier/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({}),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.detail || 'Không thể tạo vòng loại');
+      msgEl.style.color = '#34d399';
+      msgEl.textContent = `Đã tạo ${data.matches} trận cho ${data.participant_count} thí sinh. Chiếu tối đa 8 trận mỗi lần; top ${data.cutoff} sẽ vào bracket.`;
+    } catch (error) {
+      msgEl.style.color = '#f87171';
+      msgEl.textContent = `Lỗi: ${error.message}`;
+    }
+  }
+
+  async function playNextTournamentStage() {
+    const msgEl = document.getElementById('bracketMsg');
+    msgEl.style.display = 'block';
+    msgEl.style.color = 'var(--muted)';
+    msgEl.textContent = 'Đang kiểm tra bước đấu tiếp theo...';
+    try {
+      const qualifierResponse = await fetch('/api/qualifier/live', { cache: 'no-store' });
+      const qualifierData = qualifierResponse.ok ? await qualifierResponse.json() : null;
+      const qualifierActive = qualifierData?.tournament
+        && ['active', 'tiebreak'].includes(qualifierData.tournament.status);
+      const endpoint = qualifierActive ? '/api/admin/qualifier/play' : '/api/admin/bracket/play';
+      const response = await fetch(endpoint, { method: 'POST' });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.detail || 'Không thể chạy bước đấu tiếp theo');
+      msgEl.style.color = '#34d399';
+      msgEl.textContent = qualifierActive
+        ? `Đang chiếu ${data.match_count} trận vòng loại của lô ${data.round}. Theo dõi tại trang Bracket.`
+        : `Đang chạy ${data.bracket_match_ids.length} cặp vòng ${data.round_name} trên ${data.concurrent_boards} bàn. Theo dõi tại trang Bracket.`;
+    } catch (error) {
+      msgEl.style.color = '#f87171';
+      msgEl.textContent = `Lỗi: ${error.message}`;
     }
   }
 
@@ -493,7 +483,7 @@
 
   async function endTournament() {
     const confirmed = confirm(
-      'Kết thúc giải đấu? Thao tác này đóng cổng FFA và xóa toàn bộ trận FFA/bracket, cây bracket và các file replay. Tài khoản, Elo và thống kê người chơi sẽ được giữ lại.'
+      'Kết thúc giải đấu? Thao tác này đóng cổng FFA và xóa toàn bộ lịch sử vòng loại, trận FFA/bracket, cây bracket và các file replay. Tài khoản, Elo và thống kê người chơi sẽ được giữ lại.'
     );
     if (!confirmed) return;
 

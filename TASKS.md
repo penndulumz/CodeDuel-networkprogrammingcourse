@@ -230,3 +230,25 @@
 - [x] **Task 13.3**: Đại tu cẩm nang lập trình bot cho sinh viên (web/templates/guide.html) với văn phong truyền cảm hứng, giải thích trực quan hàm get_move(), 3 cấp độ thuật toán bot, và hướng dẫn tự kiểm thử bằng local_arena.py.
 - [x] **Task 13.4**: Tối ưu khả năng tương tác di động (touch target >= 42-44px, chống tràn màn hình ngang ở các góc nghiêng).
 - *Verification*: pytest -v -> 100% tests PASS (bao gồm tests/test_ui_typography.py, tests/test_ui_pages_consistency.py).
+
+## Milestone 14: Vòng Loại Top 16/8 & Trình Chiếu
+- [x] Lưu lịch sử các trận vòng loại và playoff cutoff; tạo bracket trực tiếp top 16 hoặc top 8 sau khi chốt suất.
+- [x] Lịch cân bằng 3 đối thủ/người khi số lượng chẵn, 4 khi số lượng lẻ; trình chiếu từng lô tối đa 8 trận.
+- [x] Bổ sung bảng xếp hạng, lịch sử/replay vòng loại và API live projection; sơ đồ bracket bắt đầu từ Round of 16/8.
+- [x] Cập nhật luồng kết thúc giải để dọn dữ liệu vòng loại đúng thứ tự khóa ngoại.
+- [x] Gộp nút khởi tạo vòng loại với khởi tạo giải/bracket; nút chạy tiếp tự điều phối vòng loại, playoff rồi bracket.
+- Verification: Chưa chạy test theo yêu cầu phiên làm việc.
+
+- 2026-10-24: Added startup repair for incomplete qualifier SQLite schemas. Existing malformed tables are renamed to *_legacy (preserving rows), then current qualifier tables are created so generate/end APIs can query them after restart.
+- 2026-10-24: Fixed qualifier generation NameError by importing STATUS_PENDING in the admin routes. New server restart is required before retrying the API.
+- 2026-10-24: Wired the live projection next-round and finish-now controls to qualification batches as well as bracket rounds. Qualifier batch completion now resets the shared fast-playback flag.
+- 2026-10-24: Fixed qualifier batch sizing to produce groups of 8 (final batch may be smaller); live projection now holds the completed batch until the organizer explicitly starts the next batch. Applied the same batching to cutoff tie-break matches.
+- 2026-10-24: Changed final tournament results to include actual qualifier/bracket entrants only and order by tournament placement. Removed Elo weighting and Elo columns; qualification-only entrants are placed after bracket entrants using qualification performance.
+- 2026-10-24: Removed opponent/Buchholz from qualification standings display and ranking; tie-break display labels now show Play-off in both history and live projection.
+- 2026-10-24: Replaced the qualification standings Opponent/Head-to-head column with Play-off points in both server-rendered and live-updated tables.
+- 2026-10-24: Added repeat cutoff playoff scheduling: if exactly two entrants remain tied on qualifier and playoff points across the top-16/top-8 cutoff, a new direct playoff match is added; a draw schedules another manual playoff round.
+- 2026-10-24: Isolated repeat head-to-head cutoff matches as playoff_decider. They do not add to shared playoff points; the winner only takes the remaining cutoff slot, preserving qualifiers already decided in the prior playoff.
+- 2026-10-24: Highlighted current top-16/top-8 qualifier standings rows with a gold outline in both initial and live-rendered tables.
+- 2026-10-24: Strengthened gold qualifier-row outline with high-specificity inset shadows and bumped the main stylesheet URL to bypass stale browser cache.- 2026-10-24: Softened the advancing qualifier-row outline to a 1px muted gold (#c9b777).
+- 2026-10-24: Restored the live projection to full content width; moved the match history sidebar below it so projection cards have room to form wider rows.
+- 2026-10-24: Replaced the gold outline around advancing qualifier rows with bold text in both the initial and live-updated standings.

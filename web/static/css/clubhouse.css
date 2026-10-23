@@ -213,6 +213,8 @@ body:not(.home-page) .board-stage { background:#fffdf6; border:1px solid #9aa68c
 .champion-card .champion-label { font-family:var(--font-mono); font-size:11px; font-weight:800; letter-spacing:0.12em; text-transform:uppercase; color:var(--ink); margin-bottom:6px; }
 .champion-card .champion-name { font-family:var(--font-display); font-size:22px; font-weight:900; color:var(--ink); }
 .live-projections { background:#fdfaf0; border:2px solid var(--ink); border-radius:18px; padding:22px; margin-bottom:28px; box-shadow:var(--shadow-1); }
+.bracket-live-layout { grid-template-columns:minmax(0,1fr); }
+.bracket-live-layout .bracket-history-sidebar { position:static; max-height:none; }
 .projection-grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(280px, 1fr)); gap:18px; margin-top:16px; }
 .projection-card { background:#fffdf6; border:2px solid var(--ink); border-radius:12px; box-shadow:var(--shadow-1); padding:12px; }
 .projection-players { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin:12px 0; }
