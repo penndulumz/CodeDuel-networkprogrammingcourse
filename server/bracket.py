@@ -47,7 +47,12 @@ def create_qualifier_schedule(db: Session, participant_ids: list[int]) -> tuple[
     """Create a balanced schedule with four games per entrant where possible."""
     if len(participant_ids) < 4:
         raise ValueError("At least 4 participants are required for qualification games.")
-    cutoff = 16 if len(participant_ids) >= 16 else 8
+    # Fields from 4 through 15 use an eight-slot playoff. For 5–7 entrants,
+    # everyone advances from qualification into the Quarter-Final bracket;
+    # the unused slots become byes when the bracket is created.
+    # For 5-7 entrants, advance four to the Semi-Final. Exact 4/8/16 fields
+    # bypass qualification in the admin route.
+    cutoff = 4 if 4 < len(participant_ids) < 8 else 16 if len(participant_ids) >= 16 else 8
     round_count = 4
     tournament = QualifierTournament(
         participant_count=len(participant_ids), cutoff=cutoff, round_count=round_count,
@@ -197,6 +202,9 @@ def _finalize_qualifier_bracket(db: Session, tournament_id: int) -> bool:
         return False
     if tournament.status == "completed":
         return True
+    if 4 < tournament.participant_count < 8:
+        # Normalize active tournaments created before the 5-7 cutoff changed.
+        tournament.cutoff = 4
     standings = get_qualifier_standings(db, tournament_id)
     if len(standings) < 2:
         return False
@@ -286,7 +294,8 @@ def _finalize_qualifier_bracket(db: Session, tournament_id: int) -> bool:
                 db.commit()
                 return False
 
-    selected = standings[:tournament.cutoff]
+    advancing_count = min(tournament.cutoff, tournament.participant_count)
+    selected = standings[:advancing_count]
     size = tournament.cutoff
     first_round_name = get_round_name(size)
     from server.tournament import _get_bracket_seed_pairs

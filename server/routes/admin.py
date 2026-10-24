@@ -29,7 +29,7 @@ from server.games import get_active_bot, get_active_game, get_catalog_games
 from server.models import Bot, BracketMatch, Match, QualifierMatch, QualifierTournament, TournamentSetting, User
 from server.queue import speed_up_bracket_round
 from server.routes.auth import get_current_admin
-from server.tournament import generate_bracket, is_ffa_portal_open
+from server.tournament import ROUND_NAMES, generate_bracket, is_ffa_portal_open
 from server.tournament_config import load_tournament_config
 
 router = APIRouter(prefix="/admin", tags=["admin"])
@@ -313,6 +313,24 @@ def generate_qualifier_stage(
         except ValueError as exc:
             raise HTTPException(status_code=400, detail=f"Custom rules are invalid: {exc}") from exc
 
+    # Power-of-two fields already fit a complete first-round bracket, so skip
+    # the round-robin qualifier and seed the bracket directly.
+    if len(participant_ids) in (4, 8, 16):
+        eligible_users = [
+            {"id": users_by_id[user_id].id, "username": users_by_id[user_id].username, "elo": users_by_id[user_id].elo}
+            for user_id in participant_ids
+        ]
+        matchups = generate_bracket(eligible_users)
+        create_bracket(db, matchups)
+        db.commit()
+        return {
+            "qualifier_skipped": True,
+            "participant_count": len(participant_ids),
+            "matches": 0,
+            "bracket_matches": len(matchups),
+            "playoff_round": ROUND_NAMES[len(participant_ids)],
+        }
+
     tournament, pairings = create_qualifier_schedule(db, participant_ids)
     db.commit()
     return {
@@ -323,6 +341,8 @@ def generate_qualifier_stage(
         "matches": sum(not pairing.is_bye for pairing in pairings),
         "byes": sum(pairing.is_bye for pairing in pairings),
         "cutoff": tournament.cutoff,
+        "advancing_count": min(tournament.cutoff, tournament.participant_count),
+        "playoff_round": ROUND_NAMES.get(tournament.cutoff, f"Round of {tournament.cutoff}"),
     }
 
 

@@ -132,9 +132,9 @@
     </div>
 
     <ol class="steps">
-      <li><span><b>Khởi tạo giải.</b> Các thí sinh đã chọn đấu vòng loại; mỗi người có 4 trận, tối đa 8 trận được chiếu cùng lúc.</span></li>
-      <li><span><b>Chạy vòng loại.</b> Hòa điểm ở ranh top 16/8 được phân định bằng playoff.</span></li>
-      <li><span><b>Vào bracket.</b> Hệ thống tự tạo nhánh Round of 16 hoặc Round of 8 sau khi chốt danh sách đi tiếp.</span></li>
+      <li><span><b>Khởi tạo giải.</b> Nếu có đúng 4, 8 hoặc 16 thí sinh, hệ thống tạo bracket trực tiếp. Các số lượng khác từ 5 trở lên sẽ đấu vòng loại; mỗi người có 4 trận, tối đa 8 trận được chiếu cùng lúc.</span></li>
+      <li><span><b>Chạy vòng loại nếu có.</b> Hòa điểm ở ranh top 16/8 được phân định bằng playoff.</span></li>
+      <li><span><b>Vào bracket.</b> Hệ thống tạo nhánh theo số người đi tiếp. Với 5–7 thí sinh, top 4 vào thẳng bán kết, không có tứ kết.</span></li>
     </ol>
 
     <div class="form-group" style="max-width: 280px;">
@@ -159,7 +159,7 @@
         Khởi tạo giải đấu và nhánh bracket
       </button>
       <small class="form-hint" style="display: block; margin-top: 8px;">
-        Mặc định chọn tất cả người có bot cho game hiện tại; có thể bỏ chọn để giới hạn danh sách. Lịch sử vòng loại được lưu và trình chiếu từng lô tối đa 8 trận. Với đúng 4 thí sinh sẽ có một cặp gặp lại nhau.
+        Mặc định chọn tất cả người có bot cho game hiện tại; có thể bỏ chọn để giới hạn danh sách. Đúng 4, 8 hoặc 16 thí sinh sẽ vào thẳng bracket tương ứng. Với 5–7 thí sinh, vòng loại chọn top 4 vào thẳng bán kết. Các trường hợp còn lại dùng vòng loại rồi chọn top 8 hoặc top 16.
       </small>
       <button class="btn btn-secondary btn-lg btn-block" onclick="playNextTournamentStage()">
         ▶ Chạy bước / lô đấu tiếp theo
@@ -379,7 +379,7 @@
       alert('Cần chọn ít nhất 4 thí sinh có bot cho game hiện tại.');
       return;
     }
-    if (!confirm(`Khởi tạo vòng loại cho ${participantIds.length} thí sinh đã chọn? Hệ thống sẽ tự tạo bracket top 16/8 sau vòng loại và playoff nếu có. Hãy kết thúc giải cũ trước nếu còn bracket từ giải trước.`)) return;
+    if (!confirm(`Khởi tạo giải cho ${participantIds.length} thí sinh đã chọn? Đúng 4, 8 hoặc 16 người sẽ vào thẳng bracket; các số lượng khác sẽ đấu vòng loại trước. Hãy kết thúc giải cũ trước nếu còn bracket từ giải trước.`)) return;
 
     const msgEl = document.getElementById('bracketMsg');
     msgEl.style.display = 'block';
@@ -401,6 +401,11 @@
       }
 
       msgEl.style.color = '#34d399';
+      if (data.qualifier_skipped) {
+        msgEl.textContent = `Đã bỏ qua vòng loại và tạo trực tiếp ${data.bracket_matches} trận ${data.playoff_round} cho ${data.participant_count} thí sinh.`;
+        setTimeout(() => window.location.reload(), 1000);
+        return;
+      }
       msgEl.textContent = `Đã khởi tạo ${data.matches} trận vòng loại cho ${data.participant_count} thí sinh. Chọn “Chạy bước / lô đấu tiếp theo” để bắt đầu.`;
       setTimeout(() => window.location.reload(), 1000);
     } catch (err) {
@@ -410,7 +415,7 @@
   }
 
   async function triggerQualifierGeneration() {
-    if (!confirm('Tạo lịch vòng loại cho tất cả thí sinh có bot ở game hiện tại? Vòng loại và bracket hiện tại phải hoàn tất trước khi tạo giải mới.')) return;
+    if (!confirm('Tạo giải cho tất cả thí sinh có bot ở game hiện tại? Nếu có đúng 4, 8 hoặc 16 người, hệ thống sẽ bỏ qua vòng loại và tạo bracket trực tiếp. Vòng loại và bracket hiện tại phải hoàn tất trước khi tạo giải mới.')) return;
     const msgEl = document.getElementById('bracketMsg');
     msgEl.style.display = 'block';
     msgEl.style.color = 'var(--muted)';
@@ -424,7 +429,12 @@
       const data = await response.json();
       if (!response.ok) throw new Error(data.detail || 'Không thể tạo vòng loại');
       msgEl.style.color = '#34d399';
-      msgEl.textContent = `Đã tạo ${data.matches} trận cho ${data.participant_count} thí sinh. Chiếu tối đa 8 trận mỗi lần; top ${data.cutoff} sẽ vào bracket.`;
+      if (data.qualifier_skipped) {
+        msgEl.textContent = `Có đúng ${data.participant_count} thí sinh nên đã bỏ qua vòng loại và tạo trực tiếp ${data.bracket_matches} trận ${data.playoff_round}.`;
+        setTimeout(() => window.location.reload(), 1000);
+        return;
+      }
+      msgEl.textContent = `Đã tạo ${data.matches} trận cho ${data.participant_count} thí sinh. Chiếu tối đa 8 trận mỗi lần; ${data.advancing_count} người vào ${data.playoff_round}.`;
     } catch (error) {
       msgEl.style.color = '#f87171';
       msgEl.textContent = `Lỗi: ${error.message}`;
