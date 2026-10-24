@@ -34,16 +34,19 @@
   function renderQualifierData(data) {
     const panel = document.getElementById('qualifierHistoryPanel');
     if (!panel || !data.tournament) return;
+    const participantCount = Number(data.tournament.participant_count) || 0;
+    const highlightCount = Math.min(Number(data.tournament.cutoff) || 0, participantCount);
     const summary = document.getElementById('qualifierProgressText');
     if (summary) {
-      summary.textContent = `${data.tournament.status} · ${data.tournament.completed_matches}/${data.tournament.total_matches} trận · top ${data.tournament.cutoff} vào loại trực tiếp`;
+      const nextRound = participantCount > 4 && participantCount < 8 ? ' vào bán kết' : ' vào loại trực tiếp';
+      summary.textContent = `${data.tournament.status} · ${data.tournament.completed_matches}/${data.tournament.total_matches} trận · top ${highlightCount}${nextRound}`;
     }
     const standingsBody = document.getElementById('qualifierStandingsBody');
     if (standingsBody) {
       standingsBody.replaceChildren();
       (data.standings || []).forEach((row, index) => {
         const tr = document.createElement('tr');
-        if (index < data.tournament.cutoff) tr.classList.add('qualifier-advancing');
+        if (index < highlightCount) tr.classList.add('qualifier-advancing');
         [index + 1, row.username, row.points, row.playoff_points, row.wins, row.played]
           .forEach(value => {
             const td = document.createElement('td');
@@ -404,7 +407,11 @@
   async function refresh() {
     try {
       const qualifierResponse = await fetch('/api/qualifier/live', { cache: 'no-store' });
-      const qualifierData = qualifierResponse.ok ? await qualifierResponse.json() : null;
+      if (!qualifierResponse.ok) {
+        const detail = await qualifierResponse.text();
+        throw new Error(`/api/qualifier/live HTTP ${qualifierResponse.status}: ${detail.slice(0, 220)}`);
+      }
+      const qualifierData = await qualifierResponse.json();
       if (qualifierData && qualifierData.tournament && ['active', 'tiebreak'].includes(qualifierData.tournament.status)) {
         renderQualifierData(qualifierData);
         latestPairings = qualifierData.pairings || [];

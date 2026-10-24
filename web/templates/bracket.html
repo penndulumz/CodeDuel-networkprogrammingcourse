@@ -68,12 +68,13 @@
   </div>
 
   {% if qualifier_tournament %}
+  {% set qualifier_advancing = 4 if 4 < qualifier_tournament.participant_count < 8 else qualifier_tournament.cutoff if qualifier_tournament.cutoff < qualifier_tournament.participant_count else qualifier_tournament.participant_count %}
   <section class="card section" id="qualifierHistoryPanel">
     <div class="card-header">
       <div>
         <h2 class="card-title">Vòng loại · {{ qualifier_tournament.participant_count }} thí sinh</h2>
         <div class="card-desc" id="qualifierProgressText">
-          {{ qualifier_tournament.status }} · {{ qualifier_tournament.round_count }} trận mỗi thí sinh · top {{ qualifier_tournament.cutoff }} vào loại trực tiếp
+          {{ qualifier_tournament.status }} · {{ qualifier_tournament.round_count }} trận mỗi thí sinh · top {{ qualifier_advancing }} vào loại trực tiếp{% if 4 < qualifier_tournament.participant_count < 8 %} (bán kết){% endif %}
         </div>
       </div>
     </div>
@@ -83,12 +84,11 @@
         <thead><tr><th>Hạng</th><th>Thí sinh</th><th>Điểm</th><th>Play-off</th><th>Thắng</th><th>Đã đấu</th></tr></thead>
         <tbody id="qualifierStandingsBody">
           {% for row in qualifier_standings %}
-          <tr class="{% if loop.index <= qualifier_tournament.cutoff %}qualifier-advancing{% endif %}"><td>{{ loop.index }}</td><td>{{ row.username }}</td><td>{{ row.points }}</td><td>{{ row.playoff_points }}</td><td>{{ row.wins }}</td><td>{{ row.played }}</td></tr>
+          <tr class="{% if loop.index <= qualifier_advancing %}qualifier-advancing{% endif %}"><td>{{ loop.index }}</td><td>{{ row.username }}</td><td>{{ row.points }}</td><td>{{ row.playoff_points }}</td><td>{{ row.wins }}</td><td>{{ row.played }}</td></tr>
           {% endfor %}
         </tbody>
       </table>
     </div>
-    <small class="form-hint">Viền vàng đánh dấu các vị trí top {{ qualifier_tournament.cutoff }} hiện tại; thứ hạng có thể đổi trước khi Play-off chốt suất.</small>
     <details style="margin-top:14px;">
       <summary><strong>Lịch sử các trận vòng loại</strong></summary>
       <div class="table-wrap" style="margin-top:10px;">
@@ -240,5 +240,5 @@
 {% endblock %}
 
 {% block scripts %}
-<script src="/static/js/bracket_live.js?v=hold-round-until-next-5"></script>
+<script src="/static/js/bracket_live.js?v=hold-round-until-next-8"></script>
 {% endblock %}
